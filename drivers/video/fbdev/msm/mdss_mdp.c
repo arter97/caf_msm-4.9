@@ -1270,6 +1270,7 @@ static inline void __mdss_mdp_reg_access_clk_enable(
 		mdss_update_reg_bus_vote(mdata->reg_bus_clt,
 				VOTE_INDEX_LOW);
 		mdss_bus_rt_bw_vote(true);
+		mdss_mdp_clk_update(MDSS_CLK_MNOC_AHB, 1);
 		mdss_mdp_clk_update(MDSS_CLK_AHB, 1);
 		mdss_mdp_clk_update(MDSS_CLK_AXI, 1);
 		mdss_mdp_clk_update(MDSS_CLK_MDP_CORE, 1);
@@ -1278,6 +1279,7 @@ static inline void __mdss_mdp_reg_access_clk_enable(
 		mdss_mdp_clk_update(MDSS_CLK_AXI, 0);
 		mdss_mdp_clk_update(MDSS_CLK_AHB, 0);
 		mdss_bus_rt_bw_vote(false);
+		mdss_mdp_clk_update(MDSS_CLK_MNOC_AHB, 0);
 		mdss_update_reg_bus_vote(mdata->reg_bus_clt,
 				VOTE_INDEX_DISABLE);
 	}
@@ -1558,6 +1560,7 @@ void mdss_mdp_clk_ctrl(int enable)
 		mdata->clk_ena = enable;
 		spin_unlock_irqrestore(&mdp_lock, flags);
 
+		mdss_mdp_clk_update(MDSS_CLK_MNOC_AHB, enable);
 		mdss_mdp_clk_update(MDSS_CLK_AHB, enable);
 		mdss_mdp_clk_update(MDSS_CLK_AXI, enable);
 		mdss_mdp_clk_update(MDSS_CLK_MDP_CORE, enable);
@@ -1591,6 +1594,7 @@ static inline int mdss_mdp_irq_clk_register(struct mdss_data_type *mdata,
 					    char *clk_name, int clk_idx)
 {
 	struct clk *tmp;
+	int rc = 0;
 
 	if (clk_idx >= MDSS_MAX_CLK) {
 		pr_err("invalid clk index %d\n", clk_idx);
@@ -1600,7 +1604,9 @@ static inline int mdss_mdp_irq_clk_register(struct mdss_data_type *mdata,
 	tmp = devm_clk_get(&mdata->pdev->dev, clk_name);
 	if (IS_ERR(tmp)) {
 		pr_err("unable to get clk: %s\n", clk_name);
-		return PTR_ERR(tmp);
+		rc = PTR_ERR(tmp);
+		devm_clk_put(&mdata->pdev->dev, tmp);
+		return rc;
 	}
 
 	mdata->mdp_clk[clk_idx] = tmp;
@@ -1720,6 +1726,9 @@ static int mdss_mdp_irq_clk_setup(struct mdss_data_type *mdata)
 
 	/* vsync_clk is optional for non-smart panels */
 	mdss_mdp_irq_clk_register(mdata, "vsync_clk", MDSS_CLK_MDP_VSYNC);
+
+	/* this clk is not present on all MDSS revisions */
+	mdss_mdp_irq_clk_register(mdata, "mnoc_clk", MDSS_CLK_MNOC_AHB);
 
 	/* Setting the default clock rate to the max supported.*/
 	mdss_mdp_set_clk_rate(mdata->max_mdp_clk_rate);
