@@ -4782,6 +4782,22 @@ vreg_set_voltage_fail:
 }
 
 /**
+ * mdss_mdp_notify_idle_pc() - Notify fb driver of idle power collapse
+ * @mdata: MDP private data
+ *
+ * This function is called if there are active overlays.
+ */
+static void mdss_mdp_notify_idle_pc(struct mdss_data_type *mdata)
+{
+	int i;
+
+	for (i = 0; i < mdata->nctl; i++)
+		if ((mdata->ctl_off[i].ref_cnt) &&
+			!mdss_mdp_ctl_is_power_off(&mdata->ctl_off[i]))
+			mdss_fb_idle_pc(mdata->ctl_off[i].mfd);
+}
+
+/**
  * mdss_mdp_footswitch_ctrl() - Disable/enable MDSS GDSC and CX/Batfet rails
  * @mdata: MDP private data
  * @on: 1 to turn on footswitch, 0 to turn off footswitch
@@ -4832,6 +4848,7 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 				 * active.
 				 */
 				mdata->idle_pc = true;
+				mdss_mdp_notify_idle_pc(mdata);
 				pr_debug("idle pc. active overlays=%d\n",
 					active_cnt);
 				mdss_mdp_memory_retention_enter();
