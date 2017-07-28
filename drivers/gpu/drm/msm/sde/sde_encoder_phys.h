@@ -252,6 +252,7 @@ struct sde_encoder_irq {
  * @intf_mode:		Interface mode
  * @intf_idx:		Interface index on sde hardware
  * @comp_type:      Type of compression supported
+ * @enc_cdm_csc:	Cached CSC type of CDM block
  * @enc_spinlock:	Virtual-Encoder-Wide Spin Lock for IRQ purposes
  * @enable_state:	Enable state tracking
  * @vblank_refcount:	Reference count of vblank request
@@ -291,6 +292,7 @@ struct sde_encoder_phys {
 	enum sde_intf_mode intf_mode;
 	enum sde_intf intf_idx;
 	enum msm_display_compression_type comp_type;
+	enum sde_csc_type enc_cdm_csc;
 	spinlock_t *enc_spinlock;
 	enum sde_enc_enable_state enable_state;
 	struct mutex *vblank_ctl_lock;
