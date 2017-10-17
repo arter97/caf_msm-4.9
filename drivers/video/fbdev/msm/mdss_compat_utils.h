@@ -88,6 +88,8 @@ struct msmfb_metadata32 {
 		uint32_t video_info_code;
 		struct mdss_hw_caps caps;
 		uint8_t secure_en;
+		bool sec_bl_update_en;
+		bool sec_reg_on;
 	} data;
 };
 
