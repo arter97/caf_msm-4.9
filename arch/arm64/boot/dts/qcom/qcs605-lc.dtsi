@@ -291,3 +291,7 @@
 &pm660_pdphy {
 	/delete-property/ vdd-pdphy-supply;
 };
+
+&int_codec {
+	/delete-property/ qcom,ext-disp-audio-rx;
+};
