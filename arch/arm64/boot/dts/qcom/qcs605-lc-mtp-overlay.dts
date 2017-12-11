@@ -21,6 +21,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 
 #include "qcs605-lc-mtp.dtsi"
+#include "qcs605-lc-audio-overlay.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. QC605 LC Groot + PM8005 MTP";
