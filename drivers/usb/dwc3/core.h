@@ -480,6 +480,8 @@
 #define DWC3_DEPCMD_SETTRANSFRESOURCE	(0x02 << 0)
 #define DWC3_DEPCMD_SETEPCONFIG		(0x01 << 0)
 
+#define DWC3_DEPCMD_CMD(x)		((x) & 0xf)
+
 /* The EP number goes 0..31 so ep0 is always out and ep1 is always in */
 #define DWC3_DALEPENA_EP(n)		(1 << n)
 
@@ -613,6 +615,7 @@ struct dwc3_ep {
 #define DWC3_EP_BUSY		(1 << 4)
 #define DWC3_EP_PENDING_REQUEST	(1 << 5)
 #define DWC3_EP_MISSED_ISOC	(1 << 6)
+#define DWC3_EP_TRANSFER_STARTED (1 << 8)
 
 	/* This last one is specific to EP0 */
 #define DWC3_EP0_DIR_IN		(1 << 31)
@@ -951,6 +954,7 @@ struct dwc3_scratchpad_array {
  *			increments or 0 to disable.
  * @create_reg_debugfs: create debugfs entry to allow dwc3 register dump
  * @xhci_imod_value: imod value to use with xhci
+ * @core_id: usb core id to differentiate different controller
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -1147,6 +1151,7 @@ struct dwc3 {
 	struct dwc3_gadget_events	dbg_gadget_events;
 	bool			create_reg_debugfs;
 	u32			xhci_imod_value;
+	int			core_id;
 };
 
 /* -------------------------------------------------------------------------- */

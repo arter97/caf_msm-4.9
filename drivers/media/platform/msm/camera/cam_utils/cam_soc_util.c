@@ -132,7 +132,7 @@ long cam_soc_util_get_clk_round_rate(struct cam_hw_soc_info *soc_info,
 	uint32_t clk_index, unsigned long clk_rate)
 {
 	if (!soc_info || (clk_index >= soc_info->num_clk) || (clk_rate == 0)) {
-		CAM_ERR(CAM_UTIL, "Invalid input params %pK, %d %lld",
+		CAM_ERR(CAM_UTIL, "Invalid input params %pK, %d %lu",
 			soc_info, clk_index, clk_rate);
 		return clk_rate;
 	}
@@ -325,7 +325,7 @@ int cam_soc_util_clk_disable(struct clk *clk, const char *clk_name)
  *
  * @return:             success or failure
  */
-static int cam_soc_util_clk_enable_default(struct cam_hw_soc_info *soc_info,
+int cam_soc_util_clk_enable_default(struct cam_hw_soc_info *soc_info,
 	enum cam_vote_level clk_level)
 {
 	int i, rc = 0;
@@ -372,7 +372,7 @@ clk_disable:
  *
  * @return:             success or failure
  */
-static void cam_soc_util_clk_disable_default(struct cam_hw_soc_info *soc_info)
+void cam_soc_util_clk_disable_default(struct cam_hw_soc_info *soc_info)
 {
 	int i;
 
@@ -409,6 +409,13 @@ static int cam_soc_util_get_dt_clk_info(struct cam_hw_soc_info *soc_info)
 		return -EINVAL;
 
 	of_node = soc_info->dev->of_node;
+
+	if (!of_property_read_bool(of_node, "use-shared-clk")) {
+		CAM_DBG(CAM_UTIL, "No shared clk parameter defined");
+		soc_info->use_shared_clk = false;
+	} else {
+		soc_info->use_shared_clk = true;
+	}
 
 	count = of_property_count_strings(of_node, "clock-names");
 

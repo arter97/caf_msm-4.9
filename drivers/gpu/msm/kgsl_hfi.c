@@ -183,7 +183,7 @@ static void receive_ack_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
 		rsp->ret_hdr.size,
 		rsp->ret_hdr.seqnum);
 
-	spin_lock(&hfi->msglock);
+	spin_lock_bh(&hfi->msglock);
 	list_for_each_entry_safe(msg, next, &hfi->msglist, node) {
 		if (msg->msg_id == rsp->ret_hdr.id &&
 				msg->seqnum == rsp->ret_hdr.seqnum) {
@@ -193,7 +193,7 @@ static void receive_ack_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
 	}
 
 	if (in_queue == false) {
-		spin_unlock(&hfi->msglock);
+		spin_unlock_bh(&hfi->msglock);
 		dev_err(&gmu->pdev->dev,
 				"Cannot find receiver of ack msg with id=%d\n",
 				rsp->ret_hdr.id);
@@ -202,7 +202,7 @@ static void receive_ack_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
 
 	memcpy(&msg->results, (void *) rsp, rsp->hdr.size << 2);
 	complete(&msg->msg_complete);
-	spin_unlock(&hfi->msglock);
+	spin_unlock_bh(&hfi->msglock);
 }
 
 static void receive_err_msg(struct gmu_device *gmu, struct hfi_msg_rsp *rsp)
@@ -231,9 +231,9 @@ static int hfi_send_msg(struct gmu_device *gmu, struct hfi_msg_hdr *msg,
 	ret_msg->msg_id = msg->id;
 	ret_msg->seqnum = msg->seqnum;
 
-	spin_lock(&hfi->msglock);
+	spin_lock_bh(&hfi->msglock);
 	list_add_tail(&ret_msg->node, &hfi->msglist);
-	spin_unlock(&hfi->msglock);
+	spin_unlock_bh(&hfi->msglock);
 
 	if (hfi_cmdq_write(gmu, HFI_CMD_QUEUE, msg) != size) {
 		rc = -EINVAL;
@@ -253,9 +253,9 @@ static int hfi_send_msg(struct gmu_device *gmu, struct hfi_msg_hdr *msg,
 	/* If we got here we succeeded */
 	rc = 0;
 done:
-	spin_lock(&hfi->msglock);
+	spin_lock_bh(&hfi->msglock);
 	list_del(&ret_msg->node);
-	spin_unlock(&hfi->msglock);
+	spin_unlock_bh(&hfi->msglock);
 	return rc;
 }
 
@@ -610,24 +610,6 @@ int hfi_start(struct gmu_device *gmu, uint32_t boot_state)
 	result = hfi_send_bwtbl(gmu);
 	if (result)
 		return result;
-
-	if (ADRENO_FEATURE(adreno_dev, ADRENO_LM) &&
-		test_bit(ADRENO_LM_CTRL, &adreno_dev->pwrctrl_flag)) {
-		gmu->lm_config.lm_type = 1;
-		gmu->lm_config.lm_sensor_type = 1;
-		gmu->lm_config.throttle_config = 1;
-		gmu->lm_config.idle_throttle_en = 0;
-		gmu->lm_config.acd_en = 0;
-		gmu->bcl_config = 0;
-		gmu->lm_dcvs_level = 0;
-
-		result = hfi_send_lmconfig(gmu);
-		if (result) {
-			dev_err(dev, "Failure enabling LM (%d)\n",
-					result);
-			return result;
-		}
-	}
 
 	/* Tell the GMU we are sending no more HFIs until the next boot */
 	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_HFI_USE_REG)) {

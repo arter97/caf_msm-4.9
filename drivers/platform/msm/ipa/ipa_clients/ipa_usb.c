@@ -741,6 +741,10 @@ static int ipa3_usb_register_pm(enum ipa3_usb_transport_type ttype)
 		&ipa3_usb_ctx->ttype_ctx[ttype];
 	int result;
 
+	/* create PM resources for the first tethering protocol only */
+	if (ipa3_usb_ctx->num_init_prot > 0)
+		return 0;
+
 	memset(&ttype_ctx->pm_ctx.reg_params, 0,
 		sizeof(ttype_ctx->pm_ctx.reg_params));
 	ttype_ctx->pm_ctx.reg_params.name = (ttype == IPA_USB_TRANSPORT_DPL) ?
@@ -2225,6 +2229,7 @@ static int ipa_usb_xdci_dismiss_channels(u32 ul_clnt_hdl, u32 dl_clnt_hdl,
 	}
 
 	if (!IPA3_USB_IS_TTYPE_DPL(ttype)) {
+		ipa3_xdci_ep_delay_rm(ul_clnt_hdl); /* Remove ep_delay if set */
 		/* Reset UL channel */
 		result = ipa3_reset_gsi_channel(ul_clnt_hdl);
 		if (result) {

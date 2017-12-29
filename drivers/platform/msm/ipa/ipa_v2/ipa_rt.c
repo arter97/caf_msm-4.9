@@ -94,7 +94,7 @@ int __ipa_generate_rt_hw_rule_v2(enum ipa_ip_type ip,
 		return -EPERM;
 	}
 
-	IPADBG("en_rule 0x%x\n", en_rule);
+	IPADBG_LOW("en_rule 0x%x\n", en_rule);
 
 	rule_hdr->u.hdr.en_rule = en_rule;
 	ipa_write_32(rule_hdr->u.word, (u8 *)rule_hdr);
@@ -103,7 +103,7 @@ int __ipa_generate_rt_hw_rule_v2(enum ipa_ip_type ip,
 		entry->hw_len = buf - start;
 	} else if (entry->hw_len != (buf - start)) {
 		IPAERR(
-		"hw_len differs b/w passes passed=0x%x calc=0x%xtd\n",
+		"hw_len differs b/w passes passed=0x%x calc=0x%lxtd\n",
 		entry->hw_len,
 		(buf - start));
 		return -EPERM;
@@ -197,7 +197,7 @@ int __ipa_generate_rt_hw_rule_v2_5(enum ipa_ip_type ip,
 	if (entry->hw_len == 0) {
 		entry->hw_len = buf - start;
 	} else if (entry->hw_len != (buf - start)) {
-		IPAERR("hw_len differs b/w passes passed=0x%x calc=0x%xtd\n",
+		IPAERR("hw_len differs b/w passes passed=0x%x calc=0x%lxtd\n",
 			entry->hw_len, (buf - start));
 		return -EPERM;
 	}
@@ -497,7 +497,9 @@ static void __ipa_reap_sys_rt_tbls(enum ipa_ip_type ip)
 	set = &ipa_ctx->rt_tbl_set[ip];
 	list_for_each_entry(tbl, &set->head_rt_tbl_list, link) {
 		if (tbl->prev_mem.phys_base) {
-			IPADBG("reaping rt tbl name=%s ip=%d\n", tbl->name, ip);
+			IPADBG_LOW("reaping rt");
+			IPADBG_LOW("tbl name=%s ip=%d\n",
+				tbl->name, ip);
 			dma_free_coherent(ipa_ctx->pdev, tbl->prev_mem.size,
 					tbl->prev_mem.base,
 					tbl->prev_mem.phys_base);
@@ -510,8 +512,9 @@ static void __ipa_reap_sys_rt_tbls(enum ipa_ip_type ip)
 		list_del(&tbl->link);
 		WARN_ON(tbl->prev_mem.phys_base != 0);
 		if (tbl->curr_mem.phys_base) {
-			IPADBG("reaping sys rt tbl name=%s ip=%d\n", tbl->name,
-					ip);
+			IPADBG_LOW("reaping sys");
+			IPADBG_LOW("rt tbl name=%s ip=%d\n",
+				tbl->name, ip);
 			dma_free_coherent(ipa_ctx->pdev, tbl->curr_mem.size,
 					tbl->curr_mem.base,
 					tbl->curr_mem.phys_base);
@@ -973,7 +976,7 @@ static int __ipa_del_rt_tbl(struct ipa_rt_tbl *entry)
 		list_del(&entry->link);
 		clear_bit(entry->idx, &ipa_ctx->rt_idx_bitmap[ip]);
 		entry->set->tbl_cnt--;
-		IPADBG("del rt tbl_idx=%d tbl_cnt=%d\n", entry->idx,
+		IPADBG_LOW("del rt tbl_idx=%d tbl_cnt=%d\n", entry->idx,
 				entry->set->tbl_cnt);
 		kmem_cache_free(ipa_ctx->rt_tbl_cache, entry);
 	} else {
@@ -981,7 +984,7 @@ static int __ipa_del_rt_tbl(struct ipa_rt_tbl *entry)
 				&ipa_ctx->reap_rt_tbl_set[ip].head_rt_tbl_list);
 		clear_bit(entry->idx, &ipa_ctx->rt_idx_bitmap[ip]);
 		entry->set->tbl_cnt--;
-		IPADBG("del sys rt tbl_idx=%d tbl_cnt=%d\n", entry->idx,
+		IPADBG_LOW("del sys rt tbl_idx=%d tbl_cnt=%d\n", entry->idx,
 				entry->set->tbl_cnt);
 	}
 
@@ -1062,7 +1065,8 @@ static int __ipa_add_rt_rule(enum ipa_ip_type ip, const char *name,
 		WARN_ON(1);
 		goto ipa_insert_failed;
 	}
-	IPADBG("add rt rule tbl_idx=%d rule_cnt=%d\n", tbl->idx, tbl->rule_cnt);
+	IPADBG_LOW("add rt rule tbl_idx=%d", tbl->idx);
+	IPADBG_LOW("rule_cnt=%d\n", tbl->rule_cnt);
 	*rule_hdl = id;
 	entry->id = id;
 
@@ -1147,7 +1151,7 @@ int __ipa_del_rt_rule(u32 rule_hdl)
 		__ipa_release_hdr_proc_ctx(entry->proc_ctx->id);
 	list_del(&entry->link);
 	entry->tbl->rule_cnt--;
-	IPADBG("del rt rule tbl_idx=%d rule_cnt=%d\n", entry->tbl->idx,
+	IPADBG_LOW("del rt rule tbl_idx=%d rule_cnt=%d\n", entry->tbl->idx,
 			entry->tbl->rule_cnt);
 	if (entry->tbl->rule_cnt == 0 && entry->tbl->ref_cnt == 0) {
 		if (__ipa_del_rt_tbl(entry->tbl))

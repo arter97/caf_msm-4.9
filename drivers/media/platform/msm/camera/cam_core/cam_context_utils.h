@@ -17,8 +17,6 @@
 
 int cam_context_buf_done_from_hw(struct cam_context *ctx,
 	void *done_event_data, uint32_t bubble_state);
-int cam_context_apply_req_to_hw(struct cam_context *ctx,
-	struct cam_req_mgr_apply_request *apply);
 int32_t cam_context_release_dev_to_hw(struct cam_context *ctx,
 	struct cam_release_dev_cmd *cmd);
 int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
@@ -28,5 +26,10 @@ int32_t cam_context_acquire_dev_to_hw(struct cam_context *ctx,
 int32_t cam_context_start_dev_to_hw(struct cam_context *ctx,
 	struct cam_start_stop_dev_cmd *cmd);
 int32_t cam_context_stop_dev_to_hw(struct cam_context *ctx);
+int32_t cam_context_flush_dev_to_hw(struct cam_context *ctx,
+	struct cam_flush_dev_cmd *cmd);
+int32_t cam_context_flush_ctx_to_hw(struct cam_context *ctx);
+int32_t cam_context_flush_req_to_hw(struct cam_context *ctx,
+	struct cam_flush_dev_cmd *cmd);
 
 #endif /* _CAM_CONTEXT_UTILS_H_ */

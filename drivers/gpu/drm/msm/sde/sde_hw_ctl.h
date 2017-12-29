@@ -201,6 +201,23 @@ struct sde_hw_ctl_ops {
 		enum sde_rot blk);
 
 	/**
+	 * read CTL_TOP register value and return
+	 * the data.
+	 * @ctx		: ctl path ctx pointer
+	 * @return	: CTL top register value
+	 */
+	u32 (*read_ctl_top)(struct sde_hw_ctl *ctx);
+
+	/**
+	 * read CTL layers register value and return
+	 * the data.
+	 * @ctx       : ctl path ctx pointer
+	 * @index       : layer index for this ctl path
+	 * @return	: CTL layers register value
+	 */
+	u32 (*read_ctl_layers)(struct sde_hw_ctl *ctx, int index);
+
+	/**
 	 * Set all blend stages to disabled
 	 * @ctx       : ctl path ctx pointer
 	 */
@@ -225,6 +242,12 @@ struct sde_hw_ctl_ops {
 	 */
 	void (*reg_dma_flush)(struct sde_hw_ctl *ctx, bool blocking);
 
+	/**
+	 * check if ctl start trigger state to confirm the frame pending
+	 * status
+	 * @ctx       : ctl path ctx pointer
+	 */
+	int (*get_start_state)(struct sde_hw_ctl *ctx);
 };
 
 /**

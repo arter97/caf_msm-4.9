@@ -68,6 +68,7 @@
 #define A6XX_CP_MEM_POOL_SIZE            0x8C3
 #define A6XX_CP_CHICKEN_DBG              0x841
 #define A6XX_CP_ADDR_MODE_CNTL           0x842
+#define A6XX_CP_DBG_ECO_CNTL             0x843
 #define A6XX_CP_PROTECT_CNTL             0x84F
 #define A6XX_CP_PROTECT_REG              0x850
 #define A6XX_CP_CONTEXT_SWITCH_CNTL      0x8A0
@@ -79,6 +80,7 @@
 #define A6XX_CP_CONTEXT_SWITCH_PRIV_SECURE_RESTORE_ADDR_HI   0x8A6
 #define A6XX_CP_CONTEXT_SWITCH_NON_PRIV_RESTORE_ADDR_LO   0x8A7
 #define A6XX_CP_CONTEXT_SWITCH_NON_PRIV_RESTORE_ADDR_HI   0x8A8
+#define A6XX_CP_CONTEXT_SWITCH_LEVEL_STATUS 0x8AB
 #define A6XX_CP_PERFCTR_CP_SEL_0         0x8D0
 #define A6XX_CP_PERFCTR_CP_SEL_1         0x8D1
 #define A6XX_CP_PERFCTR_CP_SEL_2         0x8D2
@@ -404,6 +406,7 @@
 #define A6XX_RBBM_SECVID_TSB_ADDR_MODE_CNTL      0xF810
 
 #define A6XX_RBBM_VBIF_CLIENT_QOS_CNTL   0x00010
+#define A6XX_RBBM_GPR0_CNTL              0x00018
 #define A6XX_RBBM_INTERFACE_HANG_INT_CNTL 0x0001f
 #define A6XX_RBBM_INT_CLEAR_CMD          0x00037
 #define A6XX_RBBM_INT_0_MASK             0x00038
@@ -532,6 +535,8 @@
 #define A6XX_DBGC_CFG_DBGBUS_CNTLT_SEGT_SHIFT       0x1C
 #define A6XX_DBGC_CFG_DBGBUS_CNTLM                  0x605
 #define A6XX_DBGC_CFG_DBGBUS_CTLTM_ENABLE_SHIFT     0x18
+#define A6XX_DBGC_CFG_DBGBUS_OPL                    0x606
+#define A6XX_DBGC_CFG_DBGBUS_OPE                    0x607
 #define A6XX_DBGC_CFG_DBGBUS_IVTL_0                 0x608
 #define A6XX_DBGC_CFG_DBGBUS_IVTL_1                 0x609
 #define A6XX_DBGC_CFG_DBGBUS_IVTL_2                 0x60a
@@ -558,8 +563,40 @@
 #define A6XX_DBGC_CFG_DBGBUS_BYTEL13_SHIFT          0x14
 #define A6XX_DBGC_CFG_DBGBUS_BYTEL14_SHIFT          0x18
 #define A6XX_DBGC_CFG_DBGBUS_BYTEL15_SHIFT          0x1C
+#define A6XX_DBGC_CFG_DBGBUS_IVTE_0                 0x612
+#define A6XX_DBGC_CFG_DBGBUS_IVTE_1                 0x613
+#define A6XX_DBGC_CFG_DBGBUS_IVTE_2                 0x614
+#define A6XX_DBGC_CFG_DBGBUS_IVTE_3                 0x615
+#define A6XX_DBGC_CFG_DBGBUS_MASKE_0                0x616
+#define A6XX_DBGC_CFG_DBGBUS_MASKE_1                0x617
+#define A6XX_DBGC_CFG_DBGBUS_MASKE_2                0x618
+#define A6XX_DBGC_CFG_DBGBUS_MASKE_3                0x619
+#define A6XX_DBGC_CFG_DBGBUS_NIBBLEE                0x61a
+#define A6XX_DBGC_CFG_DBGBUS_PTRC0                  0x61b
+#define A6XX_DBGC_CFG_DBGBUS_PTRC1                  0x61c
+#define A6XX_DBGC_CFG_DBGBUS_LOADREG                0x61d
+#define A6XX_DBGC_CFG_DBGBUS_IDX                    0x61e
+#define A6XX_DBGC_CFG_DBGBUS_CLRC                   0x61f
+#define A6XX_DBGC_CFG_DBGBUS_LOADIVT                0x620
+#define A6XX_DBGC_VBIF_DBG_CNTL                     0x621
+#define A6XX_DBGC_DBG_LO_HI_GPIO                    0x622
+#define A6XX_DBGC_EXT_TRACE_BUS_CNTL                0x623
+#define A6XX_DBGC_READ_AHB_THROUGH_DBG              0x624
 #define A6XX_DBGC_CFG_DBGBUS_TRACE_BUF1             0x62f
 #define A6XX_DBGC_CFG_DBGBUS_TRACE_BUF2             0x630
+#define A6XX_DBGC_EVT_CFG                           0x640
+#define A6XX_DBGC_EVT_INTF_SEL_0                    0x641
+#define A6XX_DBGC_EVT_INTF_SEL_1                    0x642
+#define A6XX_DBGC_PERF_ATB_CFG                      0x643
+#define A6XX_DBGC_PERF_ATB_COUNTER_SEL_0            0x644
+#define A6XX_DBGC_PERF_ATB_COUNTER_SEL_1            0x645
+#define A6XX_DBGC_PERF_ATB_COUNTER_SEL_2            0x646
+#define A6XX_DBGC_PERF_ATB_COUNTER_SEL_3            0x647
+#define A6XX_DBGC_PERF_ATB_TRIG_INTF_SEL_0          0x648
+#define A6XX_DBGC_PERF_ATB_TRIG_INTF_SEL_1          0x649
+#define A6XX_DBGC_PERF_ATB_DRAIN_CMD                0x64a
+#define A6XX_DBGC_ECO_CNTL                          0x650
+#define A6XX_DBGC_AHB_DBG_CNTL                      0x651
 
 /* VSC registers */
 #define A6XX_VSC_PERFCTR_VSC_SEL_0          0xCD8
@@ -774,7 +811,7 @@
 /* GBIF registers */
 #define A6XX_GBIF_HALT                    0x3c45
 #define A6XX_GBIF_HALT_ACK                0x3c46
-#define A6XX_GBIF_HALT_MASK               0x1
+#define A6XX_GBIF_HALT_MASK               0x2
 
 #define A6XX_GBIF_PERF_PWR_CNT_EN         0x3cc0
 #define A6XX_GBIF_PERF_CNT_SEL            0x3cc2
@@ -799,12 +836,16 @@
 #define A6XX_CX_DBGC_CFG_DBGBUS_SEL_B                   0x18401
 #define A6XX_CX_DBGC_CFG_DBGBUS_SEL_C                   0x18402
 #define A6XX_CX_DBGC_CFG_DBGBUS_SEL_D                   0x18403
+#define A6XX_CX_DBGC_CFG_DBGBUS_SEL_PING_INDEX_SHIFT    0x0
+#define A6XX_CX_DBGC_CFG_DBGBUS_SEL_PING_BLK_SEL_SHIFT  0x8
 #define A6XX_CX_DBGC_CFG_DBGBUS_CNTLT                   0x18404
 #define A6XX_CX_DBGC_CFG_DBGBUS_CNTLT_TRACEEN_SHIFT     0x0
 #define A6XX_CX_DBGC_CFG_DBGBUS_CNTLT_GRANU_SHIFT       0xC
 #define A6XX_CX_DBGC_CFG_DBGBUS_CNTLT_SEGT_SHIFT        0x1C
 #define A6XX_CX_DBGC_CFG_DBGBUS_CNTLM                   0x18405
 #define A6XX_CX_DBGC_CFG_DBGBUS_CNTLM_ENABLE_SHIFT      0x18
+#define A6XX_CX_DBGC_CFG_DBGBUS_OPL                     0x18406
+#define A6XX_CX_DBGC_CFG_DBGBUS_OPE                     0x18407
 #define A6XX_CX_DBGC_CFG_DBGBUS_IVTL_0                  0x18408
 #define A6XX_CX_DBGC_CFG_DBGBUS_IVTL_1                  0x18409
 #define A6XX_CX_DBGC_CFG_DBGBUS_IVTL_2                  0x1840A
@@ -831,10 +872,40 @@
 #define A6XX_CX_DBGC_CFG_DBGBUS_BYTEL13_SHIFT           0x14
 #define A6XX_CX_DBGC_CFG_DBGBUS_BYTEL14_SHIFT           0x18
 #define A6XX_CX_DBGC_CFG_DBGBUS_BYTEL15_SHIFT           0x1C
+#define A6XX_CX_DBGC_CFG_DBGBUS_IVTE_0                  0x18412
+#define A6XX_CX_DBGC_CFG_DBGBUS_IVTE_1                  0x18413
+#define A6XX_CX_DBGC_CFG_DBGBUS_IVTE_2                  0x18414
+#define A6XX_CX_DBGC_CFG_DBGBUS_IVTE_3                  0x18415
+#define A6XX_CX_DBGC_CFG_DBGBUS_MASKE_0                 0x18416
+#define A6XX_CX_DBGC_CFG_DBGBUS_MASKE_1                 0x18417
+#define A6XX_CX_DBGC_CFG_DBGBUS_MASKE_2                 0x18418
+#define A6XX_CX_DBGC_CFG_DBGBUS_MASKE_3                 0x18419
+#define A6XX_CX_DBGC_CFG_DBGBUS_NIBBLEE                 0x1841A
+#define A6XX_CX_DBGC_CFG_DBGBUS_PTRC0                   0x1841B
+#define A6XX_CX_DBGC_CFG_DBGBUS_PTRC1                   0x1841C
+#define A6XX_CX_DBGC_CFG_DBGBUS_LOADREG                 0x1841D
+#define A6XX_CX_DBGC_CFG_DBGBUS_IDX                     0x1841E
+#define A6XX_CX_DBGC_CFG_DBGBUS_CLRC                    0x1841F
+#define A6XX_CX_DBGC_CFG_DBGBUS_LOADIVT                 0x18420
+#define A6XX_CX_DBGC_VBIF_DBG_CNTL                      0x18421
+#define A6XX_CX_DBGC_DBG_LO_HI_GPIO                     0x18422
+#define A6XX_CX_DBGC_EXT_TRACE_BUS_CNTL                 0x18423
+#define A6XX_CX_DBGC_READ_AHB_THROUGH_DBG               0x18424
 #define A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF1              0x1842F
 #define A6XX_CX_DBGC_CFG_DBGBUS_TRACE_BUF2              0x18430
-#define A6XX_CX_DBGC_CFG_DBGBUS_SEL_PING_INDEX_SHIFT    0x0
-#define A6XX_CX_DBGC_CFG_DBGBUS_SEL_PING_BLK_SEL_SHIFT  0x8
+#define A6XX_CX_DBGC_EVT_CFG                            0x18440
+#define A6XX_CX_DBGC_EVT_INTF_SEL_0                     0x18441
+#define A6XX_CX_DBGC_EVT_INTF_SEL_1                     0x18442
+#define A6XX_CX_DBGC_PERF_ATB_CFG                       0x18443
+#define A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_0             0x18444
+#define A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_1             0x18445
+#define A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_2             0x18446
+#define A6XX_CX_DBGC_PERF_ATB_COUNTER_SEL_3             0x18447
+#define A6XX_CX_DBGC_PERF_ATB_TRIG_INTF_SEL_0           0x18448
+#define A6XX_CX_DBGC_PERF_ATB_TRIG_INTF_SEL_1           0x18449
+#define A6XX_CX_DBGC_PERF_ATB_DRAIN_CMD                 0x1844A
+#define A6XX_CX_DBGC_ECO_CNTL                           0x18450
+#define A6XX_CX_DBGC_AHB_DBG_CNTL                       0x18451
 
 /* GMU control registers */
 #define A6XX_GPU_GMU_GX_SPTPRAC_CLOCK_CONTROL   0x1A880
@@ -913,37 +984,8 @@
 
 /* ISENSE registers */
 #define A6XX_GMU_ISENSE_CTRL			0x1F95D
-#define A6XX_GPU_CS_ENABLE_REG			0x23120
 #define A6XX_GPU_GMU_CX_GMU_ISENSE_CTRL		0x1f95d
-#define A6XX_GPU_CS_AMP_CALIBRATION_CONTROL3	0x22d78
-#define A6XX_GPU_CS_AMP_CALIBRATION_CONTROL2	0x22d58
-#define A6XX_GPU_CS_A_SENSOR_CTRL_0		0x22d80
-#define A6XX_GPU_CS_A_SENSOR_CTRL_2		0x422da
-#define A6XX_GPU_CS_SENSOR_GENERAL_STATUS	0x2301a
-#define A6XX_GPU_CS_AMP_CALIBRATION_CONTROL1	0x23157
-#define A6XX_GPU_CS_SENSOR_GENERAL_STATUS	0x2301a
-#define A6XX_GPU_CS_AMP_CALIBRATION_STATUS1_0	0x2301d
-#define A6XX_GPU_CS_AMP_CALIBRATION_STATUS1_2	0x2301f
-#define A6XX_GPU_CS_AMP_CALIBRATION_STATUS1_4	0x23021
-#define A6XX_GPU_CS_AMP_CALIBRATION_DONE	0x23165
-#define A6XX_GPU_CS_AMP_PERIOD_CTRL		0x2316d
-#define A6XX_GPU_CS_AMP_CALIBRATION_DONE	0x23165
-
-#define CS_PWR_ON_STATUS			(10)
-#define AMP_SW_WRM_TRIM_START			(24)
-#define AMP_TRIM_TIMER				(6)
-#define AMP_SW_TRIM_START			(0)
-#define SS_AMPTRIM_DONE				(11)
-#define AMP_OFFSET_CHECK_MIN_ERR		(1)
-#define AMP_OFFSET_CHECK_MAX_ERR		(2)
-#define AMP_OUT_OF_RANGE_ERR			(4)
-#define TRIM_CNT_VALUE				(1)
-#define RUNTIME_CNT_VALUE			(16)
-#define TRIM_ENABLE				(0)
-
-#define AMP_ERR			(BIT(AMP_OFFSET_CHECK_MIN_ERR) || \
-				BIT(AMP_OFFSET_CHECK_MAX_ERR) || \
-				BIT(AMP_OUT_OF_RANGE_ERR))
+#define A6XX_GPU_CS_ENABLE_REG			0x23120
 
 /* LM registers */
 #define A6XX_GPU_GMU_CX_GMU_PWR_THRESHOLD       0x1F94D

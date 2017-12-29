@@ -182,6 +182,26 @@ struct cam_hw_config_args {
 };
 
 /**
+ * struct cam_hw_flush_args - Flush arguments
+ *
+ * @ctxt_to_hw_map:        HW context from the acquire
+ * @num_req_pending:       Num request to flush, valid when flush type is REQ
+ * @flush_req_pending:     Request pending pointers to flush
+ * @num_req_active:        Num request to flush, valid when flush type is REQ
+ * @flush_req_active:      Request active pointers to flush
+ * @flush_type:            The flush type
+ *
+ */
+struct cam_hw_flush_args {
+	void                           *ctxt_to_hw_map;
+	uint32_t                        num_req_pending;
+	void                           *flush_req_pending[20];
+	uint32_t                        num_req_active;
+	void                           *flush_req_active[20];
+	enum flush_type_t               flush_type;
+};
+
+/**
  * cam_hw_mgr_intf - HW manager interface
  *
  * @hw_mgr_priv:           HW manager object
@@ -203,8 +223,9 @@ struct cam_hw_config_args {
  * @hw_write:              Function pointer for Write hardware registers
  * @hw_cmd:                Function pointer for any customized commands for the
  *                         hardware manager
- * @download_fw:           Function pointer for firmware downloading
- * @hw_close:              Function pointer for subdev close
+ * @hw_open:               Function pointer for HW init
+ * @hw_close:              Function pointer for HW deinit
+ * @hw_flush:              Function pointer for HW flush
  *
  */
 struct cam_hw_mgr_intf {
@@ -220,8 +241,9 @@ struct cam_hw_mgr_intf {
 	int (*hw_read)(void *hw_priv, void *read_args);
 	int (*hw_write)(void *hw_priv, void *write_args);
 	int (*hw_cmd)(void *hw_priv, void *write_args);
-	int (*download_fw)(void *hw_priv, void *fw_download_args);
+	int (*hw_open)(void *hw_priv, void *fw_download_args);
 	int (*hw_close)(void *hw_priv, void *hw_close_args);
+	int (*hw_flush)(void *hw_priv, void *hw_flush_args);
 };
 
 #endif /* _CAM_HW_MGR_INTF_H_ */

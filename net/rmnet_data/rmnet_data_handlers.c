@@ -573,7 +573,8 @@ static int rmnet_map_egress_handler(struct sk_buff *skb,
 			 skb_is_nonlinear(skb);
 
 	if ((!(config->egress_data_format &
-	    RMNET_EGRESS_FORMAT_AGGREGATION)) || non_linear_skb)
+	    RMNET_EGRESS_FORMAT_AGGREGATION)) || csum_required ||
+	    non_linear_skb)
 		map_header = rmnet_map_add_map_header
 		(skb, additional_header_length, RMNET_MAP_NO_PAD_BYTES);
 	else
@@ -595,10 +596,13 @@ static int rmnet_map_egress_handler(struct sk_buff *skb,
 
 	skb->protocol = htons(ETH_P_MAP);
 
-	if ((config->egress_data_format & RMNET_EGRESS_FORMAT_AGGREGATION) &&
-	    !non_linear_skb) {
+	if (config->egress_data_format & RMNET_EGRESS_FORMAT_AGGREGATION) {
 		if (rmnet_ul_aggregation_skip(skb, required_headroom))
 			return RMNET_MAP_SUCCESS;
+
+		if (non_linear_skb)
+			if (unlikely(__skb_linearize(skb)))
+				return RMNET_MAP_SUCCESS;
 
 		rmnet_map_aggregate(skb, config);
 		return RMNET_MAP_CONSUMED;
@@ -730,6 +734,9 @@ void rmnet_egress_handler(struct sk_buff *skb,
 	LOGD("Packet going out on %s with egress format 0x%08X",
 	     skb->dev->name, config->egress_data_format);
 
+	if (ep->rmnet_mode == RMNET_EPMODE_VND)
+		rmnet_vnd_tx_fixup(skb, orig_dev);
+
 	if (config->egress_data_format & RMNET_EGRESS_FORMAT_MAP) {
 		switch (rmnet_map_egress_handler(skb, config, ep, orig_dev)) {
 		case RMNET_MAP_CONSUMED:
@@ -746,9 +753,6 @@ void rmnet_egress_handler(struct sk_buff *skb,
 			return;
 		}
 	}
-
-	if (ep->rmnet_mode == RMNET_EPMODE_VND)
-		rmnet_vnd_tx_fixup(skb, orig_dev);
 
 	rmnet_print_packet(skb, skb->dev->name, 't');
 	trace_rmnet_egress_handler(skb);

@@ -1656,7 +1656,9 @@ static int diag_switch_logging(struct diag_logging_mode_param_t *param)
 				}
 			}
 		}
-		if (!param->diag_id) {
+		if (!param->diag_id ||
+			(param->pd_val < UPD_WLAN) ||
+			(param->pd_val > NUM_MD_SESSIONS)) {
 			DIAG_LOG(DIAG_DEBUG_USERSPACE,
 			"diag_id support is not present for the pd mask = %d\n",
 			param->pd_mask);
@@ -1669,19 +1671,19 @@ static int diag_switch_logging(struct diag_logging_mode_param_t *param)
 			param->peripheral, param->pd_val);
 
 		peripheral = param->peripheral;
+		i = param->pd_val - UPD_WLAN;
 		if (driver->md_session_map[peripheral] &&
 			(MD_PERIPHERAL_MASK(peripheral) &
-			diag_mux->mux_mask)) {
+			diag_mux->mux_mask) &&
+			!driver->pd_session_clear[i]) {
 			DIAG_LOG(DIAG_DEBUG_USERSPACE,
 			"diag_fr: User PD is already logging onto active peripheral logging\n");
-			i = param->pd_val - UPD_WLAN;
 			driver->pd_session_clear[i] = 0;
 			return -EINVAL;
 		}
 		peripheral_mask =
 			diag_translate_mask(param->pd_mask);
 		param->peripheral_mask = peripheral_mask;
-		i = param->pd_val - UPD_WLAN;
 		if (!driver->pd_session_clear[i]) {
 			driver->pd_logging_mode[i] = 1;
 			driver->num_pd_session += 1;
@@ -1848,9 +1850,10 @@ static int diag_ioctl_lsm_deinit(void)
 		mutex_unlock(&driver->diagchar_mutex);
 		return -EINVAL;
 	}
-
-	driver->data_ready[i] |= DEINIT_TYPE;
-	atomic_inc(&driver->data_ready_notif[i]);
+	if (!(driver->data_ready[i] & DEINIT_TYPE)) {
+		driver->data_ready[i] |= DEINIT_TYPE;
+		atomic_inc(&driver->data_ready_notif[i]);
+	}
 	mutex_unlock(&driver->diagchar_mutex);
 	wake_up_interruptible(&driver->wait_q);
 
@@ -1960,12 +1963,33 @@ static int diag_ioctl_get_real_time(unsigned long ioarg)
 static int diag_ioctl_set_buffering_mode(unsigned long ioarg)
 {
 	struct diag_buffering_mode_t params;
+	int peripheral = 0;
+	uint8_t diag_id = 0;
 
 	if (copy_from_user(&params, (void __user *)ioarg, sizeof(params)))
 		return -EFAULT;
 
-	if (params.peripheral >= NUM_PERIPHERALS)
-		return -EINVAL;
+	diag_map_pd_to_diagid(params.peripheral, &diag_id, &peripheral);
+
+	if ((peripheral < 0) ||
+		peripheral >= NUM_PERIPHERALS) {
+		pr_err("diag: In %s, invalid peripheral = %d\n", __func__,
+		       peripheral);
+		return -EIO;
+	}
+
+	if (params.peripheral > NUM_PERIPHERALS &&
+		!driver->feature[peripheral].pd_buffering) {
+		pr_err("diag: In %s, pd buffering not supported for peripheral:%d\n",
+			__func__, peripheral);
+		return -EIO;
+	}
+
+	if (!driver->feature[peripheral].peripheral_buffering) {
+		pr_err("diag: In %s, peripheral %d doesn't support buffering\n",
+		       __func__, peripheral);
+		return -EIO;
+	}
 
 	mutex_lock(&driver->mode_lock);
 	driver->buffering_flag[params.peripheral] = 1;
@@ -1976,24 +2000,29 @@ static int diag_ioctl_set_buffering_mode(unsigned long ioarg)
 
 static int diag_ioctl_peripheral_drain_immediate(unsigned long ioarg)
 {
-	uint8_t peripheral;
+	uint8_t pd, diag_id = 0;
+	int peripheral = 0;
 
-	if (copy_from_user(&peripheral, (void __user *)ioarg, sizeof(uint8_t)))
+	if (copy_from_user(&pd, (void __user *)ioarg, sizeof(uint8_t)))
 		return -EFAULT;
 
-	if (peripheral >= NUM_PERIPHERALS) {
+	diag_map_pd_to_diagid(pd, &diag_id, &peripheral);
+
+	if ((peripheral < 0) ||
+		peripheral >= NUM_PERIPHERALS) {
 		pr_err("diag: In %s, invalid peripheral %d\n", __func__,
 		       peripheral);
 		return -EINVAL;
 	}
 
-	if (!driver->feature[peripheral].peripheral_buffering) {
-		pr_err("diag: In %s, peripheral %d doesn't support buffering\n",
-		       __func__, peripheral);
+	if (pd > NUM_PERIPHERALS &&
+		!driver->feature[peripheral].pd_buffering) {
+		pr_err("diag: In %s, pd buffering not supported for peripheral:%d\n",
+			__func__, peripheral);
 		return -EIO;
 	}
 
-	return diag_send_peripheral_drain_immediate(peripheral);
+	return diag_send_peripheral_drain_immediate(pd, diag_id, peripheral);
 }
 
 static int diag_ioctl_dci_support(unsigned long ioarg)

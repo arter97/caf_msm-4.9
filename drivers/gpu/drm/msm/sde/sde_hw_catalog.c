@@ -148,6 +148,7 @@ enum sde_prop {
 	SMART_DMA_REV,
 	IDLE_PC,
 	DEST_SCALER,
+	SMART_PANEL_ALIGN_MODE,
 	SDE_PROP_MAX,
 };
 
@@ -403,6 +404,8 @@ static struct sde_prop_type sde_prop[] = {
 	{SMART_DMA_REV, "qcom,sde-smart-dma-rev", false, PROP_TYPE_STRING},
 	{IDLE_PC, "qcom,sde-has-idle-pc", false, PROP_TYPE_BOOL},
 	{DEST_SCALER, "qcom,sde-has-dest-scaler", false, PROP_TYPE_BOOL},
+	{SMART_PANEL_ALIGN_MODE, "qcom,sde-smart-panel-align-mode",
+			false, PROP_TYPE_U32},
 };
 
 static struct sde_prop_type sde_perf_prop[] = {
@@ -2737,6 +2740,9 @@ static int sde_parse_dt(struct device_node *np, struct sde_mdss_cfg *cfg)
 	cfg->mdp[0].has_dest_scaler =
 		PROP_VALUE_ACCESS(prop_value, DEST_SCALER, 0);
 
+	cfg->mdp[0].smart_panel_align_mode =
+		PROP_VALUE_ACCESS(prop_value, SMART_PANEL_ALIGN_MODE, 0);
+
 	rc = of_property_read_string(np, sde_prop[QSEED_TYPE].prop_name, &type);
 	if (!rc && !strcmp(type, "qseedv3")) {
 		cfg->qseed_type = SDE_SSPP_SCALER_QSEED3;
@@ -3167,7 +3173,8 @@ static int sde_hardware_format_caps(struct sde_mdss_cfg *sde_cfg,
 	if (IS_SDE_MAJOR_MINOR_SAME((hw_rev), SDE_HW_VER_300) ||
 	    IS_SDE_MAJOR_MINOR_SAME((hw_rev), SDE_HW_VER_301) ||
 	    IS_SDE_MAJOR_MINOR_SAME((hw_rev), SDE_HW_VER_400) ||
-	    IS_SDE_MAJOR_MINOR_SAME((hw_rev), SDE_HW_VER_401))
+	    IS_SDE_MAJOR_MINOR_SAME((hw_rev), SDE_HW_VER_401) ||
+	    IS_SDE_MAJOR_MINOR_SAME((hw_rev), SDE_HW_VER_410))
 		sde_cfg->has_hdr = true;
 
 	index = sde_copy_formats(sde_cfg->dma_formats, dma_list_size,

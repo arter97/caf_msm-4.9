@@ -18,6 +18,34 @@
 #include "cam_trace.h"
 #include "cam_debug_util.h"
 
+static struct cam_context *cam_node_get_ctxt_from_free_list(
+		struct cam_node *node)
+{
+	struct cam_context *ctx = NULL;
+
+	mutex_lock(&node->list_mutex);
+	if (!list_empty(&node->free_ctx_list)) {
+		ctx = list_first_entry(&node->free_ctx_list,
+			struct cam_context, list);
+		list_del_init(&ctx->list);
+	}
+	mutex_unlock(&node->list_mutex);
+	if (ctx)
+		kref_init(&ctx->refcount);
+	return ctx;
+}
+
+void cam_node_put_ctxt_to_free_list(struct kref *ref)
+{
+	struct cam_context *ctx =
+		container_of(ref, struct cam_context, refcount);
+	struct cam_node *node = ctx->node;
+
+	mutex_lock(&node->list_mutex);
+	list_add_tail(&ctx->list, &node->free_ctx_list);
+	mutex_unlock(&node->list_mutex);
+}
+
 static int __cam_node_handle_query_cap(struct cam_node *node,
 	struct cam_query_cap_cmd *query)
 {
@@ -45,13 +73,7 @@ static int __cam_node_handle_acquire_dev(struct cam_node *node,
 	if (!acquire)
 		return -EINVAL;
 
-	mutex_lock(&node->list_mutex);
-	if (!list_empty(&node->free_ctx_list)) {
-		ctx = list_first_entry(&node->free_ctx_list,
-			struct cam_context, list);
-		list_del_init(&ctx->list);
-	}
-	mutex_unlock(&node->list_mutex);
+	ctx = cam_node_get_ctxt_from_free_list(node);
 	if (!ctx) {
 		rc = -ENOMEM;
 		goto err;
@@ -66,9 +88,7 @@ static int __cam_node_handle_acquire_dev(struct cam_node *node,
 
 	return 0;
 free_ctx:
-	mutex_lock(&node->list_mutex);
-	list_add_tail(&ctx->list, &node->free_ctx_list);
-	mutex_unlock(&node->list_mutex);
+	cam_context_putref(ctx);
 err:
 	return rc;
 }
@@ -172,6 +192,39 @@ static int __cam_node_handle_config_dev(struct cam_node *node,
 	return rc;
 }
 
+static int __cam_node_handle_flush_dev(struct cam_node *node,
+	struct cam_flush_dev_cmd *flush)
+{
+	struct cam_context *ctx = NULL;
+	int rc;
+
+	if (!flush)
+		return -EINVAL;
+
+	if (flush->dev_handle <= 0) {
+		CAM_ERR(CAM_CORE, "Invalid device handle for context");
+		return -EINVAL;
+	}
+
+	if (flush->session_handle <= 0) {
+		CAM_ERR(CAM_CORE, "Invalid session handle for context");
+		return -EINVAL;
+	}
+
+	ctx = (struct cam_context *)cam_get_device_priv(flush->dev_handle);
+	if (!ctx) {
+		CAM_ERR(CAM_CORE, "Can not get context for handle %d",
+			flush->dev_handle);
+		return -EINVAL;
+	}
+
+	rc = cam_context_handle_flush_dev(ctx, flush);
+	if (rc)
+		CAM_ERR(CAM_CORE, "FLush failure for node %s", node->name);
+
+	return rc;
+}
+
 static int __cam_node_handle_release_dev(struct cam_node *node,
 	struct cam_release_dev_cmd *release)
 {
@@ -207,9 +260,7 @@ static int __cam_node_handle_release_dev(struct cam_node *node,
 		CAM_ERR(CAM_CORE, "destroy device handle is failed node %s",
 			node->name);
 
-	mutex_lock(&node->list_mutex);
-	list_add_tail(&ctx->list, &node->free_ctx_list);
-	mutex_unlock(&node->list_mutex);
+	cam_context_putref(ctx);
 	return rc;
 }
 
@@ -312,8 +363,7 @@ int cam_node_shutdown(struct cam_node *node)
 		if (node->ctx_list[i].dev_hdl >= 0) {
 			cam_context_shutdown(&(node->ctx_list[i]));
 			cam_destroy_device_hdl(node->ctx_list[i].dev_hdl);
-			list_add_tail(&(node->ctx_list[i].list),
-				&node->free_ctx_list);
+			cam_context_putref(&(node->ctx_list[i]));
 		}
 	}
 
@@ -358,6 +408,7 @@ int cam_node_init(struct cam_node *node, struct cam_hw_mgr_intf *hw_mgr_intf,
 		}
 		INIT_LIST_HEAD(&ctx_list[i].list);
 		list_add_tail(&ctx_list[i].list, &node->free_ctx_list);
+		ctx_list[i].node = node;
 	}
 
 	node->state = CAM_NODE_STATE_INIT;
@@ -470,6 +521,20 @@ int cam_node_handle_ioctl(struct cam_node *node, struct cam_control *cmd)
 			if (rc)
 				CAM_ERR(CAM_CORE,
 					"release device failed(rc = %d)", rc);
+		}
+		break;
+	}
+	case CAM_FLUSH_REQ: {
+		struct cam_flush_dev_cmd flush;
+
+		if (copy_from_user(&flush, (void __user *)cmd->handle,
+			sizeof(flush)))
+			rc = -EFAULT;
+		else {
+			rc = __cam_node_handle_flush_dev(node, &flush);
+			if (rc)
+				CAM_ERR(CAM_CORE,
+					"flush device failed(rc = %d)", rc);
 		}
 		break;
 	}
