@@ -134,6 +134,8 @@
 #include "msm8953-pm.dtsi"
 #include "msm8953-bus.dtsi"
 #include "msm8953-coresight.dtsi"
+#include "msm8953-ion.dtsi"
+#include "msm-arm-smmu-8953.dtsi"
 
 &soc {
 	#address-cells = <1>;
@@ -522,13 +524,13 @@
 		clock-names = "core_clk_src", "core_clk",
 				"iface_clk", "bus_clk";
 		qcom,ce-opp-freq = <100000000>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	qcom_tzlog: tz-log@08600720 {
 		compatible = "qcom,tz-log";
 		reg = <0x08600720 0x2000>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	qcom_rng: qrng@e3000 {
@@ -544,7 +546,7 @@
 			<1 618 0 800>;          /* 100 MB/s */
 		clocks = <&clock_gcc clk_gcc_prng_ahb_clk>;
 		clock-names = "iface_clk";
-		status = "disabled";
+		status = "okay";
 	};
 
 	qcom_crypto: qcrypto@720000 {
@@ -577,7 +579,7 @@
 		qcom,use-sw-hmac-algo;
 		qcom,use-sw-aead-algo;
 		qcom,ce-opp-freq = <100000000>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	qcom_cedev: qcedev@720000 {
@@ -603,7 +605,7 @@
 		clock-names = "core_clk_src", "core_clk",
 				"iface_clk", "bus_clk";
 		qcom,ce-opp-freq = <100000000>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	blsp1_uart0: serial@78af000 {
@@ -1794,6 +1796,7 @@
 		vdd_cx-supply = <&pm8953_s2_level>;
 		qcom,proxy-reg-names = "vdd_cx";
 		qcom,vdd_cx-uV-uA = <RPM_SMD_REGULATOR_LEVEL_TURBO 100000>;
+		qcom,mas-crypto = <&mas_crypto>;
 
 		clocks = <&clock_gcc clk_xo_pil_lpass_clk>,
 			 <&clock_gcc clk_gcc_crypto_clk>,
@@ -1825,6 +1828,8 @@
 		vdd_pronto_pll-supply = <&pm8953_l7>;
 		proxy-reg-names = "vdd_pronto_pll";
 		vdd_pronto_pll-uV-uA = <1800000 18000>;
+		qcom,mas-crypto = <&mas_crypto>;
+
 		clocks = <&clock_gcc clk_xo_pil_pronto_clk>,
 			 <&clock_gcc clk_gcc_crypto_clk>,
 			 <&clock_gcc clk_gcc_crypto_ahb_clk>,
@@ -1847,6 +1852,42 @@
 		memory-region = <&wcnss_fw_mem>;
 	};
 
+	qcom,venus@1de0000 {
+		compatible = "qcom,pil-tz-generic";
+		reg = <0x1de0000 0x4000>;
+
+		vdd-supply = <&gdsc_venus>;
+		qcom,proxy-reg-names = "vdd";
+
+		clocks = <&clock_gcc clk_gcc_venus0_vcodec0_clk>,
+			<&clock_gcc clk_gcc_venus0_ahb_clk>,
+			<&clock_gcc clk_gcc_venus0_axi_clk>,
+			<&clock_gcc clk_gcc_crypto_clk>,
+			<&clock_gcc clk_gcc_crypto_ahb_clk>,
+			<&clock_gcc clk_gcc_crypto_axi_clk>,
+			<&clock_gcc clk_crypto_clk_src>;
+
+		clock-names = "core_clk", "iface_clk", "bus_clk",
+				"scm_core_clk", "scm_iface_clk",
+				"scm_bus_clk", "scm_core_clk_src";
+
+		qcom,proxy-clock-names = "core_clk", "iface_clk",
+					"bus_clk", "scm_core_clk",
+					"scm_iface_clk", "scm_bus_clk",
+					"scm_core_clk_src";
+		qcom,scm_core_clk_src-freq = <80000000>;
+
+		qcom,msm-bus,name = "pil-venus";
+		qcom,msm-bus,num-cases = <2>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+				<63 512 0 0>,
+				<63 512 0 304000>;
+		qcom,pas-id = <9>;
+		qcom,proxy-timeout-ms = <100>;
+		qcom,firmware-name = "venus";
+		memory-region = <&venus_mem>;
+	};
 };
 
 #include "pm8953-rpm-regulator.dtsi"
