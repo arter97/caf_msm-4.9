@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -67,7 +67,7 @@
 		#address-cells = <1>;
 
 		CPU0: cpu@0 {
-			device-type = "cpu";
+			device_type = "cpu";
 			compatible = "arm,cortex-a7";
 			reg = <0x0>;
 			#cooling-cells = <2>;
@@ -76,6 +76,8 @@
 
 	aliases {
 		qpic_nand1 = &qnand_1;
+		pci-domain0 = &pcie0;
+		sdhc1 = &sdhc_1; /* SDC1 eMMC/SD/SDIO slot */
 	};
 
 	soc: soc { };
@@ -288,6 +290,45 @@
 		status = "disabled";
 	};
 
+	sdhc_1: sdhci@8804000 {
+		compatible = "qcom,sdhci-msm-v5";
+		reg = <0x8804000 0x1000>;
+		reg-names = "hc_mem";
+
+		interrupts = <0 210 0>, <0 227 0>;
+		interrupt-names = "hc_irq", "pwr_irq";
+
+		qcom,bus-width = <4>;
+
+		qcom,msm-bus,name = "sdhc1";
+		qcom,msm-bus,num-cases = <8>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =  <78 512 0 0>, /* No vote */
+				<78 512 1600 3200>,    /* 400 KB/s*/
+				<78 512 80000 160000>, /* 20 MB/s */
+				<78 512 100000 200000>, /* 25 MB/s */
+				<78 512 200000 400000>, /* 50 MB/s */
+				<78 512 400000 800000>, /* 100 MB/s */
+				<78 512 400000 800000>, /* 200 MB/s */
+				<78 512 2048000 4096000>; /* Max. bandwidth */
+		qcom,bus-bw-vectors-bps = <0 400000 20000000 25000000 50000000
+						100000000 200000000 4294967295>;
+
+		/* PM QoS */
+		qcom,pm-qos-cpu-groups = <0x0>;
+		qcom,pm-qos-cmdq-latency-us = <70>;
+		qcom,pm-qos-legacy-latency-us = <70>;
+		qcom,pm-qos-irq-type = "affine_cores";
+		qcom,pm-qos-irq-cpu = <0>;
+		qcom,pm-qos-irq-latency = <70>;
+
+		clocks = <&clock_gcc GCC_SDCC1_AHB_CLK>,
+			<&clock_gcc GCC_SDCC1_APPS_CLK>;
+		clock-names = "iface_clk", "core_clk";
+
+		status = "disabled";
+	};
+
 	qcom,msm-imem@1468B000 {
 		compatible = "qcom,msm-imem";
 		reg = <0x1468B000 0x1000>; /* Address and size of IMEM */
@@ -345,6 +386,7 @@
 		compatible = "qcom,pil-tz-generic";
 		qcom,pas-id = <0xf>;
 		qcom,firmware-name = "ipa_fws";
+		qcom,pil-force-shutdown;
 	};
 
 	spmi_bus: qcom,spmi@c440000 {
@@ -472,7 +514,7 @@
 		vdd_cx-supply = <&pmxpoorwills_s5_level>;
 		qcom,proxy-reg-names = "vdd_cx";
 
-		qcom,pas-id = <0>;
+		qcom,pas-id = <4>;
 		qcom,smem-id = <421>;
 		qcom,proxy-timeout-ms = <10000>;
 		qcom,sysmon-id = <0>;
@@ -681,6 +723,41 @@
 		};
 	};
 
+	qmp_aop: qcom,qmp-aop@c300000 {
+		compatible = "qcom,qmp-mbox";
+		label = "aop";
+		reg = <0xc300000 0x400>,
+			<0x17811008 0x4>;
+		reg-names = "msgram", "irq-reg-base";
+		qcom,irq-mask = <0x2>;
+		interrupts = <GIC_SPI 221 IRQ_TYPE_EDGE_RISING>;
+		priority = <0>;
+		mbox-desc-offset = <0x0>;
+		#mbox-cells = <1>;
+	};
+
+	usb_detect: qcom,gpio-usbdetect {
+		compatible = "qcom,gpio-usbdetect";
+		interrupt-parent = <&spmi_bus>;
+		interrupts = <0x0 0x0d 0x0 IRQ_TYPE_NONE>;
+		interrupt-names = "vbus_det_irq";
+		status = "disabled";
+	};
+};
+
+#include "pmxpoorwills.dtsi"
+#include "sdxpoorwills-blsp.dtsi"
+#include "sdxpoorwills-regulator.dtsi"
+#include "sdxpoorwills-smp2p.dtsi"
+#include "sdxpoorwills-usb.dtsi"
+#include "sdxpoorwills-pcie.dtsi"
+#include "sdxpoorwills-bus.dtsi"
+#include "sdxpoorwills-thermal.dtsi"
+#include "sdxpoorwills-audio.dtsi"
+#include "sdxpoorwills-ion.dtsi"
+#include "msm-arm-smmu-sdxpoorwills.dtsi"
+
+&soc {
 	emac_hw: qcom,emac@00020000 {
 		compatible = "qcom,emac-dwc-eqos";
 		reg = <0x20000 0x10000>,
@@ -698,33 +775,29 @@
 			"tx-ch3-intr", "tx-ch4-intr",
 			"rx-ch0-intr", "rx-ch1-intr",
 			"rx-ch2-intr", "rx-ch3-intr";
+		qcom,msm-bus,name = "emac";
+		qcom,msm-bus,num-cases = <3>;
+		qcom,msm-bus,num-paths = <2>;
+		qcom,msm-bus,vectors-KBps =
+			<98 512 1250 0>, <1 781 0 40000>,  /* 10Mbps vote */
+			<98 512 12500 0>, <1 781 0 40000>,  /* 100Mbps vote */
+			<98 512 125000 0>, <1 781 0 40000>; /* 1000Mbps vote */
+		qcom,bus-vector-names = "10", "100", "1000";
+		clocks = <&clock_gcc GCC_ETH_AXI_CLK>,
+			<&clock_gcc GCC_ETH_PTP_CLK>,
+			<&clock_gcc GCC_ETH_RGMII_CLK>,
+			<&clock_gcc GCC_ETH_SLAVE_AHB_CLK>;
+		clock-names = "eth_axi_clk", "eth_ptp_clk",
+			"eth_rgmii_clk", "eth_slave_ahb_clk";
+		qcom,phy-intr-redirect = <&tlmm 84 GPIO_ACTIVE_LOW>;
+		qcom,phy-reset = <&tlmm 85 GPIO_ACTIVE_LOW>;
+		vreg_rgmii-supply = <&vreg_rgmii>;
+		vreg_emac_phy-supply =  <&vreg_emac_phy>;
+		vreg_rgmii_io_pads-supply = <&vreg_rgmii_io_pads>;
+		gdsc_emac-supply = <&gdsc_emac>;
 		io-macro-info {
 			io-macro-bypass-mode = <0>;
 			io-interface = "rgmii";
 		};
 	};
-
-	qmp_aop: qcom,qmp-aop@c300000 {
-		compatible = "qcom,qmp-mbox";
-		label = "aop";
-		reg = <0xc300000 0x400>,
-			<0x17811008 0x4>;
-		reg-names = "msgram", "irq-reg-base";
-		qcom,irq-mask = <0x2>;
-		interrupts = <GIC_SPI 221 IRQ_TYPE_EDGE_RISING>;
-		priority = <0>;
-		mbox-desc-offset = <0x0>;
-		#mbox-cells = <1>;
-	};
 };
-
-#include "pmxpoorwills.dtsi"
-#include "sdxpoorwills-blsp.dtsi"
-#include "sdxpoorwills-regulator.dtsi"
-#include "sdxpoorwills-smp2p.dtsi"
-#include "sdxpoorwills-usb.dtsi"
-#include "sdxpoorwills-bus.dtsi"
-#include "sdxpoorwills-thermal.dtsi"
-#include "sdxpoorwills-audio.dtsi"
-#include "sdxpoorwills-ion.dtsi"
-#include "msm-arm-smmu-sdxpoorwills.dtsi"

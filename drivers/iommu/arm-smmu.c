@@ -55,11 +55,10 @@
 #include <linux/remote_spinlock.h>
 #include <linux/ktime.h>
 #include <trace/events/iommu.h>
-#include <soc/qcom/msm_tz_smmu.h>
-#include <soc/qcom/scm.h>
 #include <linux/notifier.h>
 
 #include <linux/amba/bus.h>
+#include <soc/qcom/msm_tz_smmu.h>
 
 #include "io-pgtable.h"
 
@@ -356,11 +355,13 @@ struct arm_smmu_s2cr {
 	enum arm_smmu_s2cr_privcfg	privcfg;
 	u8				cbndx;
 	bool				cb_handoff;
+	bool				write_protected;
 };
 
 #define s2cr_init_val (struct arm_smmu_s2cr){				\
 	.type = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS,	\
 	.cb_handoff = false,						\
+	.write_protected = false,					\
 }
 
 struct arm_smmu_smr {
@@ -628,7 +629,7 @@ static bool is_dynamic_domain(struct iommu_domain *domain)
 	return !!(smmu_domain->attributes & (1 << DOMAIN_ATTR_DYNAMIC));
 }
 
-static int arm_smmu_restore_sec_cfg(struct arm_smmu_device *smmu)
+static int arm_smmu_restore_sec_cfg(struct arm_smmu_device *smmu, u32 cb)
 {
 	int ret;
 	int scm_ret = 0;
@@ -636,7 +637,7 @@ static int arm_smmu_restore_sec_cfg(struct arm_smmu_device *smmu)
 	if (!arm_smmu_is_static_cb(smmu))
 		return 0;
 
-	ret = scm_restore_sec_cfg(smmu->sec_id, 0x0, &scm_ret);
+	ret = scm_restore_sec_cfg(smmu->sec_id, cb, &scm_ret);
 	if (ret || scm_ret) {
 		pr_err("scm call IOMMU_SECURE_CFG failed\n");
 		return -EINVAL;
@@ -1556,6 +1557,19 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
+static bool arm_smmu_master_attached(struct arm_smmu_device *smmu,
+				     struct iommu_fwspec *fwspec)
+{
+	int i, idx;
+
+	for_each_cfg_sme(fwspec, i, idx) {
+		if (smmu->s2crs[idx].attach_count)
+			return true;
+	}
+
+	return false;
+}
+
 static int arm_smmu_set_pt_format(struct arm_smmu_domain *smmu_domain,
 				  struct io_pgtable_cfg *pgtbl_cfg)
 {
@@ -1966,6 +1980,10 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 
 	/* Publish page table ops for map/unmap */
 	smmu_domain->pgtbl_ops = pgtbl_ops;
+	if (arm_smmu_is_slave_side_secure(smmu_domain) &&
+			!arm_smmu_master_attached(smmu, dev->iommu_fwspec))
+		arm_smmu_restore_sec_cfg(smmu, cfg->cbndx);
+
 	return 0;
 
 out_clear_smmu:
@@ -2735,6 +2753,54 @@ static bool arm_smmu_capable(enum iommu_cap cap)
 		return false;
 	}
 }
+
+#ifdef CONFIG_MSM_TZ_SMMU
+static struct arm_smmu_device *arm_smmu_get_by_addr(void __iomem *addr)
+{
+	struct arm_smmu_device *smmu;
+	unsigned long flags;
+
+	spin_lock_irqsave(&arm_smmu_devices_lock, flags);
+	list_for_each_entry(smmu, &arm_smmu_devices, list) {
+		unsigned long base = (unsigned long)smmu->base;
+		unsigned long mask = ~(smmu->size - 1);
+
+		if ((base & mask) == ((unsigned long)addr & mask)) {
+			spin_unlock_irqrestore(&arm_smmu_devices_lock, flags);
+			return smmu;
+		}
+	}
+	spin_unlock_irqrestore(&arm_smmu_devices_lock, flags);
+	return NULL;
+}
+
+bool arm_smmu_skip_write(void __iomem *addr)
+{
+	struct arm_smmu_device *smmu;
+	unsigned long cb;
+	int i;
+
+	smmu = arm_smmu_get_by_addr(addr);
+
+	/* Skip write if smmu not available by now */
+	if (!smmu)
+		return true;
+
+	/* Do not write to global space */
+	if (((unsigned long)addr & (smmu->size - 1)) < (smmu->size >> 1))
+		return true;
+
+	/* Finally skip writing to secure CB */
+	cb = ((unsigned long)addr & ((smmu->size >> 1) - 1)) >> PAGE_SHIFT;
+	for (i = 0; i < smmu->num_mapping_groups; i++) {
+		if ((smmu->s2crs[i].cbndx == cb) &&
+		    (smmu->s2crs[i].write_protected))
+			return true;
+	}
+
+	return false;
+}
+#endif
 
 static struct arm_smmu_device *arm_smmu_get_by_list(struct device_node *np)
 {
@@ -3666,8 +3732,13 @@ static int arm_smmu_alloc_cb(struct iommu_domain *domain,
 			cb = smmu->s2crs[idx].cbndx;
 	}
 
-	if (cb >= 0 && arm_smmu_is_static_cb(smmu))
+	if (cb >= 0 && arm_smmu_is_static_cb(smmu)) {
 		smmu_domain->slave_side_secure = true;
+
+		if (arm_smmu_is_slave_side_secure(smmu_domain))
+			for_each_cfg_sme(fwspec, i, idx)
+				smmu->s2crs[idx].write_protected = true;
+	}
 
 	if (cb < 0 && !arm_smmu_is_static_cb(smmu)) {
 		mutex_unlock(&smmu->stream_map_mutex);
@@ -3843,7 +3914,7 @@ static int regulator_notifier(struct notifier_block *nb,
 	if (event == REGULATOR_EVENT_PRE_DISABLE)
 		qsmmuv2_halt(smmu);
 	else if (event == REGULATOR_EVENT_ENABLE) {
-		if (arm_smmu_restore_sec_cfg(smmu))
+		if (arm_smmu_restore_sec_cfg(smmu, 0))
 			goto power_off;
 		qsmmuv2_resume(smmu);
 	}
@@ -3996,7 +4067,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	bool cttw_dt, cttw_reg;
 	int i;
 
-	if (arm_smmu_restore_sec_cfg(smmu))
+	if (arm_smmu_restore_sec_cfg(smmu, 0))
 		return -ENODEV;
 
 	dev_dbg(smmu->dev, "probing hardware configuration...\n");
@@ -5249,6 +5320,9 @@ static int qsmmuv500_arch_init(struct arm_smmu_device *smmu)
 
 	data->version = readl_relaxed(data->tcu_base + TCU_HW_VERSION_HLOS1);
 	smmu->archdata = data;
+
+	if (arm_smmu_is_static_cb(smmu))
+		return 0;
 
 	ret = qsmmuv500_parse_errata1(smmu);
 	if (ret)

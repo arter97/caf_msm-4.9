@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -377,6 +377,44 @@
 					pins = "gpio16", "gpio17",
 							"gpio18", "gpio19";
 					drive-strength = <6>;
+					bias-disable;
+				};
+			};
+		};
+
+		pcie0 {
+			pcie0_clkreq_default: pcie0_clkreq_default {
+				mux {
+					pins = "gpio56";
+					function = "pcie_clkreq";
+				};
+				config {
+					pins = "gpio56";
+					drive-strength = <2>;
+					bias-pull-up;
+				};
+			};
+
+			pcie0_perst_default: pcie0_perst_default {
+				mux {
+					pins = "gpio57";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio57";
+					drive-strength = <2>;
+					bias-pull-down;
+				};
+			};
+
+			pcie0_wake_default: pcie0_wake_default {
+				mux {
+					pins = "gpio53";
+					function = "gpio";
+				};
+				config {
+					pins = "gpio53";
+					drive-strength = <2>;
 					bias-disable;
 				};
 			};
@@ -1296,6 +1334,82 @@
 					drive-strength = <8>;	/* 8 mA */
 					bias-disable;		/* NO PULL */
 				};
+			};
+		};
+
+		/* SDC pin type */
+		sdc1_clk_on: sdc1_clk_on {
+			config {
+				pins = "sdc1_clk";
+				bias-disable;		/* NO pull */
+				drive-strength = <16>;	/* 16 MA */
+			};
+		};
+
+		sdc1_clk_off: sdc1_clk_off {
+			config {
+				pins = "sdc1_clk";
+				bias-disable;		/* NO pull */
+				drive-strength = <2>;	/* 2 MA */
+			};
+		};
+
+		sdc1_cmd_on: sdc1_cmd_on {
+			config {
+				pins = "sdc1_cmd";
+				bias-pull-up;		/* pull up */
+				drive-strength = <10>;	/* 10 MA */
+			};
+		};
+
+		sdc1_cmd_off: sdc1_cmd_off {
+			config {
+				pins = "sdc1_cmd";
+				num-grp-pins = <1>;
+				bias-pull-up;		/* pull up */
+				drive-strength = <2>;	/* 2 MA */
+			};
+		};
+
+		sdc1_data_on: sdc1_data_on {
+			config {
+				pins = "sdc1_data";
+				bias-pull-up;		/* pull up */
+				drive-strength = <10>;	/* 10 MA */
+			};
+		};
+
+		sdc1_data_off: sdc1_data_off {
+			config {
+				pins = "sdc1_data";
+				bias-pull-up;		/* pull up */
+				drive-strength = <2>;	/* 2 MA */
+			};
+		};
+
+		sdc1_cd_on: cd_on {
+			mux {
+				pins = "gpio93";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio93";
+				drive-strength = <2>;
+				bias-pull-up;
+			};
+		};
+
+		sdc1_cd_off: cd_off {
+			mux {
+				pins = "gpio93";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio93";
+				drive-strength = <2>;
+				bias-disable;
 			};
 		};
 

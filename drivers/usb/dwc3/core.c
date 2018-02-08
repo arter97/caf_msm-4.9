@@ -858,7 +858,8 @@ int dwc3_core_init(struct dwc3 *dwc)
 	dwc3_frame_length_adjustment(dwc);
 
 	usb_phy_set_suspend(dwc->usb2_phy, 0);
-	usb_phy_set_suspend(dwc->usb3_phy, 0);
+	if (dwc->maximum_speed >= USB_SPEED_SUPER)
+		usb_phy_set_suspend(dwc->usb3_phy, 0);
 	ret = phy_power_on(dwc->usb2_generic_phy);
 	if (ret < 0)
 		goto err2;
@@ -886,6 +887,19 @@ int dwc3_core_init(struct dwc3 *dwc)
 	if (!dwc3_is_usb31(dwc) && dwc->revision >= DWC3_REVISION_310A) {
 		reg = dwc3_readl(dwc->regs, DWC3_GUCTL2);
 		reg |= DWC3_GUCTL2_RST_ACTBITLATER;
+		dwc3_writel(dwc->regs, DWC3_GUCTL2, reg);
+	}
+
+	/*
+	 * Workaround for STAR 9001198391 which affects dwc3 core
+	 * version 3.20a only. Default HP timer value is incorrectly
+	 * set to 3us. Reprogram HP timer value to support USB 3.1
+	 * HP timer ECN.
+	 */
+	if (!dwc3_is_usb31(dwc) &&  dwc->revision == DWC3_REVISION_320A) {
+		reg = dwc3_readl(dwc->regs, DWC3_GUCTL2);
+		reg &= ~DWC3_GUCTL2_HP_TIMER_MASK;
+		reg |= DWC3_GUCTL2_HP_TIMER(11);
 		dwc3_writel(dwc->regs, DWC3_GUCTL2, reg);
 	}
 

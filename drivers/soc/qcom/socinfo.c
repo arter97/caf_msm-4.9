@@ -587,6 +587,10 @@ static struct msm_soc_info cpu_of_id[] = {
 	/* SDM450 ID */
 	[338] = {MSM_CPU_SDM450, "SDM450"},
 
+	/* SDM632 ID */
+	[349] = {MSM_CPU_SDM632, "SDM632"},
+	[350] = {MSM_CPU_SDA632, "SDA632"},
+
 	/* Uninitialized IDs are not known to run Linux.
 	 * MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
 	 * considered as unknown CPU.
@@ -646,6 +650,55 @@ static char *msm_read_hardware_id(void)
 	return msm_soc_str;
 err_path:
 	return "UNKNOWN SOC TYPE";
+}
+
+const char * __init arch_read_machine_name(void)
+{
+	static char msm_machine_name[256] = "Qualcomm Technologies, Inc. ";
+	static bool string_generated;
+	u32 len = 0;
+	const char *name;
+
+	if (string_generated)
+		return msm_machine_name;
+
+	len = strlen(msm_machine_name);
+	name = of_get_flat_dt_prop(of_get_flat_dt_root(),
+				"qcom,msm-name", NULL);
+	if (name)
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", name);
+	else
+		goto no_prop_path;
+
+	name = of_get_flat_dt_prop(of_get_flat_dt_root(),
+				"qcom,pmic-name", NULL);
+	if (name) {
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", " ");
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", name);
+	} else
+		goto no_prop_path;
+
+	name = of_flat_dt_get_machine_name();
+	if (name) {
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", " ");
+		len += snprintf(msm_machine_name + len,
+					sizeof(msm_machine_name) - len,
+					"%s", name);
+	} else
+		goto no_prop_path;
+
+	string_generated = true;
+	return msm_machine_name;
+no_prop_path:
+	return of_flat_dt_get_machine_name();
 }
 
 uint32_t socinfo_get_raw_id(void)
@@ -1468,6 +1521,10 @@ static void * __init setup_dummy_socinfo(void)
 	} else if (early_machine_is_sdm450()) {
 		dummy_socinfo.id = 338;
 		strlcpy(dummy_socinfo.build_id, "sdm450 - ",
+			sizeof(dummy_socinfo.build_id));
+	} else if (early_machine_is_sdm632()) {
+		dummy_socinfo.id = 349;
+		strlcpy(dummy_socinfo.build_id, "sdm632 - ",
 			sizeof(dummy_socinfo.build_id));
 	}
 
