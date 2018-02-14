@@ -276,6 +276,7 @@ dtb-$(CONFIG_ARCH_SDM670) += sdm670-rumi.dtb \
 	qcs605-mtp.dtb \
 	qcs605-cdp.dtb \
 	qcs605-external-codec-mtp.dtb \
+	qcs605-lc-mtp.dtb \
 	sdm710-mtp.dtb \
 	sdm710-cdp.dtb \
 	sdm710-qrd.dtb \
