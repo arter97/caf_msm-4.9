@@ -1119,6 +1119,9 @@
 			qcom,smdpkt-dev-name = "smd_pkt_loopback";
 		};
 	};
+	qcom,iris-fm {
+		compatible = "qcom,iris_fm";
+	};
 
 	rpm_bus: qcom,rpm-smd {
 		compatible = "qcom,rpm-smd";
