@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -2257,7 +2257,7 @@ static int sde_encoder_resource_control(struct drm_encoder *drm_enc,
 			if (autorefresh_enabled) {
 				SDE_DEBUG_ENC(sde_enc,
 					"not handling early wakeup since auto refresh is enabled\n");
-				mutex_lock(&sde_enc->rc_lock);
+				mutex_unlock(&sde_enc->rc_lock);
 				return 0;
 			}
 
@@ -2327,6 +2327,16 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 	connector_list = &sde_kms->dev->mode_config.connector_list;
 
 	SDE_EVT32(DRMID(drm_enc));
+
+	/*
+	 * cache the crtc in sde_enc on enable for duration of use case
+	 * for correctly servicing asynchronous irq events and timers
+	 */
+	if (!drm_enc->crtc) {
+		SDE_ERROR("invalid crtc\n");
+		return;
+	}
+	sde_enc->crtc = drm_enc->crtc;
 
 	list_for_each_entry(conn_iter, connector_list, head)
 		if (conn_iter->encoder == drm_enc)
@@ -2529,16 +2539,6 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 		SDE_ERROR("power resource is not enabled\n");
 		return;
 	}
-
-	/*
-	 * cache the crtc in sde_enc on enable for duration of use case
-	 * for correctly servicing asynchronous irq events and timers
-	 */
-	if (!drm_enc->crtc) {
-		SDE_ERROR("invalid crtc\n");
-		return;
-	}
-	sde_enc->crtc = drm_enc->crtc;
 
 	ret = _sde_encoder_get_mode_info(drm_enc, &mode_info);
 	if (ret) {
@@ -3739,6 +3739,7 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 	SDE_ATRACE_BEGIN("enc_prepare_for_kickoff");
 	for (i = 0; i < sde_enc->num_phys_encs; i++) {
 		phys = sde_enc->phys_encs[i];
+		params->is_primary = sde_enc->disp_info.is_primary;
 		if (phys) {
 			if (phys->ops.prepare_for_kickoff) {
 				rc = phys->ops.prepare_for_kickoff(
