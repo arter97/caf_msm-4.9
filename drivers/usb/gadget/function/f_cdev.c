@@ -46,6 +46,8 @@
 #include <asm/ioctls.h>
 #include <asm-generic/termios.h>
 
+#include "u_serial.h"
+
 #define DEVICE_NAME "at_usb"
 #define MODULE_NAME "msm_usb_bridge"
 #define NUM_INSTANCE 3
@@ -60,36 +62,6 @@
 
 #define GS_LOG2_NOTIFY_INTERVAL		5  /* 1 << 5 == 32 msec */
 #define GS_NOTIFY_MAXPACKET		10 /* notification + 2 bytes */
-
-struct cserial {
-	struct usb_function		func;
-	struct usb_ep			*in;
-	struct usb_ep			*out;
-	struct usb_ep			*notify;
-	struct usb_request		*notify_req;
-	struct usb_cdc_line_coding	port_line_coding;
-	u8				pending;
-	u8				q_again;
-	u8				data_id;
-	u16				serial_state;
-	u16				port_handshake_bits;
-	/* control signal callbacks*/
-	unsigned int (*get_dtr)(struct cserial *p);
-	unsigned int (*get_rts)(struct cserial *p);
-
-	/* notification callbacks */
-	void (*connect)(struct cserial *p);
-	void (*disconnect)(struct cserial *p);
-	int (*send_break)(struct cserial *p, int duration);
-	unsigned int (*send_carrier_detect)(struct cserial *p,
-						unsigned int val);
-	unsigned int (*send_ring_indicator)(struct cserial *p,
-						unsigned int val);
-	int (*send_modem_ctrl_bits)(struct cserial *p, int ctrl_bits);
-
-	/* notification changes to modem */
-	void (*notify_modem)(void *port, int ctrl_bits);
-};
 
 struct f_cdev {
 	struct cdev		fcdev_cdev;
@@ -151,8 +123,8 @@ static DEFINE_MUTEX(chardev_ida_lock);
 static int usb_cser_alloc_chardev_region(void);
 static void usb_cser_chardev_deinit(void);
 static void usb_cser_read_complete(struct usb_ep *ep, struct usb_request *req);
-static int usb_cser_connect(struct f_cdev *port);
-static void usb_cser_disconnect(struct f_cdev *port);
+//static int usb_cser_connect(struct f_cdev *port);
+//static void usb_cser_disconnect(struct f_cdev *port);
 static struct f_cdev *f_cdev_alloc(char *func_name, int portno);
 static void usb_cser_free_req(struct usb_ep *ep, struct usb_request *req);
 
@@ -349,6 +321,7 @@ static inline struct f_cdev *cser_to_port(struct cserial *cser)
 	return container_of(cser, struct f_cdev, port_usb);
 }
 
+/*
 static unsigned int convert_acm_sigs_to_uart(unsigned int acm_sig)
 {
 	unsigned int uart_sig = 0;
@@ -362,6 +335,7 @@ static unsigned int convert_acm_sigs_to_uart(unsigned int acm_sig)
 
 	return uart_sig;
 }
+*/
 
 static void port_complete_set_line_coding(struct usb_ep *ep,
 		struct usb_request *req)
@@ -433,7 +407,8 @@ usb_cser_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 			w_value & ACM_CTRL_DTR ? 1 : 0,
 			w_value & ACM_CTRL_RTS ? 1 : 0);
 		if (port->port_usb.notify_modem)
-			port->port_usb.notify_modem(port, w_value);
+			port->port_usb.notify_modem(&port->port_usb, 0,
+								w_value);
 
 		break;
 
@@ -495,7 +470,7 @@ static int usb_cser_set_alt(struct usb_function *f, unsigned int intf,
 	if (port->port_usb.in->driver_data) {
 		dev_dbg(&cdev->gadget->dev,
 			"reset port(%s)\n", port->name);
-		usb_cser_disconnect(port);
+		gsmd_disconnect(&port->port_usb, 0);
 	}
 	if (!port->port_usb.in->desc || !port->port_usb.out->desc) {
 		dev_dbg(&cdev->gadget->dev,
@@ -509,7 +484,10 @@ static int usb_cser_set_alt(struct usb_function *f, unsigned int intf,
 		}
 	}
 
-	usb_cser_connect(port);
+	gsmd_connect(&port->port_usb, 0);
+	port->is_connected = true;
+	port->port_usb.pending = false;
+	port->port_usb.q_again = false;
 	return rc;
 }
 
@@ -521,7 +499,8 @@ static void usb_cser_disable(struct usb_function *f)
 	dev_dbg(&cdev->gadget->dev,
 		"port(%s) deactivated\n", port->name);
 
-	usb_cser_disconnect(port);
+	gsmd_disconnect(&port->port_usb, 0);
+	port->is_connected = false;
 	usb_ep_disable(port->port_usb.notify);
 	port->port_usb.notify->driver_data = NULL;
 }
@@ -697,6 +676,7 @@ static void usb_cser_free_req(struct usb_ep *ep, struct usb_request *req)
 	}
 }
 
+/*
 static void usb_cser_free_requests(struct usb_ep *ep, struct list_head *head)
 {
 	struct usb_request	*req;
@@ -707,6 +687,7 @@ static void usb_cser_free_requests(struct usb_ep *ep, struct list_head *head)
 		usb_cser_free_req(ep, req);
 	}
 }
+*/
 
 static struct usb_request *
 usb_cser_alloc_req(struct usb_ep *ep, unsigned int len, gfp_t flags)
@@ -742,6 +723,12 @@ static int usb_cser_bind(struct usb_configuration *c, struct usb_function *f)
 		if (status < 0)
 			return status;
 		cser_string_defs[0].id = status;
+	}
+
+	status = gsmd_setup(cdev->gadget, 1);
+	if (status) {
+		pr_err("gsmd_setup failed\n");
+		return status;
 	}
 
 	status = usb_interface_id(c, f);
@@ -844,6 +831,7 @@ static void usb_cser_unbind(struct usb_configuration *c, struct usb_function *f)
 	usb_cser_free_req(port->port_usb.notify, port->port_usb.notify_req);
 }
 
+/*
 static int usb_cser_alloc_requests(struct usb_ep *ep, struct list_head *head,
 		int num, int size,
 		void (*cb)(struct usb_ep *ep, struct usb_request *))
@@ -866,6 +854,7 @@ static int usb_cser_alloc_requests(struct usb_ep *ep, struct list_head *head,
 
 	return 0;
 }
+*/
 
 static void usb_cser_start_rx(struct f_cdev *port)
 {
@@ -937,6 +926,7 @@ static void usb_cser_read_complete(struct usb_ep *ep, struct usb_request *req)
 	wake_up(&port->read_wq);
 }
 
+/*
 static void usb_cser_write_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	unsigned long flags;
@@ -958,13 +948,13 @@ static void usb_cser_write_complete(struct usb_ep *ep, struct usb_request *req)
 	switch (req->status) {
 	default:
 		pr_debug("unexpected %s status %d\n", ep->name, req->status);
-		/* FALL THROUGH */
+		FALL THROUGH
 	case 0:
-		/* normal completion */
+		normal completion
 		break;
 
 	case -ESHUTDOWN:
-		/* disconnect */
+		disconnect
 		pr_debug("%s shutdown\n", ep->name);
 		break;
 	}
@@ -1023,7 +1013,7 @@ static void usb_cser_stop_io(struct f_cdev *port)
 	in = port->port_usb.in;
 	out = port->port_usb.out;
 
-	/* disable endpoints, aborting down any active I/O */
+	disable endpoints, aborting down any active I/O
 	usb_ep_disable(out);
 	out->driver_data = NULL;
 	usb_ep_disable(in);
@@ -1042,6 +1032,7 @@ static void usb_cser_stop_io(struct f_cdev *port)
 	usb_cser_free_requests(in, &port->write_pool);
 	spin_unlock_irqrestore(&port->port_lock, flags);
 }
+*/
 
 int f_cdev_open(struct inode *inode, struct file *file)
 {
@@ -1413,6 +1404,7 @@ static long f_cdev_ioctl(struct file *fp, unsigned int cmd,
 	return ret;
 }
 
+/*
 static void usb_cser_notify_modem(void *fport, int ctrl_bits)
 {
 	int temp;
@@ -1486,7 +1478,7 @@ void usb_cser_disconnect(struct f_cdev *port)
 
 	usb_cser_stop_io(port);
 
-	/* lower DTR to modem */
+	lower DTR to modem
 	usb_cser_notify_modem(port, 0);
 
 	spin_lock_irqsave(&port->port_lock, flags);
@@ -1495,6 +1487,7 @@ void usb_cser_disconnect(struct f_cdev *port)
 	port->nbytes_to_port_bridge = 0;
 	spin_unlock_irqrestore(&port->port_lock, flags);
 }
+*/
 
 static const struct file_operations f_cdev_fops = {
 	.owner = THIS_MODULE,

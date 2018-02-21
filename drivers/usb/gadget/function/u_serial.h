@@ -64,6 +64,37 @@ struct gserial {
 	void (*notify_modem)(void *gser, u8 portno, int ctrl_bits);
 };
 
+struct cserial {
+	struct usb_function		func;
+	struct usb_ep			*in;
+	struct usb_ep			*out;
+	struct usb_ep			*notify;
+	struct usb_request		*notify_req;
+	struct usb_cdc_line_coding	port_line_coding;
+	u8				pending;
+	u8				q_again;
+	u8				data_id;
+	u16				serial_state;
+	u16				port_handshake_bits;
+	/* control signal callbacks*/
+	unsigned int (*get_dtr)(struct cserial *p);
+	unsigned int (*get_rts)(struct cserial *p);
+
+	/* notification callbacks */
+	void (*connect)(struct cserial *p);
+	void (*disconnect)(struct cserial *p);
+	int (*send_break)(struct cserial *p, int duration);
+	unsigned int (*send_carrier_detect)(struct cserial *p,
+						unsigned int val);
+	unsigned int (*send_ring_indicator)(struct cserial *p,
+						unsigned int val);
+	int (*send_modem_ctrl_bits)(struct cserial *p, int ctrl_bits);
+
+	/* notification changes to modem */
+	void (*notify_modem)(void *port, u8 portno, int ctrl_bits);
+};
+
+
 /* utilities to allocate/free request and buffer */
 struct usb_request *gs_alloc_req(struct usb_ep *ep, unsigned len, gfp_t flags);
 void gs_free_req(struct usb_ep *, struct usb_request *req);
@@ -75,6 +106,10 @@ void gserial_free_line(unsigned char port_line);
 /* connect/disconnect is handled by individual functions */
 int gserial_connect(struct gserial *, u8 port_num);
 void gserial_disconnect(struct gserial *);
+
+int gsmd_setup(struct usb_gadget *g, unsigned int count);
+int gsmd_connect(struct cserial *gser, u8 portno);
+void gsmd_disconnect(struct cserial *gser, u8 portno);
 
 /* functions are bound to configurations by a config or gadget driver */
 int gser_bind_config(struct usb_configuration *c, u8 port_num);
