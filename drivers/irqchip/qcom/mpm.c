@@ -237,14 +237,7 @@ static int msm_mpm_gic_chip_translate(struct irq_domain *d,
 					unsigned long *hwirq,
 					unsigned int *type)
 {
-	if (is_of_node(fwspec->fwnode)) {
-		if (fwspec->param_count < 3)
-			return -EINVAL;
-		*hwirq = fwspec->param[1];
-		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-		return 0;
-	}
-	return -EINVAL;
+	return d->parent->ops->translate(d->parent, fwspec, hwirq, type);
 }
 
 static int msm_mpm_gic_chip_alloc(struct irq_domain *domain,
