@@ -25,6 +25,10 @@
 	qcom,msm-name = "MSM8953";
 	interrupt-parent = <&wakegic>;
 
+	chosen {
+		bootargs = "core_ctl_disable_cpumask=0-7";
+	};
+
 	firmware: firmware {
 		android {
 			compatible = "android,firmware";
