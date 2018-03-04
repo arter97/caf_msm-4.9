@@ -1376,7 +1376,8 @@ static phys_addr_t arm_smmu_verify_fault(struct iommu_domain *domain,
 	phys_addr_t phys_post_tlbiall;
 
 	phys = arm_smmu_iova_to_phys_hard(domain, iova);
-	tlb->tlb_flush_all(smmu_domain);
+	if (tlb)
+		tlb->tlb_flush_all(smmu_domain);
 	phys_post_tlbiall = arm_smmu_iova_to_phys_hard(domain, iova);
 
 	if (phys != phys_post_tlbiall) {
@@ -2277,8 +2278,6 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
 	const struct iommu_gather_ops *tlb;
 
 	tlb = smmu_domain->pgtbl_cfg.tlb;
-	if (!tlb)
-		return;
 
 	mutex_lock(&smmu->stream_map_mutex);
 	for_each_cfg_sme(fwspec, i, idx) {
@@ -2294,7 +2293,8 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
 	mutex_unlock(&smmu->stream_map_mutex);
 
 	/* Ensure there are no stale mappings for this context bank */
-	tlb->tlb_flush_all(smmu_domain);
+	if (tlb)
+		tlb->tlb_flush_all(smmu_domain);
 }
 
 static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
@@ -3431,7 +3431,8 @@ static void arm_smmu_tlbi_domain(struct iommu_domain *domain)
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	const struct iommu_gather_ops *tlb = smmu_domain->pgtbl_cfg.tlb;
 
-	tlb->tlb_flush_all(smmu_domain);
+	if (tlb)
+		tlb->tlb_flush_all(smmu_domain);
 }
 
 static int arm_smmu_enable_config_clocks(struct iommu_domain *domain)
@@ -5274,7 +5275,8 @@ static void qsmmuv500_init_cb(struct arm_smmu_domain *smmu_domain,
 	 * Flush the context bank after modifying ACTLR to ensure there
 	 * are no cache entries with stale state
 	 */
-	tlb->tlb_flush_all(smmu_domain);
+	if (tlb)
+		tlb->tlb_flush_all(smmu_domain);
 }
 
 static int qsmmuv500_tbu_register(struct device *dev, void *cookie)
