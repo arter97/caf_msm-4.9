@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/termios.h>
@@ -38,7 +39,7 @@
 
 static struct workqueue_struct *gsmd_wq;
 
-#define SMD_N_PORTS	2
+#define SMD_N_PORTS	1
 #define CH_OPENED	0
 #define CH_READY	1
 struct smd_port_info {
@@ -50,9 +51,6 @@ struct smd_port_info {
 struct smd_port_info smd_pi[SMD_N_PORTS] = {
 	{
 		.name = "DS",
-	},
-	{
-		.name = "UNUSED",
 	},
 };
 
@@ -68,7 +66,7 @@ struct gsmd_port {
 	struct list_head	write_pool;
 	struct work_struct	pull;
 
-	struct gserial		*port_usb;
+	struct cserial		*port_usb;
 
 	struct smd_port_info	*pi;
 	struct delayed_work	connect_work;
@@ -86,7 +84,7 @@ struct gsmd_port {
 #define SMD_ACM_CTRL_DCD		0x01
 #define SMD_ACM_CTRL_DSR		0x02
 #define SMD_ACM_CTRL_BRK		0x04
-#define SMD_ACM_CTRL_RI		0x08
+#define SMD_ACM_CTRL_RI			0x08
 	unsigned int		cbits_to_laptop;
 
 	/* pkt counters */
@@ -633,7 +631,7 @@ static void gsmd_notify_modem(void *gptr, u8 portno, int ctrl_bits)
 {
 	struct gsmd_port *port;
 	int temp;
-	struct gserial *gser = gptr;
+	struct cserial *gser = gptr;
 
 	if (portno >= n_smd_ports) {
 		pr_err("%s: invalid portno#%d\n", __func__, portno);
@@ -685,7 +683,7 @@ static void gsmd_notify_modem(void *gptr, u8 portno, int ctrl_bits)
 			~port->cbits_to_modem);
 }
 
-int gsmd_connect(struct gserial *gser, u8 portno)
+int gsmd_connect(struct cserial *gser, u8 portno)
 {
 	unsigned long flags;
 	int ret;
@@ -737,7 +735,7 @@ int gsmd_connect(struct gserial *gser, u8 portno)
 	return 0;
 }
 
-void gsmd_disconnect(struct gserial *gser, u8 portno)
+void gsmd_disconnect(struct cserial *gser, u8 portno)
 {
 	unsigned long flags;
 	struct gsmd_port *port;
@@ -1002,7 +1000,7 @@ int gsmd_setup(struct usb_gadget *g, unsigned int count)
 				__func__);
 		return -ENOMEM;
 	}
-	extra_sz = g->extra_buf_alloc;
+	extra_sz = 0;
 
 	for (i = 0; i < count; i++) {
 		mutex_init(&smd_ports[i].lock);
