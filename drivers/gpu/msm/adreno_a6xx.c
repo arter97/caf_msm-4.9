@@ -791,13 +791,14 @@ static void a6xx_start(struct adreno_device *adreno_dev)
 		kgsl_regwrite(device, A6XX_RB_CONTEXT_SWITCH_GMEM_SAVE_RESTORE,
 			0x1);
 
+	a6xx_protect_init(adreno_dev);
+
 	if (!patch_reglist && (adreno_dev->pwrup_reglist.gpuaddr != 0)) {
 		a6xx_patch_pwrup_reglist(adreno_dev);
 		patch_reglist = true;
 	}
 
 	a6xx_preemption_start(adreno_dev);
-	a6xx_protect_init(adreno_dev);
 
 	/*
 	 * We start LM here because we want all the following to be up
@@ -1257,7 +1258,7 @@ static void _load_gmu_rpmh_ucode(struct kgsl_device *device)
 	_regwrite(gmu->pdc_reg_virt,
 			PDC_GPU_TCS3_CMD0_ADDR + PDC_CMD_OFFSET, 0x30000);
 	_regwrite(gmu->pdc_reg_virt,
-			PDC_GPU_TCS3_CMD0_DATA + PDC_CMD_OFFSET, 0x3);
+			PDC_GPU_TCS3_CMD0_DATA + PDC_CMD_OFFSET, 0x6);
 	_regwrite(gmu->pdc_reg_virt,
 			PDC_GPU_TCS3_CMD0_MSGID + PDC_CMD_OFFSET * 2, 0x10108);
 	_regwrite(gmu->pdc_reg_virt,

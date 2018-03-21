@@ -21,10 +21,23 @@
 	qcom,board-id = <1 0x1>, <1 0x101>;
 };
 
+&vbus_detect {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+	extcon = <&vbus_detect>;
+};
+
 &pcie_ep {
 	status = "okay";
 };
 
 &pcie0 {
 	status = "disabled";
+};
+
+&mhi_device {
+	status = "okay";
 };

@@ -679,6 +679,8 @@ struct root_domain {
 };
 
 extern struct root_domain def_root_domain;
+extern void sched_get_rd(struct root_domain *rd);
+extern void sched_put_rd(struct root_domain *rd);
 
 #ifdef HAVE_RT_PUSH_IPI
 extern void rto_push_irq_work_func(struct irq_work *work);
@@ -2391,7 +2393,6 @@ extern unsigned int max_load_scale_factor;
 extern unsigned int max_possible_capacity;
 extern unsigned int min_max_possible_capacity;
 extern unsigned int max_power_cost;
-extern unsigned int sched_init_task_load_windows;
 extern unsigned int up_down_migrate_scale_factor;
 extern unsigned int sysctl_sched_restrict_cluster_spill;
 extern unsigned int sched_pred_alert_load;

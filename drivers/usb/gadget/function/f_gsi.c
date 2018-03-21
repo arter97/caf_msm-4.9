@@ -532,6 +532,9 @@ static int ipa_suspend_work_handler(struct gsi_data_port *d_port)
 	if (!usb_gsi_ep_op(gsi->d_port.in_ep, (void *) &f_suspend,
 				GSI_EP_OP_CHECK_FOR_SUSPEND)) {
 		ret = -EFAULT;
+		block_db = false;
+		usb_gsi_ep_op(d_port->in_ep, (void *)&block_db,
+			GSI_EP_OP_SET_CLR_BLOCK_DBL);
 		goto done;
 	}
 
@@ -2078,13 +2081,8 @@ static int gsi_set_alt(struct usb_function *f, unsigned int intf,
 		/* for rndis and rmnet alt is always 0 update alt accordingly */
 		if (gsi->prot_id == IPA_USB_RNDIS ||
 				gsi->prot_id == IPA_USB_RMNET ||
-				gsi->prot_id == IPA_USB_DIAG) {
-			if (gsi->d_port.in_ep &&
-				!gsi->d_port.in_ep->driver_data)
+				gsi->prot_id == IPA_USB_DIAG)
 				alt = 1;
-			else
-				alt = 0;
-		}
 
 		if (alt > 1)
 			goto notify_ep_disable;
@@ -2377,7 +2375,7 @@ skip_string_id_alloc:
 		if (!ep)
 			goto fail;
 		gsi->d_port.in_ep = ep;
-		msm_ep_config(gsi->d_port.in_ep);
+		msm_ep_config(gsi->d_port.in_ep, NULL);
 		ep->driver_data = cdev;	/* claim */
 	}
 
@@ -2387,7 +2385,7 @@ skip_string_id_alloc:
 		if (!ep)
 			goto fail;
 		gsi->d_port.out_ep = ep;
-		msm_ep_config(gsi->d_port.out_ep);
+		msm_ep_config(gsi->d_port.out_ep, NULL);
 		ep->driver_data = cdev;	/* claim */
 	}
 

@@ -2315,7 +2315,7 @@ static int sde_kms_cont_splash_config(struct msm_kms *kms)
 		 * configuration.
 		 */
 		if (conn_iter &&
-			conn_iter->encoder_ids[0] == encoder->base.id) {
+			(conn_iter->encoder_ids[0] == encoder->base.id)) {
 			connector = conn_iter;
 			break;
 		}
@@ -3016,15 +3016,10 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 		goto drm_obj_init_err;
 	}
 
-	dev->mode_config.min_width = 0;
-	dev->mode_config.min_height = 0;
-
-	/*
-	 * max crtc width is equal to the max mixer width * 2 and max height is
-	 * is 4K
-	 */
-	dev->mode_config.max_width = sde_kms->catalog->max_mixer_width * 2;
-	dev->mode_config.max_height = 4096;
+	dev->mode_config.min_width = sde_kms->catalog->min_display_width;
+	dev->mode_config.min_height = sde_kms->catalog->min_display_height;
+	dev->mode_config.max_width = sde_kms->catalog->max_display_width;
+	dev->mode_config.max_height = sde_kms->catalog->max_display_height;
 
 	/*
 	 * Support format modifiers for compression etc.

@@ -2140,7 +2140,7 @@ static void ipa3_q6_avoid_holb(void)
 	}
 }
 
-static void ipa3_halt_q6_cons_gsi_channels(void)
+static void ipa3_halt_q6_gsi_channels(bool prod)
 {
 	int ep_idx;
 	int client_idx;
@@ -2149,8 +2149,10 @@ static void ipa3_halt_q6_cons_gsi_channels(void)
 	int ret;
 	int code = 0;
 
+	/* if prod flag is true, then we halt the producer channels also */
 	for (client_idx = 0; client_idx < IPA_CLIENT_MAX; client_idx++) {
-		if (IPA_CLIENT_IS_Q6_CONS(client_idx)) {
+		if (IPA_CLIENT_IS_Q6_CONS(client_idx)
+			|| (IPA_CLIENT_IS_Q6_PROD(client_idx) && prod)) {
 			ep_idx = ipa3_get_ep_mapping(client_idx);
 			if (ep_idx == -1)
 				continue;
@@ -2191,7 +2193,6 @@ static void ipa3_halt_q6_cons_gsi_channels(void)
 		}
 	}
 }
-
 
 static int ipa3_q6_clean_q6_flt_tbls(enum ipa_ip_type ip,
 	enum ipa_rule_type rlt)
@@ -2607,6 +2608,7 @@ void ipa3_q6_post_shutdown_cleanup(void)
 {
 	int client_idx;
 	int ep_idx;
+	bool prod = false;
 
 	IPADBG_LOW("ENTER\n");
 
@@ -2619,7 +2621,17 @@ void ipa3_q6_post_shutdown_cleanup(void)
 
 	/* Handle the issue where SUSPEND was removed for some reason */
 	ipa3_q6_avoid_holb();
-	ipa3_halt_q6_cons_gsi_channels();
+
+	/* halt both prod and cons channels starting at IPAv4 */
+	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_0) {
+		prod = true;
+		ipa3_halt_q6_gsi_channels(prod);
+		IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
+		IPADBG("Exit without consumer check\n");
+		return;
+	}
+
+	ipa3_halt_q6_gsi_channels(prod);
 
 	for (client_idx = 0; client_idx < IPA_CLIENT_MAX; client_idx++)
 		if (IPA_CLIENT_IS_Q6_PROD(client_idx)) {
@@ -4394,8 +4406,12 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 	/* Prevent consequent calls from trying to load the FW again. */
 	if (ipa3_ctx->ipa_initialization_complete)
 		return 0;
+
+	IPADBG("active clients = %d\n",
+			atomic_read(&ipa3_ctx->ipa3_active_clients.cnt));
 	/* move proxy vote for modem on ipa3_post_init */
-	IPA_ACTIVE_CLIENTS_INC_SPECIAL("PROXY_CLK_VOTE");
+	if (ipa3_ctx->ipa_hw_type != IPA_HW_v4_0)
+		ipa3_proxy_clk_vote();
 
 	/*
 	 * indication whether working in MHI config or non MHI config is given
@@ -4532,9 +4548,6 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 
 	ipa3_register_panic_hdlr();
 
-	ipa3_ctx->q6_proxy_clk_vote_valid = true;
-	ipa3_ctx->q6_proxy_clk_vote_cnt++;
-
 	mutex_lock(&ipa3_ctx->lock);
 	ipa3_ctx->ipa_initialization_complete = true;
 	mutex_unlock(&ipa3_ctx->lock);
@@ -4551,6 +4564,7 @@ fail_setup_apps_pipes:
 	gsi_deregister_device(ipa3_ctx->gsi_dev_hdl, false);
 fail_register_device:
 	ipa3_destroy_flt_tbl_idrs();
+	ipa3_proxy_clk_unvote();
 	return result;
 }
 
@@ -4860,6 +4874,7 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	int result = 0;
 	int i;
 	struct ipa3_rt_tbl_set *rset;
+	struct ipa_active_client_logging_info log_info;
 
 	IPADBG("IPA Driver initialization started\n");
 
@@ -5050,7 +5065,13 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	}
 
 	mutex_init(&ipa3_ctx->ipa3_active_clients.mutex);
-	/* move proxy vote for modem to ipa3_post_init() */
+
+	IPA_ACTIVE_CLIENTS_PREP_SPECIAL(log_info, "PROXY_CLK_VOTE");
+	ipa3_active_clients_log_inc(&log_info, false);
+	ipa3_ctx->q6_proxy_clk_vote_valid = true;
+	ipa3_ctx->q6_proxy_clk_vote_cnt = 1;
+
+	/*Updating the proxy vote cnt 1 */
 	atomic_set(&ipa3_ctx->ipa3_active_clients.cnt, 1);
 
 	/* Create workqueues for power management */
@@ -5181,7 +5202,6 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	mutex_init(&ipa3_ctx->lock);
 	mutex_init(&ipa3_ctx->q6_proxy_clk_vote_mutex);
 	mutex_init(&ipa3_ctx->ipa_cne_evt_lock);
-	ipa3_ctx->q6_proxy_clk_vote_cnt = 0;
 
 	idr_init(&ipa3_ctx->ipa_idr);
 	spin_lock_init(&ipa3_ctx->idr_lock);
@@ -5296,8 +5316,14 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	IPADBG("ipa cdev added successful. major:%d minor:%d\n",
 			MAJOR(ipa3_ctx->dev_num),
 			MINOR(ipa3_ctx->dev_num));
+	/*
+	 * for IPA 4.0 offline charge is not needed and we need to prevent
+	 * power collapse until IPA uC is loaded.
+	 */
+
 	/* proxy vote for modem is added in ipa3_post_init() phase */
-	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
+	if (ipa3_ctx->ipa_hw_type != IPA_HW_v4_0)
+		ipa3_proxy_clk_unvote();
 	return 0;
 
 fail_cdev_add:

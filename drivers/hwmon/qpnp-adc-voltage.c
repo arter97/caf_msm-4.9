@@ -107,7 +107,7 @@
 #define QPNP_VADC_CONV_TIME_MIN					1000
 #define QPNP_VADC_CONV_TIME_MAX					1100
 #define QPNP_ADC_COMPLETION_TIMEOUT				HZ
-#define QPNP_VADC_ERR_COUNT					20
+#define QPNP_VADC_ERR_COUNT					50
 #define QPNP_OP_MODE_SHIFT					3
 
 #define QPNP_VADC_THR_LSB_MASK(val)				(val & 0xff)
@@ -224,6 +224,8 @@ static struct qpnp_vadc_scale_fn vadc_scale_fn[] = {
 	[SCALE_DIE_TEMP] = {qpnp_adc_scale_die_temp},
 	[SCALE_I_DEFAULT] = {qpnp_iadc_scale_default},
 	[SCALE_USBIN_I] = {qpnp_adc_scale_usbin_curr},
+	[SCALE_BATT_THERM_TEMP_QRD] = {qpnp_adc_batt_therm_qrd},
+	[SCALE_SMB1390_DIE_TEMP] = {qpnp_adc_scale_die_temp_1390},
 };
 
 static struct qpnp_vadc_rscale_fn adc_vadc_rscale_fn[] = {

@@ -199,7 +199,7 @@ static int32_t msm_vfe40_init_qos_parms(struct vfe_device *vfe_dev,
 	if (rc < 0 || !ds_entries) {
 		pr_err("%s: NO D/S entries found\n", __func__);
 	} else {
-		ds_settings = kcalloc(qos_entries, sizeof(uint32_t),
+		ds_settings = kcalloc(ds_entries, sizeof(uint32_t),
 				GFP_KERNEL);
 		if (!ds_settings)
 			return -ENOMEM;
@@ -1106,8 +1106,10 @@ static int msm_vfe40_start_fetch_engine_multi_pass(struct vfe_device *vfe_dev,
 				fe_cfg->stream_id);
 		vfe_dev->fetch_engine_info.bufq_handle = bufq_handle;
 
+		mutex_lock(&vfe_dev->buf_mgr->lock);
 		rc = vfe_dev->buf_mgr->ops->get_buf_by_index(
 			vfe_dev->buf_mgr, bufq_handle, fe_cfg->buf_idx, &buf);
+		mutex_unlock(&vfe_dev->buf_mgr->lock);
 		if (rc < 0 || !buf) {
 			pr_err("%s: No fetch buffer rc= %d buf= %pK\n",
 				__func__, rc, buf);

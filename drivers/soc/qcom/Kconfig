@@ -646,6 +646,15 @@ config MSM_EVENT_TIMER
 	  monitor events that require the core to be awake and ready to
 	  handle the event.
 
+config MSM_AVTIMER
+	tristate "Avtimer Driver"
+	default n
+	help
+	  This driver gets the Q6 out of power collapsed state
+	  and exposes ioctl control to read avtimer tick.
+	  Enables camera to use for VT call to get avtimer
+	  timestamp.
+
 config MSM_PM
 	depends on PM
 	select MSM_IDLE_STATS if DEBUG_FS
@@ -785,5 +794,14 @@ config QCOM_QDSS_BRIDGE
 	  The driver will help route diag traffic from modem side over the QDSS
 	  sub-system to USB on APSS side. The driver acts as a bridge between the
 	  MHI and USB interface. If unsure, say N.
+
+config MSM_BAM_DMUX
+	bool "BAM Data Mux Driver"
+	depends on SPS
+	help
+	  Support Muxed Data Channels over BAM interface.
+	  BAM has a limited number of pipes.  This driver
+	  provides a means to support more logical channels
+	  via muxing than BAM could without muxing.
 
 source "drivers/soc/qcom/wcnss/Kconfig"

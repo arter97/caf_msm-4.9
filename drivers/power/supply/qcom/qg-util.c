@@ -36,19 +36,20 @@ int qg_read(struct qpnp_qg *chip, u32 addr, u8 *val, int len)
 	int rc, i;
 	u32 dummy = 0;
 
+	rc = regmap_bulk_read(chip->regmap, addr, val, len);
+	if (rc < 0) {
+		pr_err("Failed regmap_read for address %04x rc=%d\n", addr, rc);
+		return rc;
+	}
+
 	if (is_sticky_register(addr)) {
+		/* write to the sticky register to clear it */
 		rc = regmap_write(chip->regmap, addr, dummy);
 		if (rc < 0) {
 			pr_err("Failed regmap_write for %04x rc=%d\n",
 						addr, rc);
 			return rc;
 		}
-	}
-
-	rc = regmap_bulk_read(chip->regmap, addr, val, len);
-	if (rc < 0) {
-		pr_err("Failed regmap_read for address %04x rc=%d\n", addr, rc);
-		return rc;
 	}
 
 	if (*chip->debug_mask & QG_DEBUG_BUS_READ) {
@@ -122,7 +123,7 @@ int get_fifo_length(struct qpnp_qg *chip, u32 *fifo_length, bool rt)
 	}
 
 	if (rt) {
-		*fifo_length &= COUNT_FIFO_RT_MASK;
+		*fifo_length = reg & COUNT_FIFO_RT_MASK;
 	} else {
 		*fifo_length = (reg & FIFO_LENGTH_MASK) >> FIFO_LENGTH_SHIFT;
 		*fifo_length += 1;
