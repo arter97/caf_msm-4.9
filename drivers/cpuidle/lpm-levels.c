@@ -1371,11 +1371,6 @@ static int lpm_cpuidle_enter(struct cpuidle_device *dev,
 	const struct cpumask *cpumask = get_cpu_mask(dev->cpu);
 	ktime_t start = ktime_get();
 	uint64_t start_time = ktime_to_ns(start), end_time;
-	struct power_params *pwr_params;
-
-	pwr_params = &cpu->levels[idx].pwr;
-	sched_set_cpu_cstate(dev->cpu, idx + 1,
-			pwr_params->energy_overhead, pwr_params->latency_us);
 
 	cpu_prepare(cpu, idx, true);
 	cluster_prepare(cpu->parent, cpumask, idx, true, start_time);
@@ -1394,7 +1389,6 @@ exit:
 
 	cluster_unprepare(cpu->parent, cpumask, idx, true, end_time);
 	cpu_unprepare(cpu, idx, true);
-	sched_set_cpu_cstate(smp_processor_id(), 0, 0, 0);
 	dev->last_residency = ktime_us_delta(ktime_get(), start);
 	update_history(dev, idx);
 	trace_cpu_idle_exit(idx, success);
@@ -1748,7 +1742,7 @@ static int __init lpm_levels_module_init(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		rc = arm_cpuidle_init(smp_processor_id());
+		rc = arm_cpuidle_init(cpu);
 		if (rc) {
 			pr_err("CPU%d ARM CPUidle init failed (%d)\n", cpu, rc);
 			return rc;

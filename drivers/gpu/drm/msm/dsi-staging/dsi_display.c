@@ -37,6 +37,7 @@
 #define NO_OVERRIDE -1
 
 #define MISR_BUFF_SIZE	256
+#define ESD_MODE_STRING_MAX_LEN 256
 
 #define MAX_NAME_SIZE	64
 
@@ -322,8 +323,7 @@ static irqreturn_t dsi_display_panel_te_irq_handler(int irq, void *data)
 	if (!display)
 		return IRQ_HANDLED;
 
-	atomic_set(&display->te_irq_triggered, 1);
-
+	complete_all(&display->esd_te_gate);
 	return IRQ_HANDLED;
 }
 
@@ -337,12 +337,10 @@ static void dsi_display_change_te_irq_status(struct dsi_display *display,
 
 	/* Handle unbalanced irq enable/disbale calls */
 	if (enable && !display->is_te_irq_enabled) {
-		atomic_set(&display->te_irq_triggered, 1);
 		enable_irq(gpio_to_irq(display->disp_te_gpio));
 		display->is_te_irq_enabled = true;
 	} else if (!enable && display->is_te_irq_enabled) {
 		disable_irq(gpio_to_irq(display->disp_te_gpio));
-		atomic_set(&display->te_irq_triggered, 0);
 		display->is_te_irq_enabled = false;
 	}
 }
@@ -372,6 +370,8 @@ static void dsi_display_register_te_irq(struct dsi_display *display)
 		pr_err("TE request_irq failed for ESD rc:%d\n", rc);
 		return;
 	}
+
+	init_completion(&display->esd_te_gate);
 
 	disable_irq(gpio_to_irq(display->disp_te_gpio));
 	display->is_te_irq_enabled = false;
@@ -672,16 +672,21 @@ static int dsi_display_status_bta_request(struct dsi_display *display)
 
 static int dsi_display_status_check_te(struct dsi_display *display)
 {
-	int const esd_check_success = 1;
+	int rc = 1;
+	int const esd_te_timeout = msecs_to_jiffies(3*20);
 
-	if (atomic_read(&display->te_irq_triggered)) {
-		atomic_set(&display->te_irq_triggered, 0);
-	} else {
+	dsi_display_change_te_irq_status(display, true);
+
+	reinit_completion(&display->esd_te_gate);
+	if (!wait_for_completion_timeout(&display->esd_te_gate,
+				esd_te_timeout)) {
 		pr_err("ESD check failed\n");
-		return -EINVAL;
+		rc = -EINVAL;
 	}
 
-	return esd_check_success;
+	dsi_display_change_te_irq_status(display, false);
+
+	return rc;
 }
 
 int dsi_display_check_status(void *display)
@@ -1027,62 +1032,6 @@ error:
 	return rc;
 }
 
-static ssize_t debugfs_esd_trigger_check(struct file *file,
-				  const char __user *user_buf,
-				  size_t user_len,
-				  loff_t *ppos)
-{
-	struct dsi_display *display = file->private_data;
-	char *buf;
-	int rc = 0;
-	u32 esd_trigger;
-
-	if (!display)
-		return -ENODEV;
-
-	if (*ppos)
-		return 0;
-
-	if (user_len > sizeof(u32))
-		return -EINVAL;
-
-	buf = kzalloc(user_len, GFP_KERNEL);
-	if (!buf)
-		return -ENOMEM;
-
-	if (copy_from_user(buf, user_buf, user_len)) {
-		rc = -EINVAL;
-		goto error;
-	}
-
-	buf[user_len] = '\0'; /* terminate the string */
-
-	if (kstrtouint(buf, 10, &esd_trigger)) {
-		rc = -EINVAL;
-		goto error;
-	}
-
-	if (esd_trigger != 1) {
-		rc = -EINVAL;
-		goto error;
-	}
-
-	display->esd_trigger = esd_trigger;
-
-	if (display->esd_trigger) {
-		rc = dsi_panel_trigger_esd_attack(display->panel);
-		if (rc) {
-			pr_err("Failed to trigger ESD attack\n");
-			return rc;
-		}
-	}
-
-	rc = user_len;
-error:
-	kfree(buf);
-	return rc;
-}
-
 static ssize_t debugfs_misr_read(struct file *file,
 				 char __user *user_buf,
 				 size_t user_len,
@@ -1148,6 +1097,191 @@ error:
 	return len;
 }
 
+static ssize_t debugfs_esd_trigger_check(struct file *file,
+				  const char __user *user_buf,
+				  size_t user_len,
+				  loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	char *buf;
+	int rc = 0;
+	u32 esd_trigger;
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (user_len > sizeof(u32))
+		return -EINVAL;
+
+	buf = kzalloc(user_len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, user_buf, user_len)) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	buf[user_len] = '\0'; /* terminate the string */
+
+	if (kstrtouint(buf, 10, &esd_trigger)) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	if (esd_trigger != 1) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	display->esd_trigger = esd_trigger;
+
+	if (display->esd_trigger) {
+		rc = dsi_panel_trigger_esd_attack(display->panel);
+		if (rc) {
+			pr_err("Failed to trigger ESD attack\n");
+			return rc;
+		}
+	}
+
+	rc = user_len;
+error:
+	kfree(buf);
+	return rc;
+}
+
+static ssize_t debugfs_alter_esd_check_mode(struct file *file,
+				  const char __user *user_buf,
+				  size_t user_len,
+				  loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	struct drm_panel_esd_config *esd_config;
+	char *buf;
+	int rc = 0;
+	size_t len = min_t(size_t, user_len, ESD_MODE_STRING_MAX_LEN);
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	buf = kzalloc(len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, user_buf, user_len)) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	buf[len] = '\0'; /* terminate the string */
+	if (!display->panel) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	esd_config = &display->panel->esd_config;
+	if (!esd_config) {
+		pr_err("Invalid panel esd config\n");
+		rc = -EINVAL;
+		goto error;
+	}
+
+	if (!esd_config->esd_enabled)
+		goto error;
+
+	if (!strcmp(buf, "te_signal_check\n")) {
+		esd_config->status_mode = ESD_MODE_PANEL_TE;
+		dsi_display_change_te_irq_status(display, true);
+	}
+
+	if (!strcmp(buf, "reg_read\n")) {
+		rc = dsi_panel_parse_esd_reg_read_configs(display->panel,
+						display->panel_of);
+		if (rc) {
+			pr_err("failed to alter esd check mode,rc=%d\n",
+						rc);
+			rc = user_len;
+			goto error;
+		}
+		esd_config->status_mode = ESD_MODE_REG_READ;
+		if (dsi_display_is_te_based_esd(display))
+			dsi_display_change_te_irq_status(display, false);
+	}
+
+	rc = len;
+error:
+	kfree(buf);
+	return rc;
+}
+
+static ssize_t debugfs_read_esd_check_mode(struct file *file,
+				 char __user *user_buf,
+				 size_t user_len,
+				 loff_t *ppos)
+{
+	struct dsi_display *display = file->private_data;
+	struct drm_panel_esd_config *esd_config;
+	char *buf;
+	int rc = 0;
+	size_t len = min_t(size_t, user_len, ESD_MODE_STRING_MAX_LEN);
+
+	if (!display)
+		return -ENODEV;
+
+	if (*ppos)
+		return 0;
+
+	if (!display->panel) {
+		pr_err("invalid panel data\n");
+		return -EINVAL;
+	}
+
+	buf = kzalloc(len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	esd_config = &display->panel->esd_config;
+	if (!esd_config) {
+		pr_err("Invalid panel esd config\n");
+		rc = -EINVAL;
+		goto error;
+	}
+
+	if (!esd_config->esd_enabled) {
+		rc = snprintf(buf, len, "ESD feature not enabled");
+		goto output_mode;
+	}
+
+	if (esd_config->status_mode == ESD_MODE_REG_READ)
+		rc = snprintf(buf, len, "reg_read");
+
+	if (esd_config->status_mode == ESD_MODE_PANEL_TE)
+		rc = snprintf(buf, len, "te_signal_check");
+
+output_mode:
+	if (!rc) {
+		rc = -EINVAL;
+		goto error;
+	}
+
+	if (copy_to_user(user_buf, buf, len)) {
+		rc = -EFAULT;
+		goto error;
+	}
+
+	*ppos += len;
+
+error:
+	kfree(buf);
+	return len;
+}
+
 static const struct file_operations dump_info_fops = {
 	.open = simple_open,
 	.read = debugfs_dump_info_read,
@@ -1162,6 +1296,12 @@ static const struct file_operations misr_data_fops = {
 static const struct file_operations esd_trigger_fops = {
 	.open = simple_open,
 	.write = debugfs_esd_trigger_check,
+};
+
+static const struct file_operations esd_check_mode_fops = {
+	.open = simple_open,
+	.write = debugfs_alter_esd_check_mode,
+	.read = debugfs_read_esd_check_mode,
 };
 
 static int dsi_display_debugfs_init(struct dsi_display *display)
@@ -1199,6 +1339,18 @@ static int dsi_display_debugfs_init(struct dsi_display *display)
 	if (IS_ERR_OR_NULL(dump_file)) {
 		rc = PTR_ERR(dump_file);
 		pr_err("[%s] debugfs for esd trigger file failed, rc=%d\n",
+		       display->name, rc);
+		goto error_remove_dir;
+	}
+
+	dump_file = debugfs_create_file("esd_check_mode",
+					0644,
+					dir,
+					display,
+					&esd_check_mode_fops);
+	if (IS_ERR_OR_NULL(dump_file)) {
+		rc = PTR_ERR(dump_file);
+		pr_err("[%s] debugfs for esd check mode failed, rc=%d\n",
 		       display->name, rc);
 		goto error_remove_dir;
 	}
@@ -5306,9 +5458,6 @@ int dsi_display_prepare(struct dsi_display *display)
 
 	mode = display->panel->cur_mode;
 
-	if (dsi_display_is_te_based_esd(display))
-		dsi_display_change_te_irq_status(display, true);
-
 	if (mode->dsi_mode_flags & DSI_MODE_FLAG_DMS) {
 		if (display->is_cont_splash_enabled) {
 			pr_err("DMS is not supposed to be set on first frame\n");
@@ -5835,10 +5984,6 @@ int dsi_display_unprepare(struct dsi_display *display)
 	if (rc)
 		pr_err("[%s] display wake up failed, rc=%d\n",
 		       display->name, rc);
-
-	/* Disable panel TE irq */
-	if (dsi_display_is_te_based_esd(display))
-		dsi_display_change_te_irq_status(display, false);
 
 	rc = dsi_panel_unprepare(display->panel);
 	if (rc)

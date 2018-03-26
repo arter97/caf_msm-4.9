@@ -158,7 +158,8 @@ struct smb_dt_props {
 	int			chg_inhibit_thr_mv;
 	bool			no_battery;
 	bool			hvdcp_disable;
-	bool			auto_recharge_soc;
+	int			auto_recharge_soc;
+	int			auto_recharge_vbat_mv;
 	int			wd_bark_time;
 	int			batt_profile_fcc_ua;
 	int			batt_profile_fv_uv;
@@ -329,8 +330,23 @@ static int smb5_parse_dt(struct smb5 *chip)
 		return -EINVAL;
 	}
 
-	chip->dt.auto_recharge_soc = of_property_read_bool(node,
-						"qcom,auto-recharge-soc");
+	chip->dt.auto_recharge_soc = -EINVAL;
+	rc = of_property_read_u32(node, "qcom,auto-recharge-soc",
+				&chip->dt.auto_recharge_soc);
+	if (!rc && (chip->dt.auto_recharge_soc < 0 ||
+			chip->dt.auto_recharge_soc > 100)) {
+		pr_err("qcom,auto-recharge-soc is incorrect\n");
+		return -EINVAL;
+	}
+	chg->auto_recharge_soc = chip->dt.auto_recharge_soc;
+
+	chip->dt.auto_recharge_vbat_mv = -EINVAL;
+	rc = of_property_read_u32(node, "qcom,auto-recharge-vbat-mv",
+				&chip->dt.auto_recharge_vbat_mv);
+	if (!rc && (chip->dt.auto_recharge_vbat_mv < 0)) {
+		pr_err("qcom,auto-recharge-vbat-mv is incorrect\n");
+		return -EINVAL;
+	}
 
 	chg->dcp_icl_ua = chip->dt.usb_icl_ua;
 
@@ -956,6 +972,7 @@ static enum power_supply_property smb5_batt_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX,
 	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+	POWER_SUPPLY_PROP_RECHARGE_SOC,
 };
 
 static int smb5_batt_get_prop(struct power_supply *psy,
@@ -1044,6 +1061,9 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
 		rc = smblib_get_prop_batt_charge_counter(chg, val);
+		break;
+	case POWER_SUPPLY_PROP_RECHARGE_SOC:
+		val->intval = chg->auto_recharge_soc;
 		break;
 	default:
 		pr_err("batt power supply prop %d not supported\n", psp);
@@ -1555,13 +1575,64 @@ static int smb5_init_hw(struct smb5 *chip)
 		return rc;
 	}
 
-	rc = smblib_masked_write(chg, CHGR_CFG2_REG,
-			SOC_BASED_RECHG_BIT,
-			chip->dt.auto_recharge_soc ? SOC_BASED_RECHG_BIT : 0);
+	rc = smblib_masked_write(chg, CHGR_CFG2_REG, RECHG_MASK,
+				(chip->dt.auto_recharge_vbat_mv != -EINVAL) ?
+				VBAT_BASED_RECHG_BIT : 0);
 	if (rc < 0) {
-		dev_err(chg->dev, "Couldn't configure FG_UPDATE_CFG2_SEL_REG rc=%d\n",
+		dev_err(chg->dev, "Couldn't configure VBAT-rechg CHG_CFG2_REG rc=%d\n",
 			rc);
 		return rc;
+	}
+
+	/* program the auto-recharge VBAT threshold */
+	if (chip->dt.auto_recharge_vbat_mv != -EINVAL) {
+		u32 temp = VBAT_TO_VRAW_ADC(chip->dt.auto_recharge_vbat_mv);
+
+		temp = ((temp & 0xFF00) >> 8) | ((temp & 0xFF) << 8);
+		rc = smblib_batch_write(chg,
+			CHGR_ADC_RECHARGE_THRESHOLD_MSB_REG, (u8 *)&temp, 2);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't configure ADC_RECHARGE_THRESHOLD REG rc=%d\n",
+				rc);
+			return rc;
+		}
+		/* Program the sample count for VBAT based recharge to 3 */
+		rc = smblib_masked_write(chg, CHGR_NO_SAMPLE_TERM_RCHG_CFG_REG,
+					NO_OF_SAMPLE_FOR_RCHG,
+					2 << NO_OF_SAMPLE_FOR_RCHG_SHIFT);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't configure CHGR_NO_SAMPLE_FOR_TERM_RCHG_CFG rc=%d\n",
+				rc);
+			return rc;
+		}
+	}
+
+	rc = smblib_masked_write(chg, CHGR_CFG2_REG, RECHG_MASK,
+				(chip->dt.auto_recharge_soc != -EINVAL) ?
+				SOC_BASED_RECHG_BIT : VBAT_BASED_RECHG_BIT);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't configure SOC-rechg CHG_CFG2_REG rc=%d\n",
+			rc);
+		return rc;
+	}
+
+	/* program the auto-recharge threshold */
+	if (chip->dt.auto_recharge_soc != -EINVAL) {
+		rc = smblib_write(chg, CHARGE_RCHG_SOC_THRESHOLD_CFG_REG,
+				(chip->dt.auto_recharge_soc * 255) / 100);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't configure CHG_RCHG_SOC_REG rc=%d\n",
+				rc);
+			return rc;
+		}
+		/* Program the sample count for SOC based recharge to 1 */
+		rc = smblib_masked_write(chg, CHGR_NO_SAMPLE_TERM_RCHG_CFG_REG,
+						NO_OF_SAMPLE_FOR_RCHG, 0);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't configure CHGR_NO_SAMPLE_FOR_TERM_RCHG_CFG rc=%d\n",
+				rc);
+			return rc;
+		}
 	}
 
 	if (chg->sw_jeita_enabled) {
@@ -1639,30 +1710,25 @@ static struct smb_irq_info smb5_irqs[] = {
 	[CHG_STATE_CHANGE_IRQ] = {
 		.name		= "chg-state-change",
 		.handler	= chg_state_change_irq_handler,
+		.wake		= true,
 	},
 	[STEP_CHG_STATE_CHANGE_IRQ] = {
 		.name		= "step-chg-state-change",
-		.handler	= default_irq_handler,
 	},
 	[STEP_CHG_SOC_UPDATE_FAIL_IRQ] = {
 		.name		= "step-chg-soc-update-fail",
-		.handler	= default_irq_handler,
 	},
 	[STEP_CHG_SOC_UPDATE_REQ_IRQ] = {
 		.name		= "step-chg-soc-update-req",
-		.handler	= default_irq_handler,
 	},
 	[FG_FVCAL_QUALIFIED_IRQ] = {
 		.name		= "fg-fvcal-qualified",
-		.handler	= default_irq_handler,
 	},
 	[VPH_ALARM_IRQ] = {
 		.name		= "vph-alarm",
-		.handler	= default_irq_handler,
 	},
 	[VPH_DROP_PRECHG_IRQ] = {
 		.name		= "vph-drop-prechg",
-		.handler	= default_irq_handler,
 	},
 	/* DCDC IRQs */
 	[OTG_FAIL_IRQ] = {
@@ -1671,19 +1737,17 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[OTG_OC_DISABLE_SW_IRQ] = {
 		.name		= "otg-oc-disable-sw",
-		.handler	= default_irq_handler,
 	},
 	[OTG_OC_HICCUP_IRQ] = {
 		.name		= "otg-oc-hiccup",
-		.handler	= default_irq_handler,
 	},
 	[BSM_ACTIVE_IRQ] = {
 		.name		= "bsm-active",
-		.handler	= default_irq_handler,
 	},
 	[HIGH_DUTY_CYCLE_IRQ] = {
 		.name		= "high-duty-cycle",
 		.handler	= high_duty_cycle_irq_handler,
+		.wake		= true,
 	},
 	[INPUT_CURRENT_LIMITING_IRQ] = {
 		.name		= "input-current-limiting",
@@ -1691,7 +1755,6 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[CONCURRENT_MODE_DISABLE_IRQ] = {
 		.name		= "concurrent-mode-disable",
-		.handler	= default_irq_handler,
 	},
 	[SWITCHER_POWER_OK_IRQ] = {
 		.name		= "switcher-power-ok",
@@ -1701,10 +1764,10 @@ static struct smb_irq_info smb5_irqs[] = {
 	[BAT_TEMP_IRQ] = {
 		.name		= "bat-temp",
 		.handler	= batt_temp_changed_irq_handler,
+		.wake		= true,
 	},
 	[ALL_CHNL_CONV_DONE_IRQ] = {
 		.name		= "all-chnl-conv-done",
-		.handler	= default_irq_handler,
 	},
 	[BAT_OV_IRQ] = {
 		.name		= "bat-ov",
@@ -1724,11 +1787,9 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[BUCK_OC_IRQ] = {
 		.name		= "buck-oc",
-		.handler	= default_irq_handler,
 	},
 	[VPH_OV_IRQ] = {
 		.name		= "vph-ov",
-		.handler	= default_irq_handler,
 	},
 	/* USB INPUT IRQs */
 	[USBIN_COLLAPSE_IRQ] = {
@@ -1750,23 +1811,24 @@ static struct smb_irq_info smb5_irqs[] = {
 	[USBIN_PLUGIN_IRQ] = {
 		.name		= "usbin-plugin",
 		.handler	= usb_plugin_irq_handler,
+		.wake           = true,
 	},
 	[USBIN_REVI_CHANGE_IRQ] = {
 		.name		= "usbin-revi-change",
-		.handler	= default_irq_handler,
 	},
 	[USBIN_SRC_CHANGE_IRQ] = {
 		.name		= "usbin-src-change",
 		.handler	= usb_source_change_irq_handler,
+		.wake           = true,
 	},
 	[USBIN_ICL_CHANGE_IRQ] = {
 		.name		= "usbin-icl-change",
 		.handler	= icl_change_irq_handler,
+		.wake           = true,
 	},
 	/* DC INPUT IRQs */
 	[DCIN_VASHDN_IRQ] = {
 		.name		= "dcin-vashdn",
-		.handler	= default_irq_handler,
 	},
 	[DCIN_UV_IRQ] = {
 		.name		= "dcin-uv",
@@ -1783,7 +1845,6 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[DCIN_REVI_IRQ] = {
 		.name		= "dcin-revi",
-		.handler	= default_irq_handler,
 	},
 	[DCIN_PON_IRQ] = {
 		.name		= "dcin-pon",
@@ -1797,14 +1858,15 @@ static struct smb_irq_info smb5_irqs[] = {
 	[TYPEC_OR_RID_DETECTION_CHANGE_IRQ] = {
 		.name		= "typec-or-rid-detect-change",
 		.handler	= typec_or_rid_detection_change_irq_handler,
+		.wake           = true,
 	},
 	[TYPEC_VPD_DETECT_IRQ] = {
 		.name		= "typec-vpd-detect",
-		.handler	= default_irq_handler,
 	},
 	[TYPEC_CC_STATE_CHANGE_IRQ] = {
 		.name		= "typec-cc-state-change",
 		.handler	= typec_state_change_irq_handler,
+		.wake           = true,
 	},
 	[TYPEC_VCONN_OC_IRQ] = {
 		.name		= "typec-vconn-oc",
@@ -1812,11 +1874,9 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[TYPEC_VBUS_CHANGE_IRQ] = {
 		.name		= "typec-vbus-change",
-		.handler	= default_irq_handler,
 	},
 	[TYPEC_ATTACH_DETACH_IRQ] = {
 		.name		= "typec-attach-detach",
-		.handler	= default_irq_handler,
 	},
 	[TYPEC_LEGACY_CABLE_DETECT_IRQ] = {
 		.name		= "typec-legacy-cable-detect",
@@ -1824,12 +1884,10 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[TYPEC_TRY_SNK_SRC_DETECT_IRQ] = {
 		.name		= "typec-try-snk-src-detect",
-		.handler	= default_irq_handler,
 	},
 	/* MISCELLANEOUS IRQs */
 	[WDOG_SNARL_IRQ] = {
 		.name		= "wdog-snarl",
-		.handler	= NULL,
 	},
 	[WDOG_BARK_IRQ] = {
 		.name		= "wdog-bark",
@@ -1837,7 +1895,6 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[AICL_FAIL_IRQ] = {
 		.name		= "aicl-fail",
-		.handler	= default_irq_handler,
 	},
 	[AICL_DONE_IRQ] = {
 		.name		= "aicl-done",
@@ -1845,24 +1902,19 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[SMB_EN_IRQ] = {
 		.name		= "smb-en",
-		.handler	= default_irq_handler,
 	},
 	[IMP_TRIGGER_IRQ] = {
 		.name		= "imp-trigger",
-		.handler	= default_irq_handler,
 	},
 	[TEMP_CHANGE_IRQ] = {
 		.name		= "temp-change",
-		.handler	= default_irq_handler,
 	},
 	[TEMP_CHANGE_SMB_IRQ] = {
 		.name		= "temp-change-smb",
-		.handler	= default_irq_handler,
 	},
 	/* FLASH */
 	[VREG_OK_IRQ] = {
 		.name		= "vreg-ok",
-		.handler	= schgm_flash_default_irq_handler,
 	},
 	[ILIM_S2_IRQ] = {
 		.name		= "ilim2-s2",
@@ -1870,15 +1922,12 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[ILIM_S1_IRQ] = {
 		.name		= "ilim1-s1",
-		.handler	= schgm_flash_default_irq_handler,
 	},
 	[VOUT_DOWN_IRQ] = {
 		.name		= "vout-down",
-		.handler	= schgm_flash_default_irq_handler,
 	},
 	[VOUT_UP_IRQ] = {
 		.name		= "vout-up",
-		.handler	= schgm_flash_default_irq_handler,
 	},
 	[FLASH_STATE_CHANGE_IRQ] = {
 		.name		= "flash-state-change",
@@ -1886,11 +1935,9 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[TORCH_REQ_IRQ] = {
 		.name		= "torch-req",
-		.handler	= schgm_flash_default_irq_handler,
 	},
 	[FLASH_EN_IRQ] = {
 		.name		= "flash-en",
-		.handler	= schgm_flash_default_irq_handler,
 	},
 };
 

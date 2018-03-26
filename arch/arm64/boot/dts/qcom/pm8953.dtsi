@@ -35,6 +35,7 @@
 				"resin-bark", "kpdpwr-resin-bark";
 			qcom,pon-dbc-delay = <15625>;
 			qcom,system-reset;
+			qcom,store-hard-reset-reason;
 
 			qcom,pon_1 {
 				qcom,pon-type = <0>;
@@ -78,6 +79,24 @@
 
 			gpio-controller;
 			#gpio-cells = <2>;
+
+			case_therm {
+				cas_therm_default: cas_therm_default {
+					pins = "mpp4";
+					function = "analog";
+					input-enable;
+					qcom,amux-route = <3>;
+				};
+			};
+
+			pa_therm1 {
+				pa_therm1_default: pa_therm1_default {
+					pins = "mpp2";
+					function = "analog";
+					input-enable;
+					qcom,amux-route = <1>;
+				};
+			};
 		};
 
 		pm8953_gpios: gpios {
@@ -87,15 +106,16 @@
 			interrupts = <0x0 0xc0 0 IRQ_TYPE_NONE>,
 				<0x0 0xc1 0 IRQ_TYPE_NONE>,
 				<0x0 0xc3 0 IRQ_TYPE_NONE>,
+				<0x0 0xc4 0 IRQ_TYPE_NONE>,
 				<0x0 0xc6 0 IRQ_TYPE_NONE>,
 				<0x0 0xc7 0 IRQ_TYPE_NONE>;
 			interrupt-names = "pm8953_gpio1", "pm8953_gpio2",
-					"pm8953_gpio4", "pm8953_gpio7",
-					"pm8953_gpio8";
+					"pm8953_gpio4", "pm8953_gpio5",
+					"pm8953_gpio7", "pm8953_gpio8";
 
 			gpio-controller;
 			#gpio-cells = <2>;
-			qcom,gpios-disallowed = <3 5 6>;
+			qcom,gpios-disallowed = <3 6>;
 		};
 
 		pm8953_vadc: vadc@3100 {
@@ -109,6 +129,8 @@
 			qcom,adc-vdd-reference = <1800>;
 			qcom,vadc-poll-eoc;
 			#thermal-sensor-cells = <1>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pa_therm1_default &cas_therm_default>;
 
 			chan@5 {
 				label = "vcoin";
@@ -231,6 +253,7 @@
 				qcom,scale-function = <2>;
 				qcom,hw-settle-time = <2>;
 				qcom,fast-avg-setup = <0>;
+				qcom,vadc-thermal-node;
 			};
 		};
 
