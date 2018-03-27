@@ -858,6 +858,9 @@
 		qcom,throughput-threshold = <310 600 1000>;
 		qcom,scaling-exceptions = <>;
 
+		/* ipa tz unlock registers */
+		qcom,ipa-tz-unlock-reg =
+			<0x4043583c 0x1000>; /* 32-bit reg addr and size*/
 
 		/* IPA RAM mmap */
 		qcom,ipa-ram-mmap = <
@@ -1109,7 +1112,6 @@
 		compatible = "qcom,cnss_sdio";
 		subsys-name = "AR6320_SDIO";
 		vdd-wlan-supply = <&vreg_wlan>;
-		vdd-wlan-xtal-supply = <&pmxpoorwills_l5>;
 		vdd-wlan-io-supply = <&pmxpoorwills_l6>;
 		qcom,wlan-ramdump-dynamic = <0x200000>;
 		pinctrl-names = "active", "sleep";
