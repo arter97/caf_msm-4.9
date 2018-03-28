@@ -31,7 +31,6 @@
 	};
 };
 
-<<<<<<< HEAD
 &pm8953_vadc {
 	pinctrl-0 = <&pa_therm1_default>;
 	/delete-node/ chan@13;
@@ -44,7 +43,8 @@
 &thermal_zones {
 	/delete-node/ case-therm-adc;
 	/delete-node/ case-therm-step;
-=======
+};
+
 &soc {
 	gpio_keys {
 		camera_focus {
@@ -63,5 +63,4 @@
 			debounce-interval = <15>;
 		};
 	};
->>>>>>> 85d5294... ARM: dts: msm: enable gpio keys for sdm632 devices
 };
