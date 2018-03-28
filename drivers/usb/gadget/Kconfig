@@ -155,6 +155,9 @@ config USB_F_SS_LB
 config USB_U_SERIAL
 	tristate
 
+config USB_U_SMD
+	tristate
+
 config USB_U_ETHER
 	tristate
 
@@ -552,6 +555,7 @@ config USB_CONFIGFS_F_DIAG
 
 config USB_CONFIGFS_F_CDEV
 	bool "USB Serial Character function"
+	select USB_U_SMD
 	select USB_F_CDEV
 	depends on USB_CONFIGFS
 	help
