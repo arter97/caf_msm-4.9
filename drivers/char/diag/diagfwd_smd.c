@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -807,11 +807,7 @@ static int diag_smd_read(void *ctxt, unsigned char *buf, int buf_len)
 				       (smd_info->hdl != NULL) &&
 				       (atomic_read(&smd_info->opened) == 1));
 	if (err) {
-		mutex_lock(&driver->
-				diagfwd_channel_mutex[smd_info->peripheral]);
 		diagfwd_channel_read_done(smd_info->fwd_ctxt, buf, 0);
-		mutex_unlock(&driver->
-				diagfwd_channel_mutex[smd_info->peripheral]);
 		return -ERESTARTSYS;
 	}
 
@@ -822,11 +818,7 @@ static int diag_smd_read(void *ctxt, unsigned char *buf, int buf_len)
 		DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
 			 "%s closing read thread. diag state is closed\n",
 			 smd_info->name);
-		mutex_lock(&driver->
-				diagfwd_channel_mutex[smd_info->peripheral]);
 		diagfwd_channel_read_done(smd_info->fwd_ctxt, buf, 0);
-		mutex_unlock(&driver->
-				diagfwd_channel_mutex[smd_info->peripheral]);
 		return 0;
 	}
 
@@ -885,14 +877,7 @@ static int diag_smd_read(void *ctxt, unsigned char *buf, int buf_len)
 	if (total_recd > 0) {
 		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s read total bytes: %d\n",
 			 smd_info->name, total_recd);
-		mutex_lock(&driver->
-				diagfwd_channel_mutex[smd_info->peripheral]);
-		err = diagfwd_channel_read_done(smd_info->fwd_ctxt,
-						buf, total_recd);
-		mutex_unlock(&driver->
-				diagfwd_channel_mutex[smd_info->peripheral]);
-		if (err)
-			goto fail_return;
+		diagfwd_channel_read_done(smd_info->fwd_ctxt, buf, total_recd);
 	} else {
 		DIAG_LOG(DIAG_DEBUG_PERIPHERALS, "%s error in read, err: %d\n",
 			 smd_info->name, total_recd);
@@ -901,9 +886,7 @@ static int diag_smd_read(void *ctxt, unsigned char *buf, int buf_len)
 	return 0;
 
 fail_return:
-	mutex_lock(&driver->diagfwd_channel_mutex[smd_info->peripheral]);
 	diagfwd_channel_read_done(smd_info->fwd_ctxt, buf, 0);
-	mutex_unlock(&driver->diagfwd_channel_mutex[smd_info->peripheral]);
 	return -EINVAL;
 }
 
