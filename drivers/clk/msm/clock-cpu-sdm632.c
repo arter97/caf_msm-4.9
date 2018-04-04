@@ -56,9 +56,7 @@
 static struct clk_ops clk_ops_variable_rate;
 
 DEFINE_EXT_CLK(xo_a_clk, NULL);
-static DEFINE_VDD_REGS_INIT(vdd_cpu_perf, 1);
-static DEFINE_VDD_REGS_INIT(vdd_cpu_pwr, 1);
-static DEFINE_VDD_REGS_INIT(vdd_cci, 1);
+DEFINE_VDD_REGS_INIT(vdd_cpu, 1);
 
 enum {
 	APCS_C0_PLL_BASE,
@@ -72,7 +70,6 @@ enum vdd_mx_pll_levels {
 	VDD_MX_MIN,
 	VDD_MX_LOWER,
 	VDD_MX_SVS,
-	VDD_MX_TUR,
 	VDD_MX_NUM,
 };
 
@@ -81,7 +78,6 @@ static int vdd_pll_levels[] = {
 	RPM_REGULATOR_LEVEL_MIN_SVS,    /* VDD_PLL_MIN */
 	RPM_REGULATOR_LEVEL_LOW_SVS,    /* VDD_PLL_LOW_SVS */
 	RPM_REGULATOR_LEVEL_SVS,	/* VDD_PLL_SVS */
-	RPM_REGULATOR_LEVEL_TURBO,	/* VDD_PLL_TUR */
 };
 
 static DEFINE_VDD_REGULATORS(vdd_mx, VDD_MX_NUM, 1,
@@ -128,7 +124,7 @@ static struct pll_clk apcs_c0_pll = {
 		.test_ctl_hi_val = 0x00004000,
 		.test_ctl_lo_val = 0x1C000000,
 	},
-	.max_rate = 2016000000UL,
+	.max_rate = 1785600000UL,
 	.min_rate = 614400000UL,
 	.src_rate =  19200000UL,
 	.base = &virt_bases[APCS_C0_PLL_BASE],
@@ -136,7 +132,7 @@ static struct pll_clk apcs_c0_pll = {
 		.parent = &xo_a_clk.c,
 		.dbg_name = "apcs_c0_pll",
 		.ops = &clk_ops_variable_rate,
-		VDD_MX_FMAX_MAP2(MIN, 1200000000UL, LOWER, 2016000000UL),
+		VDD_MX_FMAX_MAP2(MIN, 1200000000UL, LOWER, 2400000000UL),
 		CLK_INIT(apcs_c0_pll.c),
 	},
 };
@@ -165,7 +161,7 @@ static struct pll_clk apcs_c1_pll = {
 		.test_ctl_hi_val = 0x00004000,
 		.test_ctl_lo_val = 0x1C000000,
 	},
-	.max_rate = 2016000000UL,
+	.max_rate = 2054400000UL,
 	.min_rate = 633600000UL,
 	.src_rate =  19200000UL,
 	.base = &virt_bases[APCS_C1_PLL_BASE],
@@ -173,7 +169,7 @@ static struct pll_clk apcs_c1_pll = {
 		.parent = &xo_a_clk.c,
 		.dbg_name = "apcs_c1_pll",
 		.ops = &clk_ops_variable_rate,
-		VDD_MX_FMAX_MAP2(MIN, 1200000000UL, LOWER, 2016000000UL),
+		VDD_MX_FMAX_MAP2(MIN, 1200000000UL, LOWER, 2400000000UL),
 		CLK_INIT(apcs_c1_pll.c),
 	},
 };
@@ -194,7 +190,7 @@ static struct alpha_pll_vco_tbl apcs_cci_pll_vco[] = {
 
 static struct alpha_pll_clk apcs_cci_pll = {
 	.masks = &pll_masks_p,
-	.offset = 0x00,
+	.offset = 0x1D0000,
 	.vco_tbl = apcs_cci_pll_vco,
 	.num_vco = ARRAY_SIZE(apcs_cci_pll_vco),
 	.enable_config = 0x8,  /* Early output */
@@ -207,6 +203,7 @@ static struct alpha_pll_clk apcs_cci_pll = {
 		.rate = 787200000,
 		.dbg_name = "apcs_cci_pll",
 		.ops = &clk_ops_dyna_alpha_pll,
+		/* TODO: FMAX */
 		VDD_MX_FMAX_MAP1(SVS, 1000000000UL),
 		CLK_INIT(apcs_cci_pll.c),
 	},
@@ -232,7 +229,7 @@ struct a53_cpu_clk {
 	s32 cpu_latency_no_l2_pc_us;
 };
 
-static struct mux_div_clk perf_cpussmux = {
+static struct mux_div_clk a53ssmux_perf = {
 	.ops = &rcg_mux_div_ops,
 	.data = {
 		.max_div = 32,
@@ -240,9 +237,9 @@ static struct mux_div_clk perf_cpussmux = {
 		.is_half_divider = true,
 	},
 	.c = {
-		.dbg_name = "perf_cpussmux",
+		.dbg_name = "a53ssmux_perf",
 		.ops = &clk_ops_mux_div_clk,
-		CLK_INIT(perf_cpussmux.c),
+		CLK_INIT(a53ssmux_perf.c),
 	},
 	.div_mask = BM(4, 0),
 	.src_mask = BM(10, 8) >> 8,
@@ -252,7 +249,7 @@ static struct mux_div_clk perf_cpussmux = {
 	),
 };
 
-static struct mux_div_clk pwr_cpussmux = {
+static struct mux_div_clk a53ssmux_pwr = {
 	.ops = &rcg_mux_div_ops,
 	.data = {
 		.max_div = 32,
@@ -260,9 +257,9 @@ static struct mux_div_clk pwr_cpussmux = {
 		.is_half_divider = true,
 	},
 	.c = {
-		.dbg_name = "pwr_cpussmux",
+		.dbg_name = "a53ssmux_pwr",
 		.ops = &clk_ops_mux_div_clk,
-		CLK_INIT(pwr_cpussmux.c),
+		CLK_INIT(a53ssmux_pwr.c),
 	},
 	.div_mask = BM(4, 0),
 	.src_mask = BM(10, 8) >> 8,
@@ -272,18 +269,17 @@ static struct mux_div_clk pwr_cpussmux = {
 	),
 };
 
-static struct mux_div_clk cci_cpussmux = {
+static struct mux_div_clk a53ssmux_cci = {
 	.ops = &rcg_mux_div_ops,
 	.data = {
-		.skip_odd_div = true,
 		.max_div = 32,
 		.min_div = 2,
 		.is_half_divider = true,
 	},
 	.c = {
-		.dbg_name = "cci_cpussmux",
+		.dbg_name = "a53ssmux_cci",
 		.ops = &clk_ops_mux_div_clk,
-		CLK_INIT(cci_cpussmux.c),
+		CLK_INIT(a53ssmux_cci.c),
 	},
 	.div_mask = BM(4, 0),
 	.src_mask = BM(10, 8) >> 8,
@@ -293,9 +289,9 @@ static struct mux_div_clk cci_cpussmux = {
 	),
 };
 
-static struct a53_cpu_clk pwr_clk;
-static struct a53_cpu_clk perf_clk;
-static struct a53_cpu_clk cci_clk;
+static struct a53_cpu_clk a53_pwr_clk;
+static struct a53_cpu_clk a53_perf_clk;
+static struct a53_cpu_clk a53_cci_clk;
 
 static void do_nothing(void *unused) { }
 
@@ -374,7 +370,7 @@ static const struct clk_ops clk_ops_cpu = {
 	.handoff = a53_cpu_clk_handoff,
 };
 
-static struct a53_cpu_clk perf_clk = {
+static struct a53_cpu_clk a53_perf_clk = {
 	.cpu_reg_mask = 0x103,
 	.latency_lvl = {
 		.affinity_level = LPM_AFF_LVL_L2,
@@ -383,15 +379,15 @@ static struct a53_cpu_clk perf_clk = {
 	},
 	.cpu_latency_no_l2_pc_us = 280,
 	.c = {
-		.parent = &perf_cpussmux.c,
+		.parent = &a53ssmux_perf.c,
 		.ops = &clk_ops_cpu,
-		.vdd_class = &vdd_cpu_perf,
-		.dbg_name = "perf_clk",
-		CLK_INIT(perf_clk.c),
+		.vdd_class = &vdd_cpu,
+		.dbg_name = "a53_perf_clk",
+		CLK_INIT(a53_perf_clk.c),
 	},
 };
 
-static struct a53_cpu_clk pwr_clk = {
+static struct a53_cpu_clk a53_pwr_clk = {
 	.cpu_reg_mask = 0x3,
 	.latency_lvl = {
 		.affinity_level = LPM_AFF_LVL_L2,
@@ -400,21 +396,21 @@ static struct a53_cpu_clk pwr_clk = {
 	},
 	.cpu_latency_no_l2_pc_us = 280,
 	.c = {
-		.parent = &pwr_cpussmux.c,
+		.parent = &a53ssmux_pwr.c,
 		.ops = &clk_ops_cpu,
-		.vdd_class = &vdd_cpu_pwr,
-		.dbg_name = "pwr_clk",
-		CLK_INIT(pwr_clk.c),
+		.vdd_class = &vdd_cpu,
+		.dbg_name = "a53_pwr_clk",
+		CLK_INIT(a53_pwr_clk.c),
 	},
 };
 
-static struct a53_cpu_clk cci_clk = {
+static struct a53_cpu_clk a53_cci_clk = {
 	.c = {
-		.parent = &cci_cpussmux.c,
+		.parent = &a53ssmux_cci.c,
 		.ops = &clk_ops_cpu,
-		.vdd_class = &vdd_cci,
-		.dbg_name = "cci_clk",
-		CLK_INIT(cci_clk.c),
+		.vdd_class = &vdd_cpu,
+		.dbg_name = "a53_cci_clk",
+		CLK_INIT(a53_cci_clk.c),
 	},
 };
 
@@ -504,14 +500,14 @@ static struct clk_lookup a53_cpu_clocks[] = {
 	CLK_LIST(apcs_cci_pll),
 
 	/* Muxes */
-	CLK_LIST(pwr_cpussmux),
-	CLK_LIST(perf_cpussmux),
-	CLK_LIST(cci_cpussmux),
+	CLK_LIST(a53ssmux_pwr),
+	CLK_LIST(a53ssmux_perf),
+	CLK_LIST(a53ssmux_cci),
 
 	/* CPU clocks */
-	CLK_LIST(pwr_clk),
-	CLK_LIST(perf_clk),
-	CLK_LIST(cci_clk),
+	CLK_LIST(a53_pwr_clk),
+	CLK_LIST(a53_perf_clk),
+	CLK_LIST(a53_cci_clk),
 
 	/* debug clocks */
 	CLK_LIST(apc0_m_clk),
@@ -520,11 +516,13 @@ static struct clk_lookup a53_cpu_clocks[] = {
 	CLK_LIST(cpu_debug_pri_mux),
 };
 
-static struct mux_div_clk *a53ssmux[] = { &perf_cpussmux, &pwr_cpussmux,
-						&cci_cpussmux };
+static struct pll_clk *a53sspll[] = { &apcs_c1_pll, &apcs_c0_pll };
 
-static struct a53_cpu_clk *cpuclk[] = { &perf_clk, &pwr_clk,
-						&cci_clk };
+static struct mux_div_clk *a53ssmux[] = { &a53ssmux_perf, &a53ssmux_pwr,
+						&a53ssmux_cci };
+
+static struct a53_cpu_clk *cpuclk[] = { &a53_perf_clk, &a53_pwr_clk,
+						&a53_cci_clk };
 
 static struct clk *logical_cpu_to_clk(int cpu)
 {
@@ -532,12 +530,12 @@ static struct clk *logical_cpu_to_clk(int cpu)
 	u32 reg;
 
 	if (cpu_node && !of_property_read_u32(cpu_node, "reg", &reg)) {
-		if ((reg | pwr_clk.cpu_reg_mask) ==
-						pwr_clk.cpu_reg_mask)
-			return &pwr_clk.c;
-		if ((reg | perf_clk.cpu_reg_mask) ==
-						perf_clk.cpu_reg_mask)
-			return &perf_clk.c;
+		if ((reg | a53_pwr_clk.cpu_reg_mask) ==
+						a53_pwr_clk.cpu_reg_mask)
+			return &a53_pwr_clk.c;
+		if ((reg | a53_perf_clk.cpu_reg_mask) ==
+						a53_perf_clk.cpu_reg_mask)
+			return &a53_perf_clk.c;
 	}
 
 	return NULL;
@@ -631,6 +629,54 @@ static void get_speed_bin(struct platform_device *pdev, int *bin,
 								*version);
 }
 
+static int cpu_parse_pll_data(struct platform_device *pdev, int pll_count)
+{
+	int pll_num;
+	struct resource *res;
+	struct clk *c;
+	char pll_name[] = "apcs-xxx-pll-base";
+
+	for (pll_num = 0; pll_num < pll_count; pll_num++) {
+		snprintf(pll_name, ARRAY_SIZE(pll_name), "apcs-%s-pll-base",
+						pll_names[pll_num]);
+
+		res = platform_get_resource_byname(pdev,
+						IORESOURCE_MEM, pll_name);
+		if (!res) {
+			dev_err(&pdev->dev, "missing %s\n", pll_name);
+			return -EINVAL;
+		}
+
+		if (pll_num < APCS_CCI_PLL_BASE) {
+			a53sspll[pll_num]->base = devm_ioremap(&pdev->dev,
+					res->start, resource_size(res));
+			if (!a53sspll[pll_num]->base) {
+				dev_err(&pdev->dev, "ioremap failed for %s\n",
+								pll_name);
+				return -ENOMEM;
+			}
+		} else {
+			apcs_cci_pll.base = devm_ioremap(&pdev->dev,
+				res->start, resource_size(res));
+			if (!apcs_cci_pll.base) {
+				dev_err(&pdev->dev, "ioremap failed for %s\n",
+					pll_name);
+				return -ENOMEM;
+			}
+		}
+	}
+
+	c = devm_clk_get(&pdev->dev, "xo_a");
+	if (IS_ERR(c)) {
+		if (PTR_ERR(c) != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Unable to get xo clock\n");
+		return PTR_ERR(c);
+	}
+	xo_a_clk.c.parent = c;
+
+	return 0;
+}
+
 static int cpu_parse_devicetree(struct platform_device *pdev, int mux_id)
 {
 	struct resource *res;
@@ -668,7 +714,7 @@ static int cpu_parse_devicetree(struct platform_device *pdev, int mux_id)
 	return 0;
 }
 
-static int add_opp(struct clk *c, struct device *cpudev,
+static int add_opp(struct clk *c, struct device *cpudev, struct device *vregdev,
 			unsigned long max_rate)
 {
 	unsigned long rate = 0;
@@ -710,6 +756,13 @@ static int add_opp(struct clk *c, struct device *cpudev,
 			return ret;
 		}
 
+		ret = dev_pm_opp_add(vregdev, rate, uv);
+		if (ret) {
+			pr_warn("clock-cpu: couldn't add OPP for %lu\n",
+				rate);
+			return ret;
+		}
+
 		if (rate >= max_rate)
 			break;
 	}
@@ -722,10 +775,10 @@ static void print_opp_table(int a53_c0_cpu, int a53_c1_cpu)
 	struct dev_pm_opp *oppfmax, *oppfmin;
 	unsigned long apc0_fmax, apc1_fmax, apc0_fmin, apc1_fmin;
 
-	apc0_fmax = pwr_clk.c.fmax[pwr_clk.c.num_fmax - 1];
-	apc0_fmin = pwr_clk.c.fmax[1];
-	apc1_fmax = perf_clk.c.fmax[perf_clk.c.num_fmax - 1];
-	apc1_fmin = perf_clk.c.fmax[1];
+	apc0_fmax = a53_pwr_clk.c.fmax[a53_pwr_clk.c.num_fmax - 1];
+	apc0_fmin = a53_pwr_clk.c.fmax[1];
+	apc1_fmax = a53_perf_clk.c.fmax[a53_perf_clk.c.num_fmax - 1];
+	apc1_fmin = a53_perf_clk.c.fmax[1];
 
 	rcu_read_lock();
 	oppfmax = dev_pm_opp_find_freq_exact(get_cpu_device(a53_c0_cpu),
@@ -755,36 +808,51 @@ static void print_opp_table(int a53_c0_cpu, int a53_c1_cpu)
 
 static void populate_opp_table(struct platform_device *pdev)
 {
+	struct platform_device *apc0_dev, *apc1_dev;
+	struct device_node *apc0_node = NULL, *apc1_node;
 	unsigned long apc0_fmax, apc1_fmax;
 	int cpu, a53_c0_cpu = 0, a53_c1_cpu = 0;
-	struct device *dev;
 
-	apc0_fmax = pwr_clk.c.fmax[pwr_clk.c.num_fmax - 1];
+	apc0_node = of_parse_phandle(pdev->dev.of_node,
+						"vdd-c0-supply", 0);
+	if (!apc0_node) {
+		pr_err("can't find the apc0 dt node.\n");
+		return;
+	}
 
-	apc1_fmax = perf_clk.c.fmax[perf_clk.c.num_fmax - 1];
+	apc1_node = of_parse_phandle(pdev->dev.of_node, "vdd-c1-supply", 0);
+	if (!apc1_node) {
+		pr_err("can't find the apc1 dt node.\n");
+		return;
+	}
+
+	apc0_dev = of_find_device_by_node(apc0_node);
+	if (!apc0_dev) {
+		pr_err("can't find the apc0 device node.\n");
+		return;
+	}
+
+	apc1_dev = of_find_device_by_node(apc1_node);
+	if (!apc1_dev) {
+		pr_err("can't find the apc1 device node.\n");
+		return;
+	}
+
+	apc0_fmax = a53_pwr_clk.c.fmax[a53_pwr_clk.c.num_fmax - 1];
+
+	apc1_fmax = a53_perf_clk.c.fmax[a53_perf_clk.c.num_fmax - 1];
 
 	for_each_possible_cpu(cpu) {
-		if (logical_cpu_to_clk(cpu) == &pwr_clk.c) {
+		if (logical_cpu_to_clk(cpu) == &a53_pwr_clk.c) {
 			a53_c0_cpu = cpu;
-			dev = get_cpu_device(cpu);
-			if (!dev) {
-				pr_err("can't find cpu device for attaching OPPs\n");
-				return;
-			}
-
-			WARN(add_opp(&pwr_clk.c, dev, apc0_fmax),
+			WARN(add_opp(&a53_pwr_clk.c, get_cpu_device(cpu),
+			&apc0_dev->dev,		apc0_fmax),
 				"Failed to add OPP levels for %d\n", cpu);
 		}
-
-		if (logical_cpu_to_clk(cpu) == &perf_clk.c) {
+		if (logical_cpu_to_clk(cpu) == &a53_perf_clk.c) {
 			a53_c1_cpu = cpu;
-			dev = get_cpu_device(cpu);
-			if (!dev) {
-				pr_err("can't find cpu device for attaching OPPs\n");
-				return;
-			}
-
-			WARN(add_opp(&perf_clk.c, dev, apc1_fmax),
+			WARN(add_opp(&a53_perf_clk.c, get_cpu_device(cpu),
+			&apc1_dev->dev,		apc1_fmax),
 				"Failed to add OPP levels for %d\n", cpu);
 		}
 	}
@@ -802,15 +870,15 @@ static int clock_sdm632_pm_event(struct notifier_block *this,
 	switch (event) {
 	case PM_POST_HIBERNATION:
 	case PM_POST_SUSPEND:
-		clk_unprepare(&pwr_clk.c);
-		clk_unprepare(&perf_clk.c);
-		clk_unprepare(&cci_clk.c);
+		clk_unprepare(&a53_pwr_clk.c);
+		clk_unprepare(&a53_perf_clk.c);
+		clk_unprepare(&a53_cci_clk.c);
 		break;
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
-		clk_prepare(&pwr_clk.c);
-		clk_prepare(&perf_clk.c);
-		clk_prepare(&cci_clk.c);
+		clk_prepare(&a53_pwr_clk.c);
+		clk_prepare(&a53_perf_clk.c);
+		clk_prepare(&a53_cci_clk.c);
 		break;
 	default:
 		break;
@@ -836,11 +904,11 @@ static int clock_panic_callback(struct notifier_block *nfb,
 {
 	unsigned long rate;
 
-	rate  = (perf_clk.c.count) ? perf_clk.c.rate : 0;
-	pr_err("%s frequency: %10lu Hz\n", perf_clk.c.dbg_name, rate);
+	rate  = (a53_perf_clk.c.count) ? a53_perf_clk.c.rate : 0;
+	pr_err("%s frequency: %10lu Hz\n", a53_perf_clk.c.dbg_name, rate);
 
-	rate  = (pwr_clk.c.count) ? pwr_clk.c.rate : 0;
-	pr_err("%s frequency: %10lu Hz\n", pwr_clk.c.dbg_name, rate);
+	rate  = (a53_pwr_clk.c.count) ? a53_pwr_clk.c.rate : 0;
+	pr_err("%s frequency: %10lu Hz\n", a53_pwr_clk.c.dbg_name, rate);
 
 	return NOTIFY_OK;
 }
@@ -860,17 +928,12 @@ static int clock_a53_probe(struct platform_device *pdev)
 	int speed_bin, version, rc, cpu, mux_id;
 	char prop_name[] = "qcom,speedX-bin-vX-XXX";
 	int mux_num = A53SS_MUX_NUM;
-	struct clk *xo_clk;
 
 	get_speed_bin(pdev, &speed_bin, &version);
 
-	xo_clk = devm_clk_get(&pdev->dev, "xo_a");
-	if (IS_ERR(xo_clk)) {
-		if (PTR_ERR(xo_clk) != -EPROBE_DEFER)
-			dev_err(&pdev->dev, "Unable to get xo clock\n");
-		return PTR_ERR(xo_clk);
-	}
-	xo_a_clk.c.parent = xo_clk;
+	rc = cpu_parse_pll_data(pdev, N_PLL_BASES);
+	if (rc)
+		return rc;
 
 	/* PLL core logic */
 	vdd_mx.regulator[0] = devm_regulator_get(&pdev->dev, "vdd-mx");
@@ -927,16 +990,16 @@ static int clock_a53_probe(struct platform_device *pdev)
 	}
 
 	/* Force to move to PLL configuartion */
-	rc = clk_set_rate(&cci_clk.c, cci_early_boot_rate);
+	rc = clk_set_rate(&a53_cci_clk.c, cci_early_boot_rate);
 	if (rc)
 		dev_err(&pdev->dev, "Can't set CCI PLL rate for CCI\n");
 
-	rc = clk_set_rate(&pwr_clk.c, pwrcl_early_boot_rate);
+	rc = clk_set_rate(&a53_pwr_clk.c, pwrcl_early_boot_rate);
 	if (rc)
 		dev_err(&pdev->dev, "Can't set pwr PLL rate for Cluster-0 %ld\n",
 					pwrcl_early_boot_rate);
 
-	rc = clk_set_rate(&perf_clk.c, perfcl_early_boot_rate);
+	rc = clk_set_rate(&a53_perf_clk.c, perfcl_early_boot_rate);
 	if (rc)
 		dev_err(&pdev->dev, "Can't set perf PLL rate for Cluster-1 %ld\n",
 					perfcl_early_boot_rate);
@@ -956,20 +1019,20 @@ static int clock_a53_probe(struct platform_device *pdev)
 	for_each_online_cpu(cpu) {
 		WARN(clk_prepare_enable(&cpuclk[cpu/4]->c),
 				"Unable to turn on CPU clock");
-		WARN(clk_prepare_enable(&cci_clk.c),
+		WARN(clk_prepare_enable(&a53_cci_clk.c),
 				"Unable to turn on CCI clock");
 	}
 	put_online_cpus();
 
 	for_each_possible_cpu(cpu) {
-		if (logical_cpu_to_clk(cpu) == &perf_clk.c)
-			cpumask_set_cpu(cpu, &perf_clk.cpumask);
-		if (logical_cpu_to_clk(cpu) == &pwr_clk.c)
-			cpumask_set_cpu(cpu, &pwr_clk.cpumask);
+		if (logical_cpu_to_clk(cpu) == &a53_perf_clk.c)
+			cpumask_set_cpu(cpu, &a53_perf_clk.cpumask);
+		if (logical_cpu_to_clk(cpu) == &a53_pwr_clk.c)
+			cpumask_set_cpu(cpu, &a53_pwr_clk.cpumask);
 	}
 
-	pwr_clk.hw_low_power_ctrl = true;
-	perf_clk.hw_low_power_ctrl = true;
+	a53_pwr_clk.hw_low_power_ctrl = true;
+	a53_perf_clk.hw_low_power_ctrl = true;
 
 	register_pm_notifier(&clock_sdm632_pm_notifier);
 
@@ -1010,19 +1073,19 @@ static int __init clock_cpu_lpm_get_latency(void)
 	if (!ofnode)
 		return 0;
 
-	rc = lpm_get_latency(&perf_clk.latency_lvl,
-			&perf_clk.cpu_latency_no_l2_pc_us);
+	rc = lpm_get_latency(&a53_perf_clk.latency_lvl,
+			&a53_perf_clk.cpu_latency_no_l2_pc_us);
 	if (rc < 0)
 		pr_err("Failed to get the L2 PC value for perf\n");
 
-	rc = lpm_get_latency(&pwr_clk.latency_lvl,
-			&pwr_clk.cpu_latency_no_l2_pc_us);
+	rc = lpm_get_latency(&a53_pwr_clk.latency_lvl,
+			&a53_pwr_clk.cpu_latency_no_l2_pc_us);
 	if (rc < 0)
 		pr_err("Failed to get the L2 PC value for pwr\n");
 
 	pr_debug("Latency for pwr/perf cluster %d : %d\n",
-		pwr_clk.cpu_latency_no_l2_pc_us,
-		perf_clk.cpu_latency_no_l2_pc_us);
+		a53_pwr_clk.cpu_latency_no_l2_pc_us,
+		a53_perf_clk.cpu_latency_no_l2_pc_us);
 
 	return rc;
 }
@@ -1036,9 +1099,6 @@ late_initcall(clock_cpu_lpm_get_latency);
 #define APCS_ALIAS1_CORE_CBCR_OFF	0x8
 #define SRC_SEL				0x4
 #define SRC_DIV				0x1
-
-/* Dummy clock for setting the rate of CCI PLL in early_init*/
-DEFINE_CLK_DUMMY(p_clk, 19200000);
 
 static int __init cpu_clock_init(void)
 {
@@ -1067,7 +1127,6 @@ static int __init cpu_clock_init(void)
 	apcs_c1_pll.c.ops->set_rate(&apcs_c1_pll.c, perfcl_early_boot_rate);
 	clk_ops_variable_rate_pll.enable(&apcs_c1_pll.c);
 
-	apcs_cci_pll.c.parent = (struct clk *)&p_clk;
 	apcs_cci_pll.c.ops->set_rate(&apcs_cci_pll.c, cci_early_boot_rate);
 	clk_ops_dyna_alpha_pll.enable(&apcs_cci_pll.c);
 
