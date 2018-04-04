@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 an
@@ -25,7 +25,6 @@
 
 		arm,buffer-size = <0x100000>;
 		arm,sg-enable;
-		qcom,force-reg-dump;
 
 		coresight-name = "coresight-tmc-etr";
 		coresight-ctis = <&cti0 &cti8>;
@@ -52,7 +51,6 @@
 		coresight-name = "coresight-tmc-etf";
 
 		arm,default-sink;
-		qcom,force-reg-dump;
 		coresight-ctis = <&cti0 &cti8>;
 
 		clocks = <&clock_gcc clk_qdss_clk>,
