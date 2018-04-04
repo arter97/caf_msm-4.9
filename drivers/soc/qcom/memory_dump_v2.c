@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,6 +39,15 @@ struct msm_memory_dump {
 	struct msm_dump_table *table;
 };
 
+struct dump_vaddr_entry {
+	uint32_t id;
+	void *dump_vaddr;
+};
+
+struct msm_mem_dump_vaddr_tbl {
+	uint8_t num_node;
+	struct dump_vaddr_entry *entries;
+};
 
 static struct msm_memory_dump memdump;
 static struct msm_mem_dump_vaddr_tbl vaddr_tbl;
@@ -147,7 +156,7 @@ int msm_dump_data_register(enum msm_dump_table_ids id,
 }
 EXPORT_SYMBOL(msm_dump_data_register);
 
-struct dump_vaddr_entry *get_msm_dump_ptr(enum msm_dump_data_ids id)
+void *get_msm_dump_ptr(enum msm_dump_data_ids id)
 {
 	int i;
 
@@ -165,7 +174,7 @@ struct dump_vaddr_entry *get_msm_dump_ptr(enum msm_dump_data_ids id)
 	if (i == vaddr_tbl.num_node)
 		return NULL;
 
-	return &vaddr_tbl.entries[i];
+	return (void *)vaddr_tbl.entries[i].dump_vaddr;
 }
 EXPORT_SYMBOL(get_msm_dump_ptr);
 
@@ -324,7 +333,6 @@ static int mem_dump_probe(struct platform_device *pdev)
 		} else if (vaddr_tbl.entries) {
 			vaddr_tbl.entries[i].id = id;
 			vaddr_tbl.entries[i].dump_vaddr = dump_vaddr;
-			vaddr_tbl.entries[i].dump_data_vaddr = dump_data;
 			i++;
 		}
 	}

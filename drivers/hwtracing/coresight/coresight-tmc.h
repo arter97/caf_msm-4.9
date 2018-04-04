@@ -192,7 +192,6 @@ struct tmc_drvdata {
 	struct coresight_csr	*csr;
 	const char		*csr_name;
 	struct byte_cntr	*byte_cntr;
-	bool			force_reg_dump;
 };
 
 /* Generic functions */
