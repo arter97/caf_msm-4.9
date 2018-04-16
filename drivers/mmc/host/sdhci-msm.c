@@ -173,6 +173,8 @@
 #define MAX_DRV_TYPES_SUPPORTED_HS200	4
 #define MSM_AUTOSUSPEND_DELAY_MS 100
 
+#define RCLK_TOGGLE 0x2
+
 struct sdhci_msm_offset {
 	u32 CORE_MCI_DATA_CNT;
 	u32 CORE_MCI_STATUS;
@@ -3456,18 +3458,32 @@ static void sdhci_msm_set_clock(struct sdhci_host *host, unsigned int clock)
 					| CORE_HC_SELECT_IN_EN), host->ioaddr +
 					msm_host_offset->CORE_VENDOR_SPEC);
 		}
+		/*
+		 * After MCLK ugating, toggle the FIFO write clock to get
+		 * the FIFO pointers and flags to valid state.
+		 */
 		if (msm_host->tuning_done ||
 				(card && mmc_card_strobe(card) &&
-				 msm_host->enhanced_strobe)) {
-			/* Write 1 to SDCC_HC_REG_DLL_CONFIG_3 register with DLL_CONFIG_3[1] */
-			writel_relaxed(((readl_relaxed(host->ioaddr + 0x258)) | 0x2),
-				host->ioaddr + 0x258);
-			mb();
+				msm_host->enhanced_strobe)) {
+			/*
+			 * set HC_REG_DLL_CONFIG_3[1] to select MCLK as
+			 * DLL input clock
+			 */
+			writel_relaxed(((readl_relaxed(host->ioaddr +
+				msm_host_offset->CORE_DDR_CONFIG))
+				| RCLK_TOGGLE), host->ioaddr +
+				msm_host_offset->CORE_DDR_CONFIG);
+			/* ensure above write as toggling same bit quickly */
+			wmb();
 			udelay(2);
-			/* Write 0 to SDCC_HC_REG_DLL_CONFIG_3 register with DLL_CONFIG_3[1] */
-			writel_relaxed(((readl_relaxed(host->ioaddr + 0x258)) & ~0x2),
-				host->ioaddr + 0x258);
-			mb();
+			/*
+			 * clear HC_REG_DLL_CONFIG_3[1] to select RCLK as
+			 * DLL input clock
+			 */
+			writel_relaxed(((readl_relaxed(host->ioaddr +
+				msm_host_offset->CORE_DDR_CONFIG))
+				& ~RCLK_TOGGLE), host->ioaddr +
+				msm_host_offset->CORE_DDR_CONFIG);
 		}
 		if (!host->mmc->ios.old_rate && !msm_host->use_cdclp533) {
 			/*
