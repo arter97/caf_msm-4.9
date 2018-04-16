@@ -1812,64 +1812,53 @@ static void msm_otg_notify_chg_current(struct msm_otg *motg, unsigned int mA)
 {
 	struct usb_gadget *g = motg->phy.otg->gadget;
 	union power_supply_propval pval = {0};
-	bool enable;
-	int limit;
 
 	if (g && g->is_a_peripheral)
 		return;
 
 	dev_dbg(motg->phy.dev, "Requested curr from USB = %u\n", mA);
+	if (!psy) {
+		dev_dbg(motg->phy.dev, "no usb power supply registered\n");
+		return;
+	}
 
-	if (motg->cur_power == mA)
+	power_supply_get_property(psy, POWER_SUPPLY_PROP_REAL_TYPE, &pval);
+
+	if (motg->cur_power == mA || pval.intval != POWER_SUPPLY_TYPE_USB)
 		return;
 
 	dev_info(motg->phy.dev, "Avail curr from USB = %u\n", mA);
 	msm_otg_dbg_log_event(&motg->phy, "AVAIL CURR FROM USB", mA, 0);
 
-	if (!psy) {
-		dev_dbg(motg->phy.dev, "no usb power supply registered\n");
-		goto psy_error;
-	}
+	/* Set max current limit in uA */
+	pval.intval = 1000 * mA;
 
-	if (motg->cur_power == 0 && mA > 2) {
-		/* Enable charging */
-		enable = true;
-		limit = 1000 * mA;
-	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2)) {
-		/* Disable charging */
-		enable = false;
-		/* Set max current limit in uA */
-		limit = 1000 * mA;
-	} else {
-		enable = true;
-		/* Current has changed (100/2 --> 500) */
-		limit = 1000 * mA;
-	}
-
-	pval.intval = enable;
-	if (power_supply_set_property(psy, POWER_SUPPLY_PROP_ONLINE, &pval))
-		goto psy_error;
-
-	pval.intval = limit;
 	if (power_supply_set_property(psy, POWER_SUPPLY_PROP_SDP_CURRENT_MAX,
-									&pval))
-		goto psy_error;
-
-psy_error:
-	dev_dbg(motg->phy.dev, "power supply error when setting property\n");
+								&pval)) {
+		dev_dbg(motg->phy.dev, "power supply error when setting property\n");
+		return;
+	}
 
 	motg->cur_power = mA;
+}
+
+static void msm_otg_notify_chg_current_work(struct work_struct *w)
+{
+	struct msm_otg *motg = container_of(w,
+				struct msm_otg, notify_chg_current_work);
+	/*
+	 * Gadget driver uses set_power method to notify about the
+	 * available current based on suspend/configured states.
+	 */
+	msm_otg_notify_chg_current(motg, motg->notify_current_mA);
 }
 
 static int msm_otg_set_power(struct usb_phy *phy, unsigned int mA)
 {
 	struct msm_otg *motg = container_of(phy, struct msm_otg, phy);
 
-	/*
-	 * Gadget driver uses set_power method to notify about the
-	 * available current based on suspend/configured states.
-	 */
-	msm_otg_notify_chg_current(motg, mA);
+	motg->notify_current_mA = mA;
+	schedule_work(&motg->notify_chg_current_work);
 
 	return 0;
 }
@@ -3835,6 +3824,8 @@ static int msm_otg_probe(struct platform_device *pdev)
 	INIT_WORK(&motg->sm_work, msm_otg_sm_work);
 	INIT_DELAYED_WORK(&motg->id_status_work, msm_id_status_w);
 	INIT_DELAYED_WORK(&motg->perf_vote_work, msm_otg_perf_vote_work);
+	INIT_WORK(&motg->notify_chg_current_work,
+			 msm_otg_notify_chg_current_work);
 	motg->otg_wq = alloc_ordered_workqueue("k_otg", 0);
 	if (!motg->otg_wq) {
 		pr_err("%s: Unable to create workqueue otg_wq\n",
@@ -4189,6 +4180,7 @@ static int msm_otg_remove(struct platform_device *pdev)
 	cancel_delayed_work_sync(&motg->perf_vote_work);
 	msm_otg_perf_vote_update(motg, false);
 	cancel_work_sync(&motg->sm_work);
+	cancel_work_sync(&motg->notify_chg_current_work);
 	destroy_workqueue(motg->otg_wq);
 
 	pm_runtime_resume(&pdev->dev);

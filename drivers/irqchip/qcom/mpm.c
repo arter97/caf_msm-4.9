@@ -162,13 +162,26 @@ static inline void msm_mpm_enable_irq(struct irq_data *d, bool on)
 	}
 }
 
-static inline void msm_mpm_set_type(struct irq_data *d,
+static void msm_mpm_program_set_type(bool set, unsigned int reg,
+					unsigned int index, unsigned int mask)
+{
+	u32 type;
+
+	type = msm_mpm_read(reg, index);
+	if (set)
+		type = ENABLE_TYPE(type, mask);
+	else
+		type = CLEAR_TYPE(type, mask);
+
+	msm_mpm_write(reg, index, type);
+}
+
+static void msm_mpm_set_type(struct irq_data *d,
 					unsigned int flowtype)
 {
 	int mpm_pin[MAX_MPM_PIN_PER_IRQ] = {-1, -1};
 	unsigned long flags;
 	int i = 0;
-	u32 type;
 	unsigned int index, mask;
 	unsigned int reg = 0;
 
@@ -180,24 +193,24 @@ static inline void msm_mpm_set_type(struct irq_data *d,
 		index = mpm_pin[i]/32;
 		mask = mpm_pin[i]%32;
 
-		if (flowtype & IRQ_TYPE_LEVEL_HIGH)
-			reg = MPM_REG_FALLING_EDGE;
-
-		if (flowtype & IRQ_TYPE_EDGE_RISING)
-			reg = MPM_REG_RISING_EDGE;
-
-		if (flowtype & IRQ_TYPE_EDGE_FALLING)
-			reg = MPM_REG_POLARITY;
-
 		spin_lock_irqsave(&mpm_lock, flags);
-		type = msm_mpm_read(reg, index);
-
-		if (flowtype)
-			type = ENABLE_TYPE(type, mask);
+		reg = MPM_REG_RISING_EDGE;
+		if (flowtype & IRQ_TYPE_EDGE_RISING)
+			msm_mpm_program_set_type(1, reg, index, mask);
 		else
-			type = CLEAR_TYPE(type, mask);
+			msm_mpm_program_set_type(0, reg, index, mask);
 
-		msm_mpm_write(reg, index, type);
+		reg = MPM_REG_FALLING_EDGE;
+		if (flowtype & IRQ_TYPE_EDGE_FALLING)
+			msm_mpm_program_set_type(1, reg, index, mask);
+		else
+			msm_mpm_program_set_type(0, reg, index, mask);
+
+		reg = MPM_REG_POLARITY;
+		if (flowtype & IRQ_TYPE_LEVEL_HIGH)
+			msm_mpm_program_set_type(1, reg, index, mask);
+		else
+			msm_mpm_program_set_type(0, reg, index, mask);
 		spin_unlock_irqrestore(&mpm_lock, flags);
 	}
 }
@@ -256,9 +269,6 @@ static struct irq_chip msm_mpm_gpio_chip = {
 	.irq_set_type	= msm_mpm_gpio_chip_set_type,
 	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
 	.irq_retrigger          = irq_chip_retrigger_hierarchy,
-	.irq_set_vcpu_affinity  = irq_chip_set_vcpu_affinity_parent,
-	.irq_eoi                = irq_chip_eoi_parent,
-	.irq_set_affinity	= irq_chip_set_affinity_parent,
 };
 
 static int msm_mpm_gpio_chip_translate(struct irq_domain *d,
@@ -515,6 +525,8 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 						IRQCHIP_STATE_PENDING, true);
 
 		}
+
+		msm_mpm_write(MPM_REG_STATUS, i, 0);
 	}
 	return IRQ_HANDLED;
 }
@@ -659,27 +671,16 @@ IRQCHIP_DECLARE(mpm_gic_chip, "qcom,mpm-gic", mpm_gic_chip_init);
 static int __init mpm_gpio_chip_init(struct device_node *node,
 					struct device_node *parent)
 {
-	struct irq_domain *parent_domain;
 	const struct of_device_id *id;
 
-	if (!parent) {
-		pr_err("%s(): no parent for mpm-gic\n", node->full_name);
-		return -ENXIO;
-	}
-
-	parent_domain = irq_find_host(parent);
-	if (!parent_domain) {
-		pr_err("unable to obtain gpio parent domain defer probe\n");
-		return -ENXIO;
-	}
 	id = of_match_node(mpm_gpio_chip_data_table, node);
 	if (!id) {
 		pr_err("match_table not found for mpm-gpio\n");
 		return -ENODEV;
 	}
 
-	msm_mpm_dev_data.gpio_chip_domain = irq_domain_add_hierarchy(
-			parent_domain, 0, num_mpm_irqs, node,
+	msm_mpm_dev_data.gpio_chip_domain = irq_domain_create_linear(
+			of_node_to_fwnode(node), num_mpm_irqs,
 			&msm_mpm_gpio_chip_domain_ops, (void *)id->data);
 
 	if (!msm_mpm_dev_data.gpio_chip_domain)

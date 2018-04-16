@@ -2238,6 +2238,71 @@ static int qpnp_adc_tm_disable_rearm_low_thresholds(
 
 static int qpnp_adc_tm_read_status(struct qpnp_adc_tm_chip *chip)
 {
+	int rc = 0, sensor_notify_num = 0, i = 0, sensor_num = 0;
+	unsigned long flags;
+
+	if (qpnp_adc_tm_is_valid(chip))
+		return -ENODEV;
+
+	mutex_lock(&chip->adc->adc_lock);
+
+	rc = qpnp_adc_tm_req_sts_check(chip);
+	if (rc) {
+		pr_err("adc-tm-tm req sts check failed with %d\n", rc);
+		goto fail;
+	}
+
+	if (chip->th_info.adc_tm_high_enable) {
+		spin_lock_irqsave(&chip->th_info.adc_tm_high_lock, flags);
+		sensor_notify_num = chip->th_info.adc_tm_high_enable;
+		chip->th_info.adc_tm_high_enable = 0;
+		spin_unlock_irqrestore(&chip->th_info.adc_tm_high_lock, flags);
+		while (i < chip->max_channels_available) {
+			if ((sensor_notify_num & 0x1) == 1) {
+				sensor_num = i;
+				rc = qpnp_adc_tm_disable_rearm_high_thresholds(
+						chip, sensor_num);
+				if (rc < 0) {
+					pr_err("rearm threshold failed\n");
+					goto fail;
+				}
+			}
+			sensor_notify_num >>= 1;
+			i++;
+		}
+	}
+
+	if (chip->th_info.adc_tm_low_enable) {
+		spin_lock_irqsave(&chip->th_info.adc_tm_low_lock, flags);
+		sensor_notify_num = chip->th_info.adc_tm_low_enable;
+		chip->th_info.adc_tm_low_enable = 0;
+		spin_unlock_irqrestore(&chip->th_info.adc_tm_low_lock, flags);
+		i = 0;
+		while (i < chip->max_channels_available) {
+			if ((sensor_notify_num & 0x1) == 1) {
+				sensor_num = i;
+				rc = qpnp_adc_tm_disable_rearm_low_thresholds(
+						chip, sensor_num);
+				if (rc < 0) {
+					pr_err("rearm threshold failed\n");
+					goto fail;
+				}
+			}
+			sensor_notify_num >>= 1;
+			i++;
+		}
+	}
+
+fail:
+	mutex_unlock(&chip->adc->adc_lock);
+	if (rc < 0)
+		atomic_dec(&chip->wq_cnt);
+
+	return rc;
+}
+
+static int qpnp_adc_tm_hc_read_status(struct qpnp_adc_tm_chip *chip)
+{
 	int rc = 0, sensor_num = 0;
 
 	if (qpnp_adc_tm_is_valid(chip))
@@ -2306,9 +2371,15 @@ static void qpnp_adc_tm_high_thr_work(struct work_struct *work)
 
 	pr_debug("thr:0x%x\n", chip->th_info.adc_tm_high_enable);
 
-	rc = qpnp_adc_tm_read_status(chip);
-	if (rc < 0)
-		pr_err("adc-tm high thr work failed\n");
+	if (!chip->adc_tm_hc) {
+		rc = qpnp_adc_tm_read_status(chip);
+		if (rc < 0)
+			pr_err("adc-tm high thr work failed\n");
+	} else {
+		rc = qpnp_adc_tm_hc_read_status(chip);
+		if (rc < 0)
+			pr_err("adc-tm-hc high thr work failed\n");
+	}
 }
 
 static irqreturn_t qpnp_adc_tm_high_thr_isr(int irq, void *data)
@@ -2412,9 +2483,15 @@ static void qpnp_adc_tm_low_thr_work(struct work_struct *work)
 
 	pr_debug("thr:0x%x\n", chip->th_info.adc_tm_low_enable);
 
-	rc = qpnp_adc_tm_read_status(chip);
-	if (rc < 0)
-		pr_err("adc-tm low thr work failed\n");
+	if (!chip->adc_tm_hc) {
+		rc = qpnp_adc_tm_read_status(chip);
+		if (rc < 0)
+			pr_err("adc-tm low thr work failed\n");
+	} else {
+		rc = qpnp_adc_tm_hc_read_status(chip);
+		if (rc < 0)
+			pr_err("adc-tm-hc low thr work failed\n");
+	}
 }
 
 static irqreturn_t qpnp_adc_tm_low_thr_isr(int irq, void *data)
@@ -2959,6 +3036,9 @@ static int qpnp_adc_tm_probe(struct platform_device *pdev)
 	if (!chip)
 		return -ENOMEM;
 
+	list_add(&chip->list, &qpnp_adc_tm_device_list);
+	chip->max_channels_available = count_adc_channel_list;
+
 	adc_qpnp = devm_kzalloc(&pdev->dev, sizeof(struct qpnp_adc_drv),
 			GFP_KERNEL);
 	if (!adc_qpnp) {
@@ -3090,7 +3170,6 @@ static int qpnp_adc_tm_probe(struct platform_device *pdev)
 		INIT_LIST_HEAD(&chip->sensor[sen_idx].thr_list);
 		sen_idx++;
 	}
-	chip->max_channels_available = count_adc_channel_list;
 
 	chip->high_thr_wq = alloc_workqueue("qpnp_adc_tm_high_thr_wq",
 							WQ_HIGHPRI, 0);
@@ -3153,7 +3232,6 @@ static int qpnp_adc_tm_probe(struct platform_device *pdev)
 
 	chip->adc_vote_enable = false;
 	dev_set_drvdata(&pdev->dev, chip);
-	list_add(&chip->list, &qpnp_adc_tm_device_list);
 	spin_lock_init(&chip->th_info.adc_tm_low_lock);
 	spin_lock_init(&chip->th_info.adc_tm_high_lock);
 
@@ -3173,6 +3251,7 @@ fail:
 		destroy_workqueue(chip->high_thr_wq);
 	if (chip->low_thr_wq)
 		destroy_workqueue(chip->low_thr_wq);
+	list_del(&chip->list);
 	dev_set_drvdata(&pdev->dev, NULL);
 	return rc;
 }
