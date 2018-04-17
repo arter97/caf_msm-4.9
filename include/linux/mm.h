@@ -1175,8 +1175,13 @@ struct zap_details {
 	bool check_swap_entries;		/* Check also swap entries */
 };
 
-struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
-		pte_t pte);
+struct page *__vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
+			      pte_t pte, unsigned long vma_flags);
+static inline struct page *vm_normal_page(struct vm_area_struct *vma,
+		unsigned long addr, pte_t pte)
+{
+	return __vm_normal_page(vma, addr, pte, vma->vm_flags);
+}
 
 static inline void INIT_VMA(struct vm_area_struct *vma)
 {
