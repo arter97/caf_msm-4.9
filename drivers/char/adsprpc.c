@@ -64,6 +64,9 @@
 #define AUDIO_PDR_SERVICE_LOCATION_CLIENT_NAME   "audio_pdr_adsprpc"
 #define AUDIO_PDR_ADSP_SERVICE_NAME              "avs/audio"
 
+#define SENSORS_PDR_SERVICE_LOCATION_CLIENT_NAME   "sensors_pdr_adsprpc"
+#define SENSORS_PDR_ADSP_SERVICE_NAME              "tms/servreg"
+
 #define RPC_TIMEOUT	(5 * HZ)
 #define BALIGN		128
 #define NUM_CHANNELS	4	/* adsp, mdsp, slpi, cdsp*/
@@ -118,7 +121,7 @@
 
 static int fastrpc_glink_open(int cid);
 static void fastrpc_glink_close(void *chan, int cid);
-static int fastrpc_audio_pdr_notifier_cb(struct notifier_block *nb,
+static int fastrpc_pdr_notifier_cb(struct notifier_block *nb,
 					unsigned long code,
 					void *data);
 static struct dentry *debugfs_root;
@@ -228,6 +231,7 @@ struct fastrpc_smmu {
 	int faults;
 	int secure;
 	int coherent;
+	int sharedcb;
 };
 
 struct fastrpc_session_ctx {
@@ -364,6 +368,7 @@ struct fastrpc_file {
 	int pd;
 	char *spdname;
 	int file_close;
+	int sharedcb;
 	struct fastrpc_apps *apps;
 	struct hlist_head perf;
 	struct dentry *debugfs_file;
@@ -389,7 +394,13 @@ static struct fastrpc_channel_ctx gcinfo[NUM_CHANNELS] = {
 				.spdname =
 					AUDIO_PDR_SERVICE_LOCATION_CLIENT_NAME,
 				.pdrnb.notifier_call =
-						fastrpc_audio_pdr_notifier_cb,
+						fastrpc_pdr_notifier_cb,
+			},
+			{
+				.spdname =
+				SENSORS_PDR_SERVICE_LOCATION_CLIENT_NAME,
+				.pdrnb.notifier_call =
+						fastrpc_pdr_notifier_cb,
 			}
 		},
 	},
@@ -1745,7 +1756,7 @@ static void fastrpc_smd_read_handler(int cid)
 		if (err)
 			goto bail;
 
-		VERIFY(err, ((me->ctxtable[index]->ctxid == (rsp.ctx & ~1)) &&
+		VERIFY(err, ((me->ctxtable[index]->ctxid == (rsp.ctx & ~3)) &&
 			me->ctxtable[index]->magic == FASTRPC_CTX_MAGIC));
 		if (err)
 			goto bail;
@@ -1941,7 +1952,8 @@ static int fastrpc_init_process(struct fastrpc_file *fl,
 	VERIFY(err, 0 == (err = fastrpc_channel_open(fl)));
 	if (err)
 		goto bail;
-	if (init->flags == FASTRPC_INIT_ATTACH) {
+	if (init->flags == FASTRPC_INIT_ATTACH ||
+			init->flags == FASTRPC_INIT_ATTACH_SENSORS) {
 		remote_arg_t ra[1];
 		int tgid = fl->tgid;
 
@@ -1953,7 +1965,12 @@ static int fastrpc_init_process(struct fastrpc_file *fl,
 		ioctl.fds = NULL;
 		ioctl.attrs = NULL;
 		ioctl.crc = NULL;
-		fl->pd = 0;
+		if (init->flags == FASTRPC_INIT_ATTACH)
+			fl->pd = 0;
+		else if (init->flags == FASTRPC_INIT_ATTACH_SENSORS) {
+			fl->spdname = SENSORS_PDR_SERVICE_LOCATION_CLIENT_NAME;
+			fl->pd = 2;
+		}
 		VERIFY(err, !(err = fastrpc_internal_invoke(fl,
 			FASTRPC_MODE_PARALLEL, 1, &ioctl)));
 		if (err)
@@ -2063,6 +2080,7 @@ static int fastrpc_init_process(struct fastrpc_file *fl,
 		if (err)
 			goto bail;
 
+		fl->pd = 1;
 		inbuf.pgid = current->tgid;
 		inbuf.namelen = init->filelen;
 		inbuf.pageslen = 0;
@@ -2526,15 +2544,17 @@ static void fastrpc_channel_close(struct kref *kref)
 static void fastrpc_context_list_dtor(struct fastrpc_file *fl);
 
 static int fastrpc_session_alloc_locked(struct fastrpc_channel_ctx *chan,
-			int secure, struct fastrpc_session_ctx **session)
+	int secure, int sharedcb, struct fastrpc_session_ctx **session)
 {
 	struct fastrpc_apps *me = &gfa;
 	int idx = 0, err = 0;
 
 	if (chan->sesscount) {
 		for (idx = 0; idx < chan->sesscount; ++idx) {
-			if (!chan->session[idx].used &&
-				chan->session[idx].smmu.secure == secure) {
+			if ((sharedcb && chan->session[idx].smmu.sharedcb) ||
+					(!chan->session[idx].used &&
+					chan->session[idx].smmu.secure
+					== secure && !sharedcb)) {
 				chan->session[idx].used = 1;
 				break;
 			}
@@ -2590,7 +2610,7 @@ static void fastrpc_glink_notify_rx(void *handle, const void *priv,
 	if (err)
 		goto bail;
 
-	VERIFY(err, ((me->ctxtable[index]->ctxid == (rsp->ctx & ~1)) &&
+	VERIFY(err, ((me->ctxtable[index]->ctxid == (rsp->ctx & ~3)) &&
 		me->ctxtable[index]->magic == FASTRPC_CTX_MAGIC));
 	if (err)
 		goto bail;
@@ -2635,7 +2655,7 @@ static int fastrpc_session_alloc(struct fastrpc_channel_ctx *chan, int secure,
 
 	mutex_lock(&me->smd_mutex);
 	if (!*session)
-		err = fastrpc_session_alloc_locked(chan, secure, session);
+		err = fastrpc_session_alloc_locked(chan, secure, 0, session);
 	mutex_unlock(&me->smd_mutex);
 	return err;
 }
@@ -3075,7 +3095,7 @@ static int fastrpc_get_info(struct fastrpc_file *fl, uint32_t *info)
 		fl->cid = cid;
 		fl->ssrcount = fl->apps->channel[cid].ssrcount;
 		VERIFY(err, !fastrpc_session_alloc_locked(
-				&fl->apps->channel[cid], 0, &fl->sctx));
+			&fl->apps->channel[cid], 0, fl->sharedcb, &fl->sctx));
 		if (err)
 			goto bail;
 	}
@@ -3113,6 +3133,9 @@ static int fastrpc_internal_control(struct fastrpc_file *fl,
 			fl->qos_request = 1;
 		} else
 			pm_qos_update_request(&fl->pm_qos_req, latency);
+		break;
+	case FASTRPC_CONTROL_SMMU:
+		fl->sharedcb = cp->smmu.sharedcb;
 		break;
 	default:
 		err = -ENOTTY;
@@ -3354,7 +3377,7 @@ static int fastrpc_restart_notifier_cb(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
-static int fastrpc_audio_pdr_notifier_cb(struct notifier_block *pdrnb,
+static int fastrpc_pdr_notifier_cb(struct notifier_block *pdrnb,
 					unsigned long code,
 					void *data)
 {
@@ -3391,7 +3414,7 @@ static int fastrpc_get_service_location_notify(struct notifier_block *nb,
 {
 	struct fastrpc_static_pd *spd;
 	struct pd_qmi_client_data *pdr = data;
-	int curr_state = 0;
+	int curr_state = 0, i = 0;
 
 	spd = container_of(nb, struct fastrpc_static_pd, get_service_nb);
 	if (opcode == LOCATOR_DOWN) {
@@ -3399,15 +3422,21 @@ static int fastrpc_get_service_location_notify(struct notifier_block *nb,
 		return NOTIFY_DONE;
 	}
 
-	if (pdr->total_domains == 1) {
-		spd->pdrhandle = service_notif_register_notifier(
-				pdr->domain_list[0].name,
-				pdr->domain_list[0].instance_id,
+	for (i = 0; i < pdr->total_domains; i++) {
+		if ((!strcmp(pdr->domain_list[i].name,
+					"msm/adsp/audio_pd")) ||
+					(!strcmp(pdr->domain_list[i].name,
+					"msm/adsp/sensor_pd"))) {
+			spd->pdrhandle =
+				service_notif_register_notifier(
+				pdr->domain_list[i].name,
+				pdr->domain_list[i].instance_id,
 				&spd->pdrnb, &curr_state);
-		if (IS_ERR(spd->pdrhandle))
-			pr_err("ADSPRPC: Unable to register notifier\n");
-	} else
-		pr_err("ADSPRPC: Service returned invalid domains\n");
+			if (IS_ERR(spd->pdrhandle))
+				pr_err("ADSPRPC: Unable to register notifier\n");
+			break;
+		}
+	}
 
 	return NOTIFY_DONE;
 }
@@ -3466,6 +3495,8 @@ static int fastrpc_cb_probe(struct device *dev)
 	sess->used = 0;
 	sess->smmu.coherent = of_property_read_bool(dev->of_node,
 						"dma-coherent");
+	sess->smmu.sharedcb = of_property_read_bool(dev->of_node,
+						"shared-cb");
 	sess->smmu.secure = of_property_read_bool(dev->of_node,
 						"qcom,secure-context-bank");
 	if (sess->smmu.secure)
@@ -3703,6 +3734,24 @@ static int fastrpc_probe(struct platform_device *pdev)
 		ret = get_service_location(
 				AUDIO_PDR_SERVICE_LOCATION_CLIENT_NAME,
 				AUDIO_PDR_ADSP_SERVICE_NAME,
+				&me->channel[0].spd[session].get_service_nb);
+		if (ret)
+			pr_err("ADSPRPC: Get service location failed: %d\n",
+								ret);
+	}
+	if (of_property_read_bool(dev->of_node,
+					"qcom,fastrpc-adsp-sensors-pdr")) {
+		int session;
+
+		VERIFY(err, !fastrpc_get_adsp_session(
+			SENSORS_PDR_SERVICE_LOCATION_CLIENT_NAME, &session));
+		if (err)
+			goto spdbail;
+		me->channel[0].spd[session].get_service_nb.notifier_call =
+					fastrpc_get_service_location_notify;
+		ret = get_service_location(
+				SENSORS_PDR_SERVICE_LOCATION_CLIENT_NAME,
+				SENSORS_PDR_ADSP_SERVICE_NAME,
 				&me->channel[0].spd[session].get_service_nb);
 		if (ret)
 			pr_err("ADSPRPC: Get service location failed: %d\n",
