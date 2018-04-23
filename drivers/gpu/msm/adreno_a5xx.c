@@ -122,14 +122,42 @@ static void a530_efuse_speed_bin(struct adreno_device *adreno_dev)
 	adreno_dev->speed_bin = (val & speed_bin[1]) >> speed_bin[2];
 }
 
+static void a505_efuse_speed_bin(struct adreno_device *adreno_dev)
+{
+	unsigned int val_sw, val_hw;
+	unsigned int speed_bin_hw[3];
+	unsigned int speed_bin_sw[3];
+	struct kgsl_device *device = &adreno_dev->dev;
+
+	if (of_property_read_u32_array(device->pdev->dev.of_node,
+		"qcom,gpu-speed-bin", speed_bin_sw, 3))
+		return;
+
+	adreno_efuse_read_u32(adreno_dev, speed_bin_sw[0], &val_sw);
+	adreno_dev->speed_bin = (val_sw & speed_bin_sw[1]) >> speed_bin_sw[2];
+
+	if (of_property_read_u32_array(device->pdev->dev.of_node,
+		"qcom,gpu-speed-bin-hw", speed_bin_hw, 3))
+		return;
+
+	adreno_efuse_read_u32(adreno_dev, speed_bin_hw[0], &val_hw);
+	/*
+	 * OR the software and hardware fuse value to get the final
+	 * fuse value to choose the speed bin.
+	 * Final speed_bin value is a 4 digit value with bit 0 and 1
+	 * for SW FUSE and bit 2 and 3 for HW FUSE.
+	 */
+	adreno_dev->speed_bin |= (val_hw & speed_bin_hw[1]) >> speed_bin_hw[2];
+}
+
 static const struct {
 	int (*check)(struct adreno_device *adreno_dev);
 	void (*func)(struct adreno_device *adreno_dev);
 } a5xx_efuse_funcs[] = {
 	{ adreno_is_a530, a530_efuse_leakage },
 	{ adreno_is_a530, a530_efuse_speed_bin },
-	{ adreno_is_a504, a530_efuse_speed_bin },
-	{ adreno_is_a505, a530_efuse_speed_bin },
+	{ adreno_is_a504, a505_efuse_speed_bin },
+	{ adreno_is_a505, a505_efuse_speed_bin },
 	{ adreno_is_a512, a530_efuse_speed_bin },
 	{ adreno_is_a508, a530_efuse_speed_bin },
 };
