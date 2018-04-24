@@ -11,8 +11,11 @@
  * GNU General Public License for more details.
  */
 
-#include "sdm439-mtp.dtsi"
+#include "sdm439.dtsi"
 
-&mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi_hx8399c_hd_vid>;
+/ {
+	model = "Qualcomm Technologies, Inc. SDA439";
+	compatible = "qcom,sda439";
+	qcom,msm-id = <363 0x0>;
+	qcom,msm-name = "SDA439";
 };
