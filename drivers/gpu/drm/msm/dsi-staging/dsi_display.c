@@ -2180,6 +2180,20 @@ static int dsi_display_phy_reset_config(struct dsi_display *display,
 	return 0;
 }
 
+static void dsi_display_toggle_resync_fifo(struct dsi_display *display)
+{
+	struct dsi_display_ctrl *ctrl;
+	int i;
+
+	if (!display)
+		return;
+
+	for (i = 0; i < display->ctrl_count; i++) {
+		ctrl = &display->ctrl[i];
+		dsi_phy_toggle_resync_fifo(ctrl->phy);
+	}
+}
+
 static int dsi_display_ctrl_update(struct dsi_display *display)
 {
 	int rc = 0;
@@ -3089,6 +3103,15 @@ int dsi_post_clkon_cb(void *priv,
 		dsi_display_ctrl_irq_update(display, true);
 	}
 	if (clk & DSI_LINK_CLK) {
+		/*
+		 * Toggle the resync FIFO everytime clock changes, except
+		 * when cont-splash screen transition is going on.
+		 * Toggling resync FIFO during cont splash transition
+		 * can lead to blinks on the display.
+		 */
+		if (!display->is_cont_splash_enabled)
+			dsi_display_toggle_resync_fifo(display);
+
 		if (display->ulps_enabled) {
 			rc = dsi_display_set_ulps(display, false);
 			if (rc) {
@@ -5146,6 +5169,53 @@ error:
 		kfree(display->modes);
 
 	mutex_unlock(&display->display_lock);
+	return rc;
+}
+
+int dsi_display_get_panel_vfp(void *dsi_display,
+	int h_active, int v_active)
+{
+	int i, rc = 0;
+	u32 count, refresh_rate = 0;
+	struct dsi_dfps_capabilities dfps_caps;
+	struct dsi_display *display = (struct dsi_display *)dsi_display;
+
+	if (!display)
+		return -EINVAL;
+
+	rc = dsi_display_get_mode_count(display, &count);
+	if (rc)
+		return rc;
+
+	mutex_lock(&display->display_lock);
+
+	if (display->panel && display->panel->cur_mode)
+		refresh_rate = display->panel->cur_mode->timing.refresh_rate;
+
+	dsi_panel_get_dfps_caps(display->panel, &dfps_caps);
+	if (dfps_caps.dfps_support)
+		refresh_rate = dfps_caps.max_refresh_rate;
+
+	if (!refresh_rate) {
+		mutex_unlock(&display->display_lock);
+		pr_err("Null Refresh Rate\n");
+		return -EINVAL;
+	}
+
+	h_active *= display->ctrl_count;
+
+	for (i = 0; i < count; i++) {
+		struct dsi_display_mode *m = &display->modes[i];
+
+		if (m && v_active == m->timing.v_active &&
+			h_active == m->timing.h_active &&
+			refresh_rate == m->timing.refresh_rate) {
+			rc = m->timing.v_front_porch;
+			break;
+		}
+	}
+	mutex_unlock(&display->display_lock);
+
 	return rc;
 }
 
