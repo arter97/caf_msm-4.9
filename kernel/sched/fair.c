@@ -6886,6 +6886,7 @@ static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
 	int start_cpu = walt_start_cpu(prev_cpu);
 	bool do_rotate = false;
 	bool avoid_prev_cpu = false;
+	bool active_migration = (p->state == TASK_RUNNING);
 
 	sd = rcu_dereference(per_cpu(sd_ea, start_cpu));
 
@@ -6996,6 +6997,9 @@ retry:
 			continue;
 
 		if (sched_cpu_high_irqload(i))
+			continue;
+
+		if (active_migration && !idle_cpu(i))
 			continue;
 
 		/*
