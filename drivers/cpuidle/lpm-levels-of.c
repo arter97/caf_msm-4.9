@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -456,7 +456,7 @@ static int parse_cluster_params(struct device_node *node,
 	/* Set default_level to 0 as default */
 	c->default_level = 0;
 
-	return ret;
+	return 0;
 fail:
 	pr_err("Failed to read key: %s ret: %d\n", key, ret);
 
