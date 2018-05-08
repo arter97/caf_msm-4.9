@@ -610,8 +610,12 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 		return -EINVAL;
 
 	spin_lock_irq(&dev->lock);
+	if (dev->state == STATE_OFFLINE) {
+		spin_unlock_irq(&dev->lock);
+		return -ENODEV;
+	}
 	if (dev->ep_out->desc) {
-		len = usb_ep_align_maybe(cdev->gadget, dev->ep_out, count);
+		len = usb_ep_align_maybe(dev->cdev->gadget, dev->ep_out, count);
 		if (len > MTP_BULK_BUFFER_SIZE) {
 			spin_unlock_irq(&dev->lock);
 			return -EINVAL;
@@ -1545,7 +1549,9 @@ static void mtp_function_disable(struct usb_function *f)
 	struct usb_composite_dev	*cdev = dev->cdev;
 
 	DBG(cdev, "mtp_function_disable\n");
+	spin_lock_irq(&dev->lock);
 	dev->state = STATE_OFFLINE;
+	spin_unlock_irq(&dev->lock);
 	usb_ep_disable(dev->ep_in);
 	usb_ep_disable(dev->ep_out);
 	usb_ep_disable(dev->ep_intr);
