@@ -614,8 +614,14 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 		spin_unlock_irq(&dev->lock);
 		return -ENODEV;
 	}
+
 	if (dev->ep_out->desc) {
-		len = usb_ep_align_maybe(dev->cdev->gadget, dev->ep_out, count);
+		if (!cdev) {
+			spin_unlock_irq(&dev->lock);
+			return -ENODEV;
+		}
+
+		len = usb_ep_align_maybe(cdev->gadget, dev->ep_out, count);
 		if (len > MTP_BULK_BUFFER_SIZE) {
 			spin_unlock_irq(&dev->lock);
 			return -EINVAL;
@@ -1493,7 +1499,10 @@ mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	while ((req = mtp_req_get(dev, &dev->intr_idle)))
 		mtp_request_free(req, dev->ep_intr);
 	mutex_unlock(&dev->read_mutex);
+	spin_lock_irq(&dev->lock);
 	dev->state = STATE_OFFLINE;
+	dev->cdev = NULL;
+	spin_unlock_irq(&dev->lock);
 	kfree(f->os_desc_table);
 	f->os_desc_n = 0;
 	fi_mtp->func_inst.f = NULL;
