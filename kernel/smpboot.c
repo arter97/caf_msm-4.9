@@ -121,7 +121,9 @@ static int smpboot_thread_fn(void *data)
 		}
 
 		if (kthread_should_park()) {
+			raw_spin_lock(&current->pi_lock);
 			__set_current_state(TASK_RUNNING);
+			raw_spin_unlock(&current->pi_lock);
 			preempt_enable();
 			if (ht->park && td->status == HP_THREAD_ACTIVE) {
 				BUG_ON(td->cpu != smp_processor_id());
