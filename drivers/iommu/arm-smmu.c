@@ -535,6 +535,8 @@ struct arm_smmu_domain {
 	struct list_head		unassign_list;
 	struct mutex			assign_lock;
 	struct list_head		secure_pool_list;
+	/* nonsecure pool protected by pgtbl_lock */
+	struct list_head		nonsecure_pool;
 	struct iommu_domain		domain;
 
 	bool				qsmmuv500_errata1_init;
@@ -1314,8 +1316,19 @@ static void *arm_smmu_alloc_pages_exact(void *cookie,
 	void *page;
 	struct arm_smmu_domain *smmu_domain = cookie;
 
-	if (!arm_smmu_is_master_side_secure(smmu_domain))
+	if (!arm_smmu_is_master_side_secure(smmu_domain)) {
+		struct page *pg;
+		/* size is expected to be 4K with current configuration */
+		if (size == PAGE_SIZE) {
+			pg = list_first_entry_or_null(
+				&smmu_domain->nonsecure_pool, struct page, lru);
+			if (pg) {
+				list_del_init(&pg->lru);
+				return page_address(pg);
+			}
+		}
 		return alloc_pages_exact(size, gfp_mask);
+	}
 
 	page = arm_smmu_secure_pool_remove(smmu_domain, size);
 	if (page)
@@ -2081,6 +2094,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
 	INIT_LIST_HEAD(&smmu_domain->unassign_list);
 	mutex_init(&smmu_domain->assign_lock);
 	INIT_LIST_HEAD(&smmu_domain->secure_pool_list);
+	INIT_LIST_HEAD(&smmu_domain->nonsecure_pool);
 	arm_smmu_domain_reinit(smmu_domain);
 
 	return &smmu_domain->domain;
@@ -2433,6 +2447,60 @@ static int arm_smmu_prepare_pgtable(void *addr, void *cookie)
 	return 0;
 }
 
+static void arm_smmu_prealloc_memory(struct arm_smmu_domain *smmu_domain,
+					size_t size, struct list_head *pool)
+{
+	int i;
+	u32 nr = 0;
+	struct page *page;
+
+	if ((smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC)) ||
+			arm_smmu_has_secure_vmid(smmu_domain))
+		return;
+
+	/* number of 2nd level pagetable entries */
+	nr += round_up(size, SZ_1G) >> 30;
+	/* number of 3rd level pagetabel entries */
+	nr += round_up(size, SZ_2M) >> 21;
+
+	/* Retry later with atomic allocation on error */
+	for (i = 0; i < nr; i++) {
+		page = alloc_pages(GFP_KERNEL | __GFP_ZERO, 0);
+		if (!page)
+			break;
+		list_add(&page->lru, pool);
+	}
+}
+
+static void arm_smmu_prealloc_memory_sg(struct arm_smmu_domain *smmu_domain,
+					struct scatterlist *sgl, int nents,
+					struct list_head *pool)
+{
+	int i;
+	size_t size = 0;
+	struct scatterlist *sg;
+
+	if ((smmu_domain->attributes & (1 << DOMAIN_ATTR_ATOMIC)) ||
+			arm_smmu_has_secure_vmid(smmu_domain))
+		return;
+
+	for_each_sg(sgl, sg, nents, i)
+		size += sg->length;
+
+	arm_smmu_prealloc_memory(smmu_domain, size, pool);
+}
+
+static void arm_smmu_release_prealloc_memory(
+		struct arm_smmu_domain *smmu_domain, struct list_head *list)
+{
+	struct page *page, *tmp;
+
+	list_for_each_entry_safe(page, tmp, list, lru) {
+		list_del(&page->lru);
+		__free_pages(page, 0);
+	}
+}
+
 static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 {
 	int ret;
@@ -2511,19 +2579,24 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 	unsigned long flags;
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	struct io_pgtable_ops *ops= smmu_domain->pgtbl_ops;
+	LIST_HEAD(nonsecure_pool);
 
 	if (!ops)
 		return -ENODEV;
 
+	arm_smmu_prealloc_memory(smmu_domain, size, &nonsecure_pool);
 	arm_smmu_secure_domain_lock(smmu_domain);
 
 	spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
+	list_splice_init(&nonsecure_pool, &smmu_domain->nonsecure_pool);
 	ret = ops->map(ops, iova, paddr, size, prot);
+	list_splice_init(&smmu_domain->nonsecure_pool, &nonsecure_pool);
 	spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
 
 	arm_smmu_assign_table(smmu_domain);
 	arm_smmu_secure_domain_unlock(smmu_domain);
 
+	arm_smmu_release_prealloc_memory(smmu_domain, &nonsecure_pool);
 	return ret;
 }
 
@@ -2590,10 +2663,12 @@ static size_t arm_smmu_map_sg(struct iommu_domain *domain, unsigned long iova,
 	unsigned int idx_start, idx_end;
 	struct scatterlist *sg_start, *sg_end;
 	unsigned long __saved_iova_start;
+	LIST_HEAD(nonsecure_pool);
 
 	if (!ops)
 		return -ENODEV;
 
+	arm_smmu_prealloc_memory_sg(smmu_domain, sg, nents, &nonsecure_pool);
 	arm_smmu_secure_domain_lock(smmu_domain);
 
 	__saved_iova_start = iova;
@@ -2612,8 +2687,10 @@ static size_t arm_smmu_map_sg(struct iommu_domain *domain, unsigned long iova,
 		}
 
 		spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
+		list_splice_init(&nonsecure_pool, &smmu_domain->nonsecure_pool);
 		ret = ops->map_sg(ops, iova, sg_start, idx_end - idx_start,
 				  prot, &size);
+		list_splice_init(&smmu_domain->nonsecure_pool, &nonsecure_pool);
 		spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
 		/* Returns 0 on error */
 		if (!ret) {
@@ -2634,6 +2711,7 @@ out:
 		iova = __saved_iova_start;
 	}
 	arm_smmu_secure_domain_unlock(smmu_domain);
+	arm_smmu_release_prealloc_memory(smmu_domain, &nonsecure_pool);
 	return iova - __saved_iova_start;
 }
 
