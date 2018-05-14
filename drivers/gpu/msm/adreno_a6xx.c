@@ -61,6 +61,7 @@ static const struct adreno_vbif_data a615_gbif[] = {
 static const struct adreno_vbif_platform a6xx_vbif_platforms[] = {
 	{ adreno_is_a630, a630_vbif },
 	{ adreno_is_a615, a615_gbif },
+	{ adreno_is_a616, a615_gbif },
 };
 
 
@@ -251,6 +252,7 @@ static const struct {
 } a6xx_hwcg_registers[] = {
 	{adreno_is_a630, a630_hwcg_regs, ARRAY_SIZE(a630_hwcg_regs)},
 	{adreno_is_a615, a615_hwcg_regs, ARRAY_SIZE(a615_hwcg_regs)},
+	{adreno_is_a616, a615_hwcg_regs, ARRAY_SIZE(a615_hwcg_regs)},
 };
 
 static struct a6xx_protected_regs {
@@ -499,7 +501,7 @@ static void a6xx_enable_64bit(struct adreno_device *adreno_dev)
 static inline unsigned int
 __get_rbbm_clock_cntl_on(struct adreno_device *adreno_dev)
 {
-	if (adreno_is_a615(adreno_dev))
+	if (adreno_is_a615(adreno_dev) || adreno_is_a616(adreno_dev))
 		return 0x8AA8AA82;
 	else
 		return 0x8AA8AA02;
@@ -508,7 +510,7 @@ __get_rbbm_clock_cntl_on(struct adreno_device *adreno_dev)
 static inline unsigned int
 __get_gmu_ao_cgc_mode_cntl(struct adreno_device *adreno_dev)
 {
-	if (adreno_is_a615(adreno_dev))
+	if (adreno_is_a615(adreno_dev) || adreno_is_a616(adreno_dev))
 		return 0x00000222;
 	else
 		return 0x00020202;
@@ -517,7 +519,7 @@ __get_gmu_ao_cgc_mode_cntl(struct adreno_device *adreno_dev)
 static inline unsigned int
 __get_gmu_ao_cgc_delay_cntl(struct adreno_device *adreno_dev)
 {
-	if (adreno_is_a615(adreno_dev))
+	if (adreno_is_a615(adreno_dev) || adreno_is_a616(adreno_dev))
 		return 0x00000111;
 	else
 		return 0x00010111;
@@ -526,7 +528,7 @@ __get_gmu_ao_cgc_delay_cntl(struct adreno_device *adreno_dev)
 static inline unsigned int
 __get_gmu_ao_cgc_hyst_cntl(struct adreno_device *adreno_dev)
 {
-	if (adreno_is_a615(adreno_dev))
+	if (adreno_is_a615(adreno_dev) || adreno_is_a616(adreno_dev))
 		return 0x00000555;
 	else
 		return 0x00005555;
@@ -643,7 +645,7 @@ static void a6xx_patch_pwrup_reglist(struct adreno_device *adreno_dev)
 		+ sizeof(a6xx_ifpc_pwrup_reglist), a6xx_pwrup_reglist,
 		sizeof(a6xx_pwrup_reglist));
 
-	if (adreno_is_a615(adreno_dev)) {
+	if (adreno_is_a615(adreno_dev) || adreno_is_a616(adreno_dev)) {
 		for (i = 0; i < ARRAY_SIZE(a615_pwrup_reglist); i++) {
 			r = &a615_pwrup_reglist[i];
 			kgsl_regread(KGSL_DEVICE(adreno_dev),
@@ -1706,6 +1708,10 @@ static int a6xx_rpmh_power_on_gpu(struct kgsl_device *device)
 	struct device *dev = &gmu->pdev->dev;
 	int val;
 
+	/* Only trigger wakeup sequence if sleep sequence was done earlier */
+	if (!test_bit(GMU_RSCC_SLEEP_SEQ_DONE, &gmu->flags))
+		return 0;
+
 	kgsl_gmu_regread(device, A6XX_GPU_CC_GX_DOMAIN_MISC, &val);
 	if (!(val & 0x1))
 		dev_err_ratelimited(&gmu->pdev->dev,
@@ -1735,6 +1741,9 @@ static int a6xx_rpmh_power_on_gpu(struct kgsl_device *device)
 
 	kgsl_gmu_regwrite(device, A6XX_GMU_RSCC_CONTROL_REQ, 0);
 
+	/* Clear sleep sequence flag as wakeup sequence is successful */
+	clear_bit(GMU_RSCC_SLEEP_SEQ_DONE, &gmu->flags);
+
 	/* Enable the power counter because it was disabled before slumber */
 	kgsl_gmu_regwrite(device, A6XX_GMU_CX_GMU_POWER_COUNTER_ENABLE, 1);
 
@@ -1749,6 +1758,9 @@ static int a6xx_rpmh_power_off_gpu(struct kgsl_device *device)
 	struct gmu_device *gmu = &device->gmu;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int ret;
+
+	if (test_bit(GMU_RSCC_SLEEP_SEQ_DONE, &gmu->flags))
+		return 0;
 
 	/* RSC sleep sequence is different on v1 */
 	if (adreno_is_a630v1(adreno_dev))
@@ -1791,6 +1803,7 @@ static int a6xx_rpmh_power_off_gpu(struct kgsl_device *device)
 			test_bit(ADRENO_LM_CTRL, &adreno_dev->pwrctrl_flag))
 		kgsl_gmu_regwrite(device, A6XX_GMU_AO_SPARE_CNTL, 0);
 
+	set_bit(GMU_RSCC_SLEEP_SEQ_DONE, &gmu->flags);
 	return 0;
 }
 
@@ -1809,15 +1822,13 @@ static int a6xx_gmu_fw_start(struct kgsl_device *device,
 	unsigned int chipid = 0;
 
 	switch (boot_state) {
-	case GMU_RESET:
-		/* fall through */
 	case GMU_COLD_BOOT:
 		/* Turn on TCM retention */
 		kgsl_gmu_regwrite(device, A6XX_GMU_GENERAL_7, 1);
 
 		if (!test_and_set_bit(GMU_BOOT_INIT_DONE, &gmu->flags))
 			_load_gmu_rpmh_ucode(device);
-		else if (boot_state != GMU_RESET) {
+		else {
 			ret = a6xx_rpmh_power_on_gpu(device);
 			if (ret)
 				return ret;
@@ -3587,6 +3598,7 @@ static const struct {
 	void (*func)(struct adreno_device *adreno_dev);
 } a6xx_efuse_funcs[] = {
 	{ adreno_is_a615, a6xx_efuse_speed_bin },
+	{ adreno_is_a616, a6xx_efuse_speed_bin },
 };
 
 static void a6xx_check_features(struct adreno_device *adreno_dev)

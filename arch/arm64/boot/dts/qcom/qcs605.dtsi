@@ -66,10 +66,6 @@
 	status = "disabled";
 };
 
-&dump_mem {
-	status = "disabled";
-};
-
 &soc {
 	qcom,rmnet-ipa {
 		status = "disabled";
