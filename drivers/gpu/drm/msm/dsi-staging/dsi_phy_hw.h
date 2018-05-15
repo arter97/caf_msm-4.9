@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -232,6 +232,14 @@ struct dsi_phy_hw_ops {
 	 */
 	int (*phy_timing_val)(struct dsi_phy_per_lane_cfgs *timing_val,
 				u32 *timing, u32 size);
+
+	/**
+	 * clamp_ctrl() - configure clamps for DSI lanes
+	 * @phy:        DSI PHY handle.
+	 * @enable:     boolean to specify clamp enable/disable.
+	 * Return:    error code.
+	 */
+	void (*clamp_ctrl)(struct dsi_phy_hw *phy, bool enable);
 
 	/**
 	 * phy_lane_reset() - Reset dsi phy lanes in case of error.
