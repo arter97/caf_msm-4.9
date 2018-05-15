@@ -248,7 +248,7 @@
 
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
-				<&afe>, <&lsm>, <&routing>, <&cpe>, <&compr>,
+				<&afe>, <&lsm>, <&routing>, <&cpe>,
 				<&pcm_noirq>;
 		asoc-platform-names = "msm-pcm-dsp.0", "msm-pcm-dsp.1",
 				"msm-pcm-dsp.2", "msm-voip-dsp",
@@ -256,7 +256,7 @@
 				"msm-compress-dsp", "msm-pcm-hostless",
 				"msm-pcm-afe", "msm-lsm-client",
 				"msm-pcm-routing", "msm-cpe-lsm",
-				"msm-compr-dsp", "msm-pcm-dsp-noirq";
+				"msm-pcm-dsp-noirq";
 
 		asoc-cpu = <&dai_pri_auxpcm>,
 				<&dai_mi2s2>, <&dai_mi2s3>, <&dai_mi2s5>,

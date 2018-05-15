@@ -126,6 +126,18 @@ config ARCH_SDM429
 	select HAVE_CLK_PREPARE
 	select COMMON_CLK_MSM
 
+config ARCH_MSM8917
+	bool "Enable support for MSM8917"
+	select CPU_V7
+	select HAVE_ARM_ARCH_TIMER
+	select PINCTRL
+	select QCOM_SCM if SMP
+	select PM_DEVFREQ
+	select CLKDEV_LOOKUP
+	select HAVE_CLK
+	select HAVE_CLK_PREPARE
+	select COMMON_CLK_MSM
+
 config ARCH_SDM450
 	bool "Enable support for SDM450"
 	select CPU_V7
@@ -136,6 +148,22 @@ config ARCH_SDM450
 	select CLKDEV_LOOKUP
 	select HAVE_CLK
 	select HAVE_CLK_PREPARE
+	select COMMON_CLK_MSM
+
+config ARCH_SDM632
+	bool "Enable Support for Qualcomm Technologies Inc. SDM632"
+	select CPU_V7
+	select PINCTRL
+	select QCOM_SCM if SMP
+	select CLKDEV_LOOKUP
+	select HAVE_CLK
+	select HAVE_CLK_PREPARE
+	select SOC_BUS
+	select PM_OPP
+	select MFD_CORE
+	select SND_SOC_COMPRESS
+	select SND_HWDEP
+	select CPU_FREQ_QCOM
 	select COMMON_CLK_MSM
 
 endmenu

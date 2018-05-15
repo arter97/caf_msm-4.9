@@ -22,7 +22,7 @@
 	qcom,msm-name = "SDM632";
 
 	chosen {
-		/delete-property/ bootargs;
+		bootargs = "kpti=0";
 	};
 };
 
@@ -81,10 +81,6 @@
 	/delete-node/ apc1-cpu3-usr;
 
 	case-therm-step {
-		status = "disabled";
-	};
-
-	quiet-therm-step {
 		status = "disabled";
 	};
 
@@ -983,3 +979,4 @@
 	/delete-node/ case-therm-step;
 };
 
+#include "sdm632-coresight.dtsi"

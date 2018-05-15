@@ -4158,16 +4158,12 @@ void msm_isp_process_axi_irq_stream(struct vfe_device *vfe_dev,
 		return;
 	}
 
-	#ifdef CONFIG_MSM_AVTIMER
 	if (vfe_dev->vt_enable) {
 		msm_isp_get_avtimer_ts(ts);
 		time_stamp = &ts->vt_time;
 	} else {
 		time_stamp = &ts->buf_time;
 	}
-	#else
-	time_stamp = &ts->buf_time;
-	#endif
 
 	frame_id = vfe_dev->axi_data.
 		src_info[SRC_TO_INTF(stream_info->stream_src)].frame_id;

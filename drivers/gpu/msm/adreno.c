@@ -279,6 +279,59 @@ int adreno_efuse_read_u32(struct adreno_device *adreno_dev, unsigned int offset,
 	return 0;
 }
 
+void adreno_efuse_speed_bin_array(struct adreno_device *adreno_dev)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	int ret, count, i = 0;
+	unsigned int val, vector_size = 3;
+	unsigned int *bin_vector;
+
+	/*
+	 * Here count is no of 32 bit elements in the
+	 * speed-bin-vector array. If there are two fuses
+	 * i.e If no of fuses are 2 then no of elements will be
+	 * 2 * 3 = 6(elements of 32 bit each).
+	 */
+	count = of_property_count_u32_elems(device->pdev->dev.of_node,
+				"qcom,gpu-speed-bin-vectors");
+	if (count <= 0)
+		return;
+
+	bin_vector = kmalloc(sizeof(count * sizeof(unsigned int)),
+			GFP_KERNEL);
+	if (bin_vector == NULL) {
+		KGSL_DRV_ERR(device,
+				"Unable to allocate memory for speed-bin vector\n");
+		return;
+	}
+
+	if (of_property_read_u32_array(device->pdev->
+			dev.of_node, "qcom,gpu-speed-bin-vectors",
+			bin_vector, count)) {
+		KGSL_DRV_ERR(device,
+				"Speed-bin-vectors is invalid\n");
+		kfree(bin_vector);
+		return;
+	}
+
+	/*
+	 * Final value of adreno_dev->speed_bin is the value formed by
+	 * OR'ing the values read from all the fuses.
+	 */
+	while (i < count) {
+		ret = adreno_efuse_read_u32(adreno_dev, bin_vector[i], &val);
+
+		if (ret < 0)
+			break;
+
+		adreno_dev->speed_bin |= (val & bin_vector[i+1])
+				>> bin_vector[i+2];
+		i += vector_size;
+	}
+
+	kfree(bin_vector);
+}
+
 static int _get_counter(struct adreno_device *adreno_dev,
 		int group, int countable, unsigned int *lo,
 		unsigned int *hi)
@@ -848,6 +901,58 @@ static const struct of_device_id adreno_match_table[] = {
 	{}
 };
 
+static void adreno_of_get_ca_target_pwrlevel(struct adreno_device *adreno_dev,
+		struct device_node *node)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	unsigned int ca_target_pwrlevel = 1;
+
+	of_property_read_u32(node, "qcom,ca-target-pwrlevel",
+		&ca_target_pwrlevel);
+
+	if (ca_target_pwrlevel > device->pwrctrl.num_pwrlevels - 2)
+		ca_target_pwrlevel = 1;
+
+	device->pwrscale.ctxt_aware_target_pwrlevel = ca_target_pwrlevel;
+}
+
+static void adreno_of_get_ca_aware_properties(struct adreno_device *adreno_dev,
+		struct device_node *parent)
+{
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	struct kgsl_pwrscale *pwrscale = &device->pwrscale;
+	struct device_node *node, *child;
+	unsigned int bin = 0;
+
+	pwrscale->ctxt_aware_enable =
+		of_property_read_bool(parent, "qcom,enable-ca-jump");
+
+	if (pwrscale->ctxt_aware_enable) {
+		if (of_property_read_u32(parent, "qcom,ca-busy-penalty",
+			&pwrscale->ctxt_aware_busy_penalty))
+			pwrscale->ctxt_aware_busy_penalty = 12000;
+
+		node = of_find_node_by_name(parent, "qcom,gpu-pwrlevel-bins");
+		if (node == NULL) {
+			adreno_of_get_ca_target_pwrlevel(adreno_dev, parent);
+			return;
+		}
+
+		for_each_child_of_node(node, child) {
+			if (of_property_read_u32(child, "qcom,speed-bin", &bin))
+				continue;
+
+			if (bin == adreno_dev->speed_bin) {
+				adreno_of_get_ca_target_pwrlevel(adreno_dev,
+					child);
+				return;
+			}
+		}
+
+		pwrscale->ctxt_aware_target_pwrlevel = 1;
+	}
+}
+
 static int adreno_of_parse_pwrlevels(struct adreno_device *adreno_dev,
 		struct device_node *node)
 {
@@ -1004,6 +1109,9 @@ static int adreno_of_get_power(struct adreno_device *adreno_dev,
 
 	if (adreno_of_get_pwrlevels(adreno_dev, node))
 		return -EINVAL;
+
+	/* Get context aware DCVS properties */
+	adreno_of_get_ca_aware_properties(adreno_dev, node);
 
 	/* get pm-qos-active-latency, set it to default if not found */
 	if (of_property_read_u32(node, "qcom,pm-qos-active-latency",

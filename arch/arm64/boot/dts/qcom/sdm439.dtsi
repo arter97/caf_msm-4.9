@@ -172,6 +172,7 @@
 
 		CPU_COST_0: core-cost0 {
 			busy-cost-data = <
+				 800000	137
 				1305600	207
 				1497600	256
 				1708800	327
@@ -196,6 +197,7 @@
 		};
 		CLUSTER_COST_0: cluster-cost0 {
 			busy-cost-data = <
+				 800000	49
 				1305600	61
 				1497600	71
 				1708800	85
@@ -378,8 +380,9 @@
 		<26 512 0 6374400>, /* 8. 796.80 MHz */
 		<26 512 0 7449600>; /* 9. 931.20 MHz */
 
-	qcom,gpu-speed-bin = <0x6004 0x00C00000 22>;
-	qcom,gpu-speed-bin-hw = <0x6008 0x00000600 7>;
+	qcom,gpu-speed-bin-vectors =
+		<0x6004 0x00c00000 22>,
+		<0x6008 0x00000600 7>;
 
 	/delete-node/qcom,gpu-pwrlevels;
 	qcom,gpu-pwrlevel-bins {
@@ -511,7 +514,7 @@
 
 			qcom,speed-bin = <5>;
 
-			qcom,initial-pwrlevel = <2>;
+			qcom,initial-pwrlevel = <1>;
 
 			/* NOM */
 			qcom,gpu-pwrlevel@0 {
@@ -563,8 +566,8 @@
 				reg = <0>;
 				qcom,gpu-freq = <320000000>;
 				qcom,bus-freq = <4>;
-				qcom,bus-min = <3>;
-				qcom,bus-max = <5>;
+				qcom,bus-min = <4>;
+				qcom,bus-max = <8>;
 			};
 
 			/* XO */
@@ -578,4 +581,3 @@
 		};
 	};
 };
-
