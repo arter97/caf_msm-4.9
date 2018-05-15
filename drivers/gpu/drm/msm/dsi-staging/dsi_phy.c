@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -891,6 +891,26 @@ int dsi_phy_disable(struct msm_dsi_phy *phy)
 	mutex_unlock(&phy->phy_lock);
 
 	return rc;
+}
+
+/**
+ * dsi_phy_set_clamp_state() - configure clamps for DSI lanes
+ * @phy:        DSI PHY handle.
+ * @enable:     boolean to specify clamp enable/disable.
+ *
+ * Return: error code.
+ */
+int dsi_phy_set_clamp_state(struct msm_dsi_phy *phy, bool enable)
+{
+	if (!phy)
+		return -EINVAL;
+
+	pr_debug("[%s] enable=%d\n", phy->name, enable);
+
+	if (phy->hw.ops.clamp_ctrl)
+		phy->hw.ops.clamp_ctrl(&phy->hw, enable);
+
+	return 0;
 }
 
 /**
