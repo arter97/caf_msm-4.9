@@ -145,4 +145,8 @@
 &thermal_zones {
 	/delete-node/ case-therm-adc;
 	/delete-node/ case-therm-step;
+
+	sdm632-skin-step {
+		status = "disabled";
+	};
 };

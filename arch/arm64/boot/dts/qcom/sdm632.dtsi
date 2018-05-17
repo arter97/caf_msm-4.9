@@ -95,6 +95,10 @@
 		status = "disabled";
 	};
 
+	quiet-therm-step {
+		status = "disabled";
+	};
+
 	video-usr {
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
