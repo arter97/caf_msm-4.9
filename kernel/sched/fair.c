@@ -7075,9 +7075,12 @@ retry:
 		/*
 		 * Ensure minimum capacity to grant the required boost.
 		 * The target CPU can be already at a capacity level higher
-		 * than the one required to boost the task.
+		 * than the one required to boost the task. But allow the
+		 * task to placed on an idle but lower capacity CPU when
+		 * all the CPUs in the higher capacity sched group are
+		 * overutilized.
 		 */
-		if (new_util > capacity_orig_of(i))
+		if ((sg_target == start_sg) && new_util > capacity_orig_of(i))
 			continue;
 
 		cpu_idle_idx = idle_get_state_idx(cpu_rq(i));
@@ -7163,6 +7166,16 @@ retry:
 		do_rotate = false;
 		i = -1;
 		goto retry;
+	}
+
+	/*
+	 * If we don't find a candidate CPU in the primary sched group,
+	 * expand the search to the other groups.
+	 */
+	if (target_cpu == -1 && min_util_cpu == -1 &&
+				sg_target->next != start_sg) {
+		sg_target = sg_target->next;
+		goto next_sg;
 	}
 
 	/*
