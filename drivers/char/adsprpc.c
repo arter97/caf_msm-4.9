@@ -2728,6 +2728,7 @@ static int fastrpc_file_free(struct fastrpc_file *fl)
 	mutex_unlock(&fl->perf_mutex);
 	mutex_destroy(&fl->perf_mutex);
 	mutex_destroy(&fl->fl_map_mutex);
+	mutex_destroy(&fl->map_mutex);
 	kfree(fl);
 	return 0;
 }
@@ -2741,7 +2742,6 @@ static int fastrpc_device_release(struct inode *inode, struct file *file)
 			pm_qos_remove_request(&fl->pm_qos_req);
 		if (fl->debugfs_file != NULL)
 			debugfs_remove(fl->debugfs_file);
-		mutex_destroy(&fl->map_mutex);
 		fastrpc_file_free(fl);
 		file->private_data = NULL;
 	}
