@@ -213,4 +213,8 @@
 	quiet-therm-step {
 		status = "disabled";
 	};
+
+	sdm632-skin-step {
+		status = "disabled";
+	};
 };
