@@ -616,7 +616,6 @@ static void msm_geni_serial_abort_rx(struct uart_port *uport)
 static void msm_geni_serial_complete_rx_eot(struct uart_port *uport)
 {
 	int poll_done = 0, tries = 0;
-	u32 geni_status = 0;
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	do {
@@ -625,11 +624,11 @@ static void msm_geni_serial_complete_rx_eot(struct uart_port *uport)
 		tries++;
 	} while (!poll_done && tries < 5);
 
-	geni_status = geni_read_reg_nolog(uport->membase, SE_GENI_STATUS);
-
 	if (!poll_done)
-		IPC_LOG_MSG(port->ipc_log_misc, "%s: RX_EOT, GENI:0x%x\n",
-							__func__, geni_status);
+		IPC_LOG_MSG(port->ipc_log_misc,
+		"%s: RX_EOT, GENI:0x%x, DMA_DEBUG:0x%x\n", __func__,
+		geni_read_reg_nolog(uport->membase, SE_GENI_STATUS),
+		geni_read_reg_nolog(uport->membase, SE_DMA_DEBUG_REG0));
 	else
 		geni_write_reg_nolog(RX_EOT, uport->membase, SE_DMA_RX_IRQ_CLR);
 }
@@ -1130,7 +1129,9 @@ static void stop_rx_sequencer(struct uart_port *uport)
 	 * cancel control bit.
 	 */
 	mb();
-	msm_geni_serial_complete_rx_eot(uport);
+	if (!uart_console(uport))
+		msm_geni_serial_complete_rx_eot(uport);
+
 	done = msm_geni_serial_poll_bit(uport, SE_GENI_S_CMD_CTRL_REG,
 					S_GENI_CMD_CANCEL, false);
 	if (done) {
