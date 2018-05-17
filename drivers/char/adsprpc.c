@@ -2688,8 +2688,7 @@ static int fastrpc_file_free(struct fastrpc_file *fl)
 	spin_unlock(&fl->apps->hlock);
 
 	if (!fl->sctx) {
-		kfree(fl);
-		return 0;
+		goto bail;
 	}
 	spin_lock(&fl->hlock);
 	fl->file_close = 1;
@@ -2722,8 +2721,11 @@ static int fastrpc_file_free(struct fastrpc_file *fl)
 		kfree(fperf);
 	} while (fperf);
 	mutex_unlock(&fl->perf_mutex);
+
+bail:
 	mutex_destroy(&fl->perf_mutex);
 	mutex_destroy(&fl->fl_map_mutex);
+	mutex_destroy(&fl->map_mutex);
 	kfree(fl);
 	return 0;
 }
@@ -2737,7 +2739,6 @@ static int fastrpc_device_release(struct inode *inode, struct file *file)
 			pm_qos_remove_request(&fl->pm_qos_req);
 		if (fl->debugfs_file != NULL)
 			debugfs_remove(fl->debugfs_file);
-		mutex_destroy(&fl->map_mutex);
 		fastrpc_file_free(fl);
 		file->private_data = NULL;
 	}
