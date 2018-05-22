@@ -12,11 +12,11 @@
  */
 
 /*
- * Per-File-Key (PFK) - EXT4
+ * Per-File-Key (PFK) - f2fs
  *
- * This driver is used for working with EXT4 crypt extension
+ * This driver is used for working with EXT4/F2FS crypt extension
  *
- * The key information  is stored in node by EXT4 when file is first opened
+ * The key information  is stored in node by EXT4/F2FS when file is first opened
  * and will be later accessed by Block Device Driver to actually load the key
  * to encryption hw.
  *
@@ -28,84 +28,73 @@
 
 
 /* Uncomment the line below to enable debug messages */
-/* #define DEBUG 1 */
-#define pr_fmt(fmt)	"pfk_ext4 [%s]: " fmt, __func__
+#define DEBUG 1
+#define pr_fmt(fmt)	"pfk_f2fs [%s]: " fmt, __func__
 
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/errno.h>
 #include <linux/printk.h>
-
 #include "fscrypt_ice.h"
-#include "pfk_ext4.h"
-//#include "ext4_ice.h"
+#include "pfk_f2fs.h"
 
-static bool pfk_ext4_ready;
+static bool pfk_f2fs_ready;
 
-/*
- * Deinit function, should be invoked by upper PFK layer
- */
-void pfk_ext4_deinit(void)
+void pfk_f2fs_deinit(void)
 {
-	pfk_ext4_ready = false;
+	pfk_f2fs_ready = false;
 }
-EXPORT_SYMBOL(pfk_ext4_deinit);
 
-/*
- * Init function, should be invoked by upper PFK layer
- */
-int __init pfk_ext4_init(void)
+int __init pfk_f2fs_init(void)
 {
-	pfk_ext4_ready = true;
-	pr_info("PFK EXT4 inited successfully\n");
+	pfk_f2fs_ready = true;
+	pr_info("PFK F2FS inited successfully\n");
 
 	return 0;
 }
-EXPORT_SYMBOL(pfk_ext4_init);
 
-/*
- * Driver is initialized and ready.
+/**
+ * pfk_f2fs_is_ready() - driver is initialized and ready.
  *
  * Return: true if the driver is ready.
  */
-static inline bool pfk_ext4_is_ready(void)
+static inline bool pfk_f2fs_is_ready(void)
 {
-	return pfk_ext4_ready;
+	return pfk_f2fs_ready;
 }
 
-/*
- * Checks if inode belongs to ICE EXT4 PFE
+/**
+ * pfk_is_f2fs_type() - return true if inode belongs to ICE F2FS PFE
+ * @inode: inode pointer
  */
-bool pfk_is_ext4_type(const struct inode *inode)
+bool pfk_is_f2fs_type(const struct inode *inode)
 {
-	if (!pfe_is_inode_filesystem_type(inode, "ext4"))
+	if (!pfe_is_inode_filesystem_type(inode, "f2fs"))
 		return false;
 
 	return fscrypt_should_be_processed_by_ice(inode);
 }
-EXPORT_SYMBOL(pfk_is_ext4_type);
 
-/*
- * parse cipher from inode to enum
+/**
+ * pfk_f2fs_parse_cipher() - parse cipher from inode to enum
  * @inode: inode
  * @algo: pointer to store the output enum (can be null)
  *
  * return 0 in case of success, error otherwise (i.e not supported cipher)
  */
-static int pfk_ext4_parse_cipher(const struct inode *inode,
-	enum ice_cryto_algo_mode *algo)
+static int pfk_f2fs_parse_cipher(const struct inode *inode,
+		enum ice_cryto_algo_mode *algo)
 {
 	/*
 	 * currently only AES XTS algo is supported
 	 * in the future, table with supported ciphers might
 	 * be introduced
 	 */
-
 	if (!inode)
 		return -EINVAL;
 
 	if (!fscrypt_is_aes_xts_cipher(inode)) {
-		pr_err("ext4 alghoritm is not supported by pfk\n");
+		pr_err("f2fs alghoritm is not supported by pfk\n");
 		return -EINVAL;
 	}
 
@@ -115,11 +104,12 @@ static int pfk_ext4_parse_cipher(const struct inode *inode,
 	return 0;
 }
 
-int pfk_ext4_parse_inode(const struct bio *bio,
-	const struct inode *inode,
-	struct pfk_key_info *key_info,
-	enum ice_cryto_algo_mode *algo,
-	bool *is_pfe)
+
+int pfk_f2fs_parse_inode(const struct bio *bio,
+		const struct inode *inode,
+		struct pfk_key_info *key_info,
+		enum ice_cryto_algo_mode *algo,
+		bool *is_pfe)
 {
 	int ret = 0;
 
@@ -133,7 +123,7 @@ int pfk_ext4_parse_inode(const struct bio *bio,
 	 */
 	*is_pfe = true;
 
-	if (!pfk_ext4_is_ready())
+	if (!pfk_f2fs_is_ready())
 		return -ENODEV;
 
 	if (!inode)
@@ -144,29 +134,29 @@ int pfk_ext4_parse_inode(const struct bio *bio,
 
 	key_info->key = fscrypt_get_ice_encryption_key(inode);
 	if (!key_info->key) {
-		pr_err("could not parse key from ext4\n");
+		pr_err("could not parse key from f2fs\n");
 		return -EINVAL;
 	}
 
 	key_info->key_size = fscrypt_get_ice_encryption_key_size(inode);
 	if (!key_info->key_size) {
-		pr_err("could not parse key size from ext4\n");
+		pr_err("could not parse key size from f2fs\n");
 		return -EINVAL;
 	}
 
 	key_info->salt = fscrypt_get_ice_encryption_salt(inode);
 	if (!key_info->salt) {
-		pr_err("could not parse salt from ext4\n");
+		pr_err("could not parse salt from f2fs\n");
 		return -EINVAL;
 	}
 
 	key_info->salt_size = fscrypt_get_ice_encryption_salt_size(inode);
 	if (!key_info->salt_size) {
-		pr_err("could not parse salt size from ext4\n");
+		pr_err("could not parse salt size from f2fs\n");
 		return -EINVAL;
 	}
 
-	ret = pfk_ext4_parse_cipher(inode, algo);
+	ret = pfk_f2fs_parse_cipher(inode, algo);
 	if (ret != 0) {
 		pr_err("not supported cipher\n");
 		return ret;
@@ -174,19 +164,30 @@ int pfk_ext4_parse_inode(const struct bio *bio,
 
 	return 0;
 }
-EXPORT_SYMBOL(pfk_ext4_parse_inode);
 
-bool pfk_ext4_allow_merge_bio(const struct bio *bio1,
-	const struct bio *bio2, const struct inode *inode1,
-	const struct inode *inode2)
+bool pfk_f2fs_allow_merge_bio(const struct bio *bio1,
+		const struct bio *bio2, const struct inode *inode1,
+		const struct inode *inode2)
 {
-	/* if there is no ext4 pfk, don't disallow merging blocks */
-	if (!pfk_ext4_is_ready())
+	bool mergeable;
+
+	/* if there is no f2fs pfk, don't disallow merging blocks */
+	if (!pfk_f2fs_is_ready())
 		return true;
 
 	if (!inode1 || !inode2)
 		return false;
 
-	return fscrypt_is_ice_encryption_info_equal(inode1, inode2);
+	mergeable = fscrypt_is_ice_encryption_info_equal(inode1, inode2);
+	if (!mergeable)
+		return false;
+
+
+	/* ICE allows only consecutive iv_key stream. */
+	if (!bio_dun(bio1) && !bio_dun(bio2))
+		return true;
+	else if (!bio_dun(bio1) || !bio_dun(bio2))
+		return false;
+
+	return bio_end_dun(bio1) == bio_dun(bio2);
 }
-EXPORT_SYMBOL(pfk_ext4_allow_merge_bio);
