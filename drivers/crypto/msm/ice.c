@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -143,6 +143,9 @@ static int qti_ice_setting_config(struct request *req,
 		pr_err("%s ICE disabled fuse is blown\n", __func__);
 		return -EPERM;
 	}
+
+	if (!setting)
+		return -EINVAL;
 
 	if ((short)(crypto_data->key_index) >= 0) {
 
@@ -1451,7 +1454,7 @@ static int qcom_ice_config_start(struct platform_device *pdev,
 	int ret = 0;
 	bool is_pfe = false;
 
-	if (!pdev || !req || !setting) {
+	if (!pdev || !req) {
 		pr_err("%s: Invalid params passed\n", __func__);
 		return -EINVAL;
 	}
@@ -1633,7 +1636,7 @@ static struct ice_device *get_ice_device_from_storage_type
 
 	list_for_each_entry(ice_dev, &ice_devices, list) {
 		if (!strcmp(ice_dev->ice_instance_type, storage_type)) {
-			pr_info("%s: found ice device %p\n", __func__, ice_dev);
+			pr_debug("%s: ice device %pK\n", __func__, ice_dev);
 			return ice_dev;
 		}
 	}
