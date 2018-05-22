@@ -3404,10 +3404,17 @@ static int fastrpc_get_service_location_notify(struct notifier_block *nb,
 				pdr->domain_list[0].name,
 				pdr->domain_list[0].instance_id,
 				&spd->pdrnb, &curr_state);
-		if (IS_ERR(spd->pdrhandle))
+		if (IS_ERR(spd->pdrhandle)) {
 			pr_err("ADSPRPC: Unable to register notifier\n");
-	} else
+		} else if (curr_state == SERVREG_NOTIF_SERVICE_STATE_UP_V01) {
+			pr_info("ADSPRPC: SERVREG_NOTIF_SERVICE_STATE_UP_V01 received\n");
+			spd->ispdup = 1;
+		} else if (curr_state == SERVREG_NOTIF_SERVICE_STATE_UNINIT_V01) {
+			pr_info("ADSPRPC: SERVREG_NOTIF_SERVICE_STATE_UNINIT_V01 received\n");
+		}
+	} else {
 		pr_err("ADSPRPC: Service returned invalid domains\n");
+	}
 
 	return NOTIFY_DONE;
 }
