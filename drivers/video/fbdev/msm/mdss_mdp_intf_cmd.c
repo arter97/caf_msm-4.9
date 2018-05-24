@@ -1530,6 +1530,10 @@ static void clk_ctrl_delayed_off_work(struct work_struct *work)
 
 		/* re-assign to have the correct order in the context */
 		ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
+
+		if (!sctl)
+			goto exit;
+
 		sctx = (struct mdss_mdp_cmd_ctx *) sctl->intf_ctx[MASTER_CTX];
 		if (!ctx || !sctx) {
 			pr_err("invalid %s %s\n",
@@ -1637,6 +1641,10 @@ static void clk_ctrl_gate_work(struct work_struct *work)
 
 		/* re-assign to have the correct order in the context */
 		ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
+
+		if (!sctl)
+			goto exit;
+
 		sctx = (struct mdss_mdp_cmd_ctx *) sctl->intf_ctx[MASTER_CTX];
 		if (!ctx || !sctx) {
 			pr_err("%s ERROR invalid %s %s\n", __func__,
