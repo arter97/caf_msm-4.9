@@ -12,7 +12,6 @@
  */
 
 #include "sdm670-mtp.dtsi"
-#include "sdm670-camera-sensor-360camera.dtsi"
 #include "sdm670-audio-overlay.dtsi"
 
 &qupv3_se3_i2c {

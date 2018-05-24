@@ -177,6 +177,11 @@ module_param_named(
 	debug_mask, __debug_mask, int, 0600
 );
 
+static int __pd_disabled;
+module_param_named(
+	pd_disabled, __pd_disabled, int, 0600
+);
+
 static int __weak_chg_icl_ua = 500000;
 module_param_named(
 	weak_chg_icl_ua, __weak_chg_icl_ua, int, 0600
@@ -224,6 +229,8 @@ static int smb5_chg_config_init(struct smb5 *chip)
 		chg->param = smb5_pmi632_params;
 		chg->use_extcon = true;
 		chg->name = "pmi632_charger";
+		/* PMI632 does not support PD */
+		__pd_disabled = 1;
 		chg->hw_max_icl_ua =
 			(chip->dt.usb_icl_ua > 0) ? chip->dt.usb_icl_ua
 						: PMI632_MAX_ICL_UA;
@@ -434,7 +441,6 @@ static enum power_supply_property smb5_usb_props[] = {
 	POWER_SUPPLY_PROP_TYPEC_MODE,
 	POWER_SUPPLY_PROP_TYPEC_POWER_ROLE,
 	POWER_SUPPLY_PROP_TYPEC_CC_ORIENTATION,
-	POWER_SUPPLY_PROP_PD_ALLOWED,
 	POWER_SUPPLY_PROP_PD_ACTIVE,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_NOW,
@@ -514,9 +520,6 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 			val->intval = 0;
 		else
 			rc = smblib_get_prop_typec_cc_orientation(chg, val);
-		break;
-	case POWER_SUPPLY_PROP_PD_ALLOWED:
-		rc = smblib_get_prop_pd_allowed(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_PD_ACTIVE:
 		val->intval = chg->pd_active;
@@ -605,12 +608,6 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 	struct smb_charger *chg = &chip->chg;
 	int rc = 0;
 
-	mutex_lock(&chg->lock);
-	if (!chg->typec_present) {
-		rc = -EINVAL;
-		goto unlock;
-	}
-
 	switch (psp) {
 	case POWER_SUPPLY_PROP_PD_CURRENT_MAX:
 		rc = smblib_set_prop_pd_current_max(chg, val);
@@ -652,8 +649,6 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 		break;
 	}
 
-unlock:
-	mutex_unlock(&chg->lock);
 	return rc;
 }
 
@@ -1424,6 +1419,42 @@ static int smb5_init_vconn_regulator(struct smb5 *chip)
 static int smb5_configure_typec(struct smb_charger *chg)
 {
 	int rc;
+	u8 val = 0;
+
+	rc = smblib_read(chg, LEGACY_CABLE_STATUS_REG, &val);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't read Legacy status rc=%d\n", rc);
+		return rc;
+	}
+	/*
+	 * If Legacy cable is detected re-trigger Legacy detection
+	 * by disabling/enabling typeC mode.
+	 */
+	if (val & TYPEC_LEGACY_CABLE_STATUS_BIT) {
+		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
+				TYPEC_DISABLE_CMD_BIT, TYPEC_DISABLE_CMD_BIT);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't disable TYPEC rc=%d\n", rc);
+			return rc;
+		}
+
+		/* delay before enabling typeC */
+		msleep(500);
+
+		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
+				TYPEC_DISABLE_CMD_BIT, 0);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't enable TYPEC rc=%d\n", rc);
+			return rc;
+		}
+	}
+
+	/* disable apsd */
+	rc = smblib_configure_hvdcp_apsd(chg, false);
+	if (rc < 0) {
+		dev_err(chg->dev, "Couldn't disable APSD rc=%d\n", rc);
+		return rc;
+	}
 
 	rc = smblib_write(chg, TYPE_C_INTERRUPT_EN_CFG_1_REG,
 				TYPEC_CCOUT_DETACH_INT_EN_BIT |
@@ -1459,14 +1490,6 @@ static int smb5_configure_micro_usb(struct smb_charger *chg)
 {
 	int rc;
 
-	/* configure micro USB mode */
-	rc = smblib_masked_write(chg, TYPEC_U_USB_CFG_REG,
-			EN_MICRO_USB_MODE_BIT, EN_MICRO_USB_MODE_BIT);
-	if (rc < 0) {
-		dev_err(chg->dev, "Couldn't enable micro USB mode rc=%d\n", rc);
-		return rc;
-	}
-
 	rc = smblib_masked_write(chg, TYPE_C_INTERRUPT_EN_CFG_2_REG,
 					MICRO_USB_STATE_CHANGE_INT_EN_BIT,
 					MICRO_USB_STATE_CHANGE_INT_EN_BIT);
@@ -1500,7 +1523,6 @@ static int smb5_init_hw(struct smb5 *chip)
 				&chg->default_icl_ua);
 
 	/* Use SW based VBUS control, disable HW autonomous mode */
-	/* TODO: auth can be enabled through vote based on APSD flow */
 	rc = smblib_masked_write(chg, USBIN_OPTIONS_1_CFG_REG,
 		HVDCP_AUTH_ALG_EN_CFG_BIT | HVDCP_AUTONOMOUS_MODE_EN_CFG_BIT,
 		HVDCP_AUTH_ALG_EN_CFG_BIT);
@@ -1537,18 +1559,31 @@ static int smb5_init_hw(struct smb5 *chip)
 		type = !!(val & EN_MICRO_USB_MODE_BIT);
 	}
 
-	chg->connector_type = type ? POWER_SUPPLY_CONNECTOR_MICRO_USB
-					: POWER_SUPPLY_CONNECTOR_TYPEC;
 	pr_debug("Connector type=%s\n", type ? "Micro USB" : "TypeC");
+
+	if (type) {
+		chg->connector_type = POWER_SUPPLY_CONNECTOR_MICRO_USB;
+		rc = smb5_configure_micro_usb(chg);
+	} else {
+		chg->connector_type = POWER_SUPPLY_CONNECTOR_TYPEC;
+		rc = smb5_configure_typec(chg);
+	}
+	if (rc < 0) {
+		dev_err(chg->dev,
+			"Couldn't configure TypeC/micro-USB mode rc=%d\n", rc);
+		return rc;
+	}
 
 	/*
 	 * PMI632 based hw init:
+	 * - Rerun APSD to ensure proper charger detection if device
+	 *   boots with charger connected.
 	 * - Initialize flash module for PMI632
 	 */
-	if (chg->smb_version == PMI632_SUBTYPE)
+	if (chg->smb_version == PMI632_SUBTYPE) {
 		schgm_flash_init(chg);
-
-	smblib_rerun_apsd_if_required(chg);
+		smblib_rerun_apsd_if_required(chg);
+	}
 
 	/* vote 0mA on usb_icl for non battery platforms */
 	vote(chg->usb_icl_votable,
@@ -1565,12 +1600,6 @@ static int smb5_init_hw(struct smb5 *chip)
 	vote(chg->fv_votable,
 		BATT_PROFILE_VOTER, chg->batt_profile_fv_uv > 0,
 		chg->batt_profile_fv_uv);
-	vote(chg->pd_disallowed_votable_indirect, CC_DETACHED_VOTER,
-			true, 0);
-	vote(chg->pd_disallowed_votable_indirect, APSD_VOTER,
-			true, 0);
-	vote(chg->pd_disallowed_votable_indirect, MICRO_USB_VOTER,
-		chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB, 0);
 
 	/* Some h/w limit maximum supported ICL */
 	vote(chg->usb_icl_votable, HW_LIMIT_VOTER,
@@ -1578,29 +1607,21 @@ static int smb5_init_hw(struct smb5 *chip)
 
 	/*
 	 * AICL configuration:
-	 * start from min and AICL ADC disable
+	 * AICL ADC disable
 	 */
-	rc = smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
+	if (chg->smb_version != PMI632_SUBTYPE) {
+		rc = smblib_masked_write(chg, USBIN_AICL_OPTIONS_CFG_REG,
 				USBIN_AICL_ADC_EN_BIT, 0);
-	if (rc < 0) {
-		dev_err(chg->dev, "Couldn't configure AICL rc=%d\n", rc);
-		return rc;
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't config AICL rc=%d\n", rc);
+			return rc;
+		}
 	}
 
 	/* enable the charging path */
 	rc = vote(chg->chg_disable_votable, DEFAULT_VOTER, false, 0);
 	if (rc < 0) {
 		dev_err(chg->dev, "Couldn't enable charging rc=%d\n", rc);
-		return rc;
-	}
-
-	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB)
-		rc = smb5_configure_micro_usb(chg);
-	else
-		rc = smb5_configure_typec(chg);
-	if (rc < 0) {
-		dev_err(chg->dev,
-			"Couldn't configure TypeC/micro-USB mode rc=%d\n", rc);
 		return rc;
 	}
 
@@ -1812,11 +1833,21 @@ static int smb5_determine_initial_status(struct smb5 *chip)
 {
 	struct smb_irq_data irq_data = {chip, "determine-initial-status"};
 	struct smb_charger *chg = &chip->chg;
+	union power_supply_propval val;
+	int rc;
+
+	rc = smblib_get_prop_usb_present(chg, &val);
+	if (rc < 0) {
+		pr_err("Couldn't get usb present rc=%d\n", rc);
+		return rc;
+	}
+	chg->early_usb_attach = val.intval;
 
 	if (chg->bms_psy)
 		smblib_suspend_on_debug_battery(chg);
 
 	usb_plugin_irq_handler(0, &irq_data);
+	typec_attach_detach_irq_handler(0, &irq_data);
 	typec_state_change_irq_handler(0, &irq_data);
 	usb_source_change_irq_handler(0, &irq_data);
 	chg_state_change_irq_handler(0, &irq_data);
@@ -2008,6 +2039,7 @@ static struct smb_irq_info smb5_irqs[] = {
 	},
 	[TYPEC_ATTACH_DETACH_IRQ] = {
 		.name		= "typec-attach-detach",
+		.handler	= typec_attach_detach_irq_handler,
 	},
 	[TYPEC_LEGACY_CABLE_DETECT_IRQ] = {
 		.name		= "typec-legacy-cable-detect",
@@ -2303,6 +2335,7 @@ static int smb5_probe(struct platform_device *pdev)
 	chg = &chip->chg;
 	chg->dev = &pdev->dev;
 	chg->debug_mask = &__debug_mask;
+	chg->pd_disabled = &__pd_disabled;
 	chg->weak_chg_icl_ua = &__weak_chg_icl_ua;
 	chg->mode = PARALLEL_MASTER;
 	chg->irq_info = smb5_irqs;
@@ -2451,6 +2484,10 @@ static int smb5_remove(struct platform_device *pdev)
 {
 	struct smb5 *chip = platform_get_drvdata(pdev);
 	struct smb_charger *chg = &chip->chg;
+
+	/* force enable APSD */
+	smblib_masked_write(chg, USBIN_OPTIONS_1_CFG_REG,
+				BC1P2_SRC_DETECT_BIT, BC1P2_SRC_DETECT_BIT);
 
 	smb5_free_interrupts(chg);
 	smblib_deinit(chg);
