@@ -364,6 +364,8 @@ struct sde_connector {
 	struct delayed_work status_work;
 	u32 force_panel_dead;
 
+	bool esd_status_check;
+
 	bool bl_scale_dirty;
 	u32 bl_scale;
 	u32 bl_scale_ad;

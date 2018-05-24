@@ -5805,10 +5805,22 @@ static int sched_group_energy(struct energy_env *eenv)
 	u64 total_energy = 0;
 	struct cpumask visit_cpus;
 	struct sched_group *sg;
+	int cpu_count;
 
 	WARN_ON(!eenv->sg_top->sge);
 
 	cpumask_copy(&visit_cpus, sched_group_cpus(eenv->sg_top));
+	/* If a cpu is hotplugged in while we are in this function,
+	 * it does not appear in the existing visit_cpus mask
+	 * which came from the sched_group pointer of the
+	 * sched_domain pointed at by sd_ea for either the prev
+	 * or next cpu and was dereferenced in __energy_diff.
+	 * Since we will dereference sd_scs later as we iterate
+	 * through the CPUs we expect to visit, new CPUs can
+	 * be present which are not in the visit_cpus mask.
+	 * Guard this with cpu_count.
+	 */
+	cpu_count = cpumask_weight(&visit_cpus);
 
 	while (!cpumask_empty(&visit_cpus)) {
 		struct sched_group *sg_shared_cap = NULL;
@@ -5818,6 +5830,8 @@ static int sched_group_energy(struct energy_env *eenv)
 		/*
 		 * Is the group utilization affected by cpus outside this
 		 * sched_group?
+		 * This sd may have groups with cpus which were not present
+		 * when we took visit_cpus.
 		 */
 		sd = rcu_dereference(per_cpu(sd_scs, cpu));
 
@@ -5883,8 +5897,24 @@ static int sched_group_energy(struct energy_env *eenv)
 					idle_idx,
 					sg->sge->cap_states[eenv->cap_idx].cap);
 
-				if (!sd->child)
+				if (!sd->child) {
+					/*
+					 * cpu_count here is the number of
+					 * cpus we expect to visit in this
+					 * calculation. If we race against
+					 * hotplug, we can have extra cpus
+					 * added to the groups we are
+					 * iterating which do not appear in
+					 * the visit_cpus mask. In that case
+					 * we are not able to calculate energy
+					 * without restarting so we will bail
+					 * out and use prev_cpu this time.
+					 */
+					if (!cpu_count)
+						return -EINVAL;
 					cpumask_xor(&visit_cpus, &visit_cpus, sched_group_cpus(sg));
+					cpu_count--;
+				}
 
 				if (cpumask_equal(sched_group_cpus(sg), sched_group_cpus(eenv->sg_top)))
 					goto next_cpu;
@@ -5896,6 +5926,9 @@ static int sched_group_energy(struct energy_env *eenv)
 		 * If we raced with hotplug and got an sd NULL-pointer;
 		 * returning a wrong energy estimation is better than
 		 * entering an infinite loop.
+		 * Specifically: If a cpu is unplugged after we took
+		 * the visit_cpus mask, it no longer has an sd_scs
+		 * pointer, so when we dereference it, we get NULL.
 		 */
 		if (cpumask_test_cpu(cpu, &visit_cpus))
 			return -EINVAL;
@@ -6819,6 +6852,39 @@ is_packing_eligible(struct task_struct *p, unsigned long task_util,
 	return cpu_cap_idx_pack == cpu_cap_idx_spread;
 }
 
+#define SCHED_SELECT_PREV_CPU_NSEC	2000000
+#define SCHED_FORCE_CPU_SELECTION_NSEC	20000000
+
+static inline bool
+bias_to_prev_cpu(struct task_struct *p, struct cpumask *rtg_target)
+{
+	int prev_cpu = task_cpu(p);
+#ifdef CONFIG_SCHED_WALT
+	u64 ms = p->ravg.mark_start;
+#else
+	u64 ms = sched_clock();
+#endif
+
+	if (cpu_isolated(prev_cpu) || !idle_cpu(prev_cpu))
+		return false;
+
+	if (!ms)
+		return false;
+
+	if (ms - p->last_cpu_selected_ts >= SCHED_SELECT_PREV_CPU_NSEC) {
+		p->last_cpu_selected_ts = ms;
+		return false;
+	}
+
+	if (ms - p->last_sleep_ts >= SCHED_SELECT_PREV_CPU_NSEC)
+		return false;
+
+	if (rtg_target && !cpumask_test_cpu(prev_cpu, rtg_target))
+		return false;
+
+	return true;
+}
+
 unsigned int sched_smp_overlap_capacity = SCHED_CAPACITY_SCALE;
 
 static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
@@ -6878,6 +6944,9 @@ static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
 					task_util(p), cpu, cpu, 0, need_idle);
 		return cpu;
 	}
+
+	if (bias_to_prev_cpu(p, rtg_target))
+		return prev_cpu;
 
 	task_util_boosted = boosted_task_util(p);
 	if (sysctl_sched_is_big_little) {
