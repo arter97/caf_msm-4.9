@@ -369,12 +369,7 @@
 				type = "passive";
 			};
 			quiet_cpus_632_trip: quiet-cpus-trip {
-				temperature = <46000>;
-				hysteresis = <0>;
-				type = "passive";
-			};
-			quiet_gpu_632_trip: quiet-gpu-trip {
-				temperature = <47000>;
+				temperature = <48000>;
 				hysteresis = <0>;
 				type = "passive";
 			};
@@ -386,6 +381,11 @@
 			quiet_batt_632_trip1: quiet-batt-trip1 {
 				temperature = <48000>;
 				hysteresis = <4000>;
+				type = "passive";
+			};
+			quiet_gpu_632_trip: quiet-gpu-trip {
+				temperature = <50000>;
+				hysteresis = <0>;
 				type = "passive";
 			};
 			quiet_batt_632_trip2: quiet-batt-trip2 {
