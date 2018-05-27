@@ -14,7 +14,10 @@
 #include "sdm670-pmic-overlay.dtsi"
 #include "sdm670-sde-display.dtsi"
 #include "sdm670-camera-sensor-mtp.dtsi"
+
+&qupv3_se10_i2c {
 #include "smb1355.dtsi"
+};
 
 &ufsphy_mem {
 	compatible = "qcom,ufs-phy-qmp-v3";
@@ -202,7 +205,7 @@
 
 		cam_snapshot {
 			label = "cam_snapshot";
-			gpios = <&tlmm 91 0>;
+			gpios = <&tlmm 91 GPIO_ACTIVE_LOW>;
 			linux,input-type = <1>;
 			linux,code = <766>;
 			gpio-key,wakeup;
@@ -212,7 +215,7 @@
 
 		cam_focus {
 			label = "cam_focus";
-			gpios = <&tlmm 92 0>;
+			gpios = <&tlmm 92 GPIO_ACTIVE_HIGH>;
 			linux,input-type = <1>;
 			linux,code = <528>;
 			gpio-key,wakeup;

@@ -417,7 +417,7 @@ void mdss_dsi_dfps_config_8996(struct mdss_dsi_ctrl_pdata *ctrl)
 	wmb(); /* make sure phy timings are updated*/
 }
 
-static void mdss_dsi_ctrl_phy_reset(struct mdss_dsi_ctrl_pdata *ctrl)
+void mdss_dsi_ctrl_phy_reset(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	/* start phy sw reset */
 	MIPI_OUTP(ctrl->ctrl_base + 0x12c, 0x0001);
@@ -519,8 +519,7 @@ void mdss_dsi_phy_sw_reset(struct mdss_dsi_ctrl_pdata *ctrl)
 	 * is only done from the clock master. This will ensure that the PLL is
 	 * off when PHY reset is called.
 	 */
-	if (mdss_dsi_is_ctrl_clk_slave(ctrl) ||
-		(ctrl->shared_data->phy_rev == DSI_PHY_REV_12NM))
+	if (mdss_dsi_is_ctrl_clk_slave(ctrl))
 		return;
 
 	mdss_dsi_phy_sw_reset_sub(ctrl);
@@ -2280,7 +2279,8 @@ int mdss_dsi_post_clkon_cb(void *priv,
 		if (ctrl->phy_power_off || mmss_clamp)
 			mdss_dsi_phy_power_on(ctrl, mmss_clamp);
 	}
-	if ((clk & MDSS_DSI_LINK_CLK) && (l_type == MDSS_DSI_LINK_HS_CLK)) {
+
+	if ((clk & MDSS_DSI_LINK_CLK) && (l_type == MDSS_DSI_LINK_LP_CLK)) {
 		if (ctrl->ulps) {
 			/*
 			 * ULPS Entry Request. This is needed if the lanes were
@@ -2311,9 +2311,12 @@ int mdss_dsi_post_clkon_cb(void *priv,
 				goto error;
 			}
 		}
-		/* Enable HS TX driver in DSI PHY if applicable */
-		mdss_dsi_phy_hstx_drv_ctrl(ctrl, true);
 	}
+
+	/* Enable HS TX driver in DSI PHY if applicable */
+	if ((clk & MDSS_DSI_LINK_CLK) && (l_type == MDSS_DSI_LINK_HS_CLK))
+		mdss_dsi_phy_hstx_drv_ctrl(ctrl, true);
+
 error:
 	return rc;
 }
@@ -2428,6 +2431,26 @@ int mdss_dsi_pre_clkon_cb(void *priv,
 	/* Disable dynamic clock gating*/
 	if (ctrl->mdss_util->dyn_clk_gating_ctrl)
 		ctrl->mdss_util->dyn_clk_gating_ctrl(0);
+
+	if ((clk_type & MDSS_DSI_LINK_CLK) &&
+		(l_type == MDSS_DSI_LINK_HS_CLK)) {
+		u32 data = 0;
+
+		data = MIPI_INP((ctrl->ctrl_io.base) + 0x0120);
+		/*
+		 * For 12nm PHY, the PLL unlock bit in DSI_CLK_STATUS gets set
+		 * when PLL is turned off. When device comes out of static
+		 * screen without the DSI controller getting power collapsed,
+		 * the bit might not clear sometimes. Clear the bit before
+		 * turning ON the PLL. This avoids false error interrupt due to
+		 * PLL unlocked bit after PLL is turned ON.
+		 */
+		if (data & BIT(16)) {
+			pr_debug("pll unlocked: 0x%x\n", data);
+			MIPI_OUTP((ctrl->ctrl_io.base) + 0x120, BIT(16));
+		}
+
+	}
 
 	return rc;
 }
