@@ -11,9 +11,12 @@
 #ifndef _FSCRYPT_PRIVATE_H
 #define _FSCRYPT_PRIVATE_H
 
+#ifndef __FS_HAS_ENCRYPTION
 #define __FS_HAS_ENCRYPTION 1
+#endif
 #include <linux/fscrypt.h>
 #include <crypto/hash.h>
+#include <linux/pfk.h>
 
 /* Encryption parameters */
 #define FS_IV_SIZE			16
@@ -49,17 +52,26 @@ struct fscrypt_context {
 
 #define FS_ENCRYPTION_CONTEXT_FORMAT_V1		1
 
+enum ci_mode_info {
+	CI_NONE_MODE = 0,
+	CI_DATA_MODE,
+	CI_FNAME_MODE,
+};
+
+
 /*
  * A pointer to this structure is stored in the file system's in-core
  * representation of an inode.
  */
 struct fscrypt_info {
+	u8 ci_mode;
 	u8 ci_data_mode;
 	u8 ci_filename_mode;
 	u8 ci_flags;
 	struct crypto_skcipher *ci_ctfm;
 	struct crypto_cipher *ci_essiv_tfm;
 	u8 ci_master_key[FS_KEY_DESCRIPTOR_SIZE];
+	u8 ci_raw_key[FS_MAX_KEY_SIZE];
 };
 
 typedef enum {
@@ -69,6 +81,12 @@ typedef enum {
 
 #define FS_CTX_REQUIRES_FREE_ENCRYPT_FL		0x00000001
 #define FS_CTX_HAS_BOUNCE_BUFFER_FL		0x00000002
+
+static inline bool is_private_data_mode(struct fscrypt_info *ci)
+{
+	return ci->ci_mode == CI_DATA_MODE &&
+		ci->ci_data_mode == FS_ENCRYPTION_MODE_PRIVATE;
+}
 
 /* crypto.c */
 extern int fscrypt_initialize(unsigned int cop_flags);
