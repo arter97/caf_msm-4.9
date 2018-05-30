@@ -17,6 +17,7 @@
 #include <linux/interrupt.h>
 #include <linux/hash.h>
 #include <soc/qcom/smem.h>
+#include <soc/qcom/boot_stats.h>
 #include "vidc_hfi_helper.h"
 #include "vidc_hfi_io.h"
 #include "msm_vidc_debug.h"
@@ -1462,6 +1463,7 @@ static int hfi_process_session_ftb_done(
 {
 	struct msm_vidc_cb_data_done data_done = {0};
 	bool is_decoder = false, is_encoder = false;
+	static int first_enc_frame = 1;
 
 	if (!msg_hdr) {
 		dprintk(VIDC_ERR, "Invalid Params\n");
@@ -1485,6 +1487,11 @@ static int hfi_process_session_ftb_done(
 		msg_hdr;
 		dprintk(VIDC_DBG, "RECEIVED: SESSION_FTB_DONE[%#x]\n",
 				pkt->session_id);
+                if (first_enc_frame == 1) {
+                   boot_stats_init();
+                   pr_debug("KPI: First Encoded frame received\n");
+                   first_enc_frame++;
+                }
 		if (sizeof(struct
 			hfi_msg_session_fill_buffer_done_compressed_packet)
 			> pkt->size) {
