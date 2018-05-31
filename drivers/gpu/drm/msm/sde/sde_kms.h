@@ -226,6 +226,8 @@ struct sde_kms {
 	void **dp_displays;
 
 	bool has_danger_ctrl;
+
+	bool first_kickoff;
 };
 
 struct vsync_info {
