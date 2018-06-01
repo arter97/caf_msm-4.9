@@ -1491,14 +1491,18 @@ static int smb5_configure_typec(struct smb_charger *chg)
 		return rc;
 	}
 
-	/* configure VCONN for software control */
-	rc = smblib_masked_write(chg, TYPE_C_VCONN_CONTROL_REG,
+	/* Keep VCONN in h/w controlled mode for PMI632 */
+	if (chg->smb_version != PMI632_SUBTYPE) {
+		/* configure VCONN for software control */
+		rc = smblib_masked_write(chg, TYPE_C_VCONN_CONTROL_REG,
 				 VCONN_EN_SRC_BIT | VCONN_EN_VALUE_BIT,
 				 VCONN_EN_SRC_BIT);
-	if (rc < 0) {
-		dev_err(chg->dev,
-			"Couldn't configure VCONN for SW control rc=%d\n", rc);
-		return rc;
+		if (rc < 0) {
+			dev_err(chg->dev,
+				"Couldn't configure VCONN for SW control rc=%d\n",
+				rc);
+			return rc;
+		}
 	}
 
 	return rc;
@@ -1610,6 +1614,13 @@ static int smb5_init_hw(struct smb5 *chip)
 
 		schgm_flash_init(chg);
 		smblib_rerun_apsd_if_required(chg);
+	}
+
+	/* clear the ICL override if it is set */
+	rc = smblib_icl_override(chg, false);
+	if (rc < 0) {
+		pr_err("Couldn't disable ICL override rc=%d\n", rc);
+		return rc;
 	}
 
 	/* vote 0mA on usb_icl for non battery platforms */
