@@ -1819,6 +1819,7 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 	unsigned long ser_clk_cfg = 0;
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 	unsigned long clk_rate;
+	unsigned long flags;
 
 	if (!uart_console(uport)) {
 		int ret = msm_geni_serial_power_on(uport);
@@ -1830,7 +1831,13 @@ static void msm_geni_serial_set_termios(struct uart_port *uport,
 			return;
 		}
 	}
+	/* Take a spinlock else stop_rx causes a race with an ISR due to Cancel
+	 * and FSM_RESET. This also has a potential race with the dma_map/unmap
+	 * operations of ISR.
+	 */
+	spin_lock_irqsave(&uport->lock, flags);
 	msm_geni_serial_stop_rx(uport);
+	spin_unlock_irqrestore(&uport->lock, flags);
 	/* baud rate */
 	baud = uart_get_baud_rate(uport, termios, old, 300, 4000000);
 	port->cur_baud = baud;
