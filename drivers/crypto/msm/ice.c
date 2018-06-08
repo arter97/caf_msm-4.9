@@ -25,8 +25,26 @@
 #include <soc/qcom/scm.h>
 #include <soc/qcom/qseecomi.h>
 #include "iceregs.h"
-#include <linux/pfk.h>
 
+#ifdef CONFIG_PFK
+#include <linux/pfk.h>
+#else
+#include <linux/bio.h>
+static inline int pfk_load_key_start(const struct bio *bio,
+	struct ice_crypto_setting *ice_setting, bool *is_pfe, bool async)
+{
+	return 0;
+}
+
+static inline int pfk_load_key_end(const struct bio *bio, bool *is_pfe)
+{
+	return 0;
+}
+
+static inline void pfk_clear_on_reset(void)
+{
+}
+#endif
 
 #define TZ_SYSCALL_CREATE_SMC_ID(o, s, f) \
 	((uint32_t)((((o & 0x3f) << 24) | (s & 0xff) << 8) | (f & 0xff)))
@@ -133,9 +151,6 @@ static int qti_ice_setting_config(struct request *req,
 		pr_err("%s ICE disabled fuse is blown\n", __func__);
 		return -EPERM;
 	}
-
-	if (!setting)
-		return -EINVAL;
 
 	if ((short)(crypto_data->key_index) >= 0) {
 
@@ -1473,7 +1488,7 @@ static int qcom_ice_config_start(struct platform_device *pdev,
 	bool is_pfe = false;
 	sector_t data_size;
 
-	if (!pdev || !req) {
+	if (!pdev || !req || !setting) {
 		pr_err("%s: Invalid params passed\n", __func__);
 		return -EINVAL;
 	}
@@ -1649,7 +1664,7 @@ static struct ice_device *get_ice_device_from_storage_type
 
 	list_for_each_entry(ice_dev, &ice_devices, list) {
 		if (!strcmp(ice_dev->ice_instance_type, storage_type)) {
-			pr_debug("%s: ice device %pK\n", __func__, ice_dev);
+			pr_info("%s: found ice device %p\n", __func__, ice_dev);
 			return ice_dev;
 		}
 	}
