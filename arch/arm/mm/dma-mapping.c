@@ -2598,13 +2598,8 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
 				    const struct iommu_ops *iommu)
 {
 	struct dma_iommu_mapping *mapping;
-	struct iommu_group *group;
 
 	if (!iommu)
-		return false;
-
-	group = iommu_group_get(dev);
-	if (!group)
 		return false;
 
 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
