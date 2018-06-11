@@ -52,6 +52,13 @@ static struct smb_params smb5_pmi632_params = {
 		.max_u  = 3000000,
 		.step_u = 50000,
 	},
+	.icl_max_stat		= {
+		.name   = "dcdc icl max status",
+		.reg    = ICL_MAX_STATUS_REG,
+		.min_u  = 0,
+		.max_u  = 3000000,
+		.step_u = 50000,
+	},
 	.icl_stat		= {
 		.name   = "input current limit status",
 		.reg    = AICL_ICL_STATUS_REG,
@@ -90,7 +97,7 @@ static struct smb_params smb5_pmi632_params = {
 	},
 };
 
-static struct smb_params smb5_pmi855_params = {
+static struct smb_params smb5_pm855b_params = {
 	.fcc			= {
 		.name   = "fast charge current",
 		.reg    = CHGR_FAST_CHARGE_CURRENT_CFG_REG,
@@ -112,8 +119,15 @@ static struct smb_params smb5_pmi855_params = {
 		.max_u  = 5000000,
 		.step_u = 50000,
 	},
+	.icl_max_stat		= {
+		.name   = "dcdc icl max status",
+		.reg    = ICL_MAX_STATUS_REG,
+		.min_u  = 0,
+		.max_u  = 5000000,
+		.step_u = 50000,
+	},
 	.icl_stat		= {
-		.name   = "input current limit status",
+		.name   = "aicl icl status",
 		.reg    = AICL_ICL_STATUS_REG,
 		.min_u  = 0,
 		.max_u  = 5000000,
@@ -221,7 +235,7 @@ static int smb5_chg_config_init(struct smb5 *chip)
 	switch (pmic_rev_id->pmic_subtype) {
 	case PM855B_SUBTYPE:
 		chip->chg.smb_version = PM855B_SUBTYPE;
-		chg->param = smb5_pmi855_params;
+		chg->param = smb5_pm855b_params;
 		chg->name = "pm855b_charger";
 		break;
 	case PMI632_SUBTYPE:
@@ -230,7 +244,7 @@ static int smb5_chg_config_init(struct smb5 *chip)
 		chg->use_extcon = true;
 		chg->name = "pmi632_charger";
 		/* PMI632 does not support PD */
-		__pd_disabled = 1;
+		chg->pd_not_supported = true;
 		chg->hw_max_icl_ua =
 			(chip->dt.usb_icl_ua > 0) ? chip->dt.usb_icl_ua
 						: PMI632_MAX_ICL_UA;
@@ -1072,6 +1086,7 @@ static enum power_supply_property smb5_batt_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX,
 	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_RECHARGE_SOC,
 };
 
@@ -1165,6 +1180,9 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
 		rc = smblib_get_prop_batt_charge_counter(chg, val);
+		break;
+	case POWER_SUPPLY_PROP_CYCLE_COUNT:
+		rc = smblib_get_prop_batt_cycle_count(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_RECHARGE_SOC:
 		val->intval = chg->auto_recharge_soc;
@@ -1473,14 +1491,18 @@ static int smb5_configure_typec(struct smb_charger *chg)
 		return rc;
 	}
 
-	/* configure VCONN for software control */
-	rc = smblib_masked_write(chg, TYPE_C_VCONN_CONTROL_REG,
+	/* Keep VCONN in h/w controlled mode for PMI632 */
+	if (chg->smb_version != PMI632_SUBTYPE) {
+		/* configure VCONN for software control */
+		rc = smblib_masked_write(chg, TYPE_C_VCONN_CONTROL_REG,
 				 VCONN_EN_SRC_BIT | VCONN_EN_VALUE_BIT,
 				 VCONN_EN_SRC_BIT);
-	if (rc < 0) {
-		dev_err(chg->dev,
-			"Couldn't configure VCONN for SW control rc=%d\n", rc);
-		return rc;
+		if (rc < 0) {
+			dev_err(chg->dev,
+				"Couldn't configure VCONN for SW control rc=%d\n",
+				rc);
+			return rc;
+		}
 	}
 
 	return rc;
@@ -1576,13 +1598,29 @@ static int smb5_init_hw(struct smb5 *chip)
 
 	/*
 	 * PMI632 based hw init:
+	 * - Enable STAT pin function on SMB_EN
 	 * - Rerun APSD to ensure proper charger detection if device
 	 *   boots with charger connected.
 	 * - Initialize flash module for PMI632
 	 */
 	if (chg->smb_version == PMI632_SUBTYPE) {
+		rc = smblib_masked_write(chg, MISC_SMB_EN_CMD_REG,
+					EN_STAT_CMD_BIT, EN_STAT_CMD_BIT);
+		if (rc < 0) {
+			dev_err(chg->dev, "Couldn't configure SMB_EN rc=%d\n",
+					rc);
+			return rc;
+		}
+
 		schgm_flash_init(chg);
 		smblib_rerun_apsd_if_required(chg);
+	}
+
+	/* clear the ICL override if it is set */
+	rc = smblib_icl_override(chg, false);
+	if (rc < 0) {
+		pr_err("Couldn't disable ICL override rc=%d\n", rc);
+		return rc;
 	}
 
 	/* vote 0mA on usb_icl for non battery platforms */

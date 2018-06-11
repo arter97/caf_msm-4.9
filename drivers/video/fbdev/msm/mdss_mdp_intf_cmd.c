@@ -1135,14 +1135,19 @@ static int mdss_mdp_cmd_intf_recovery(void *data, int event)
 		return -EINVAL;
 
 	/*
-	 * Currently, only intf_fifo_underflow is
+	 * Currently, intf_fifo_overflow is not
 	 * supported for recovery sequence for command
 	 * mode DSI interface
 	 */
-	if (event != MDP_INTF_DSI_CMD_FIFO_UNDERFLOW) {
+	if (event == MDP_INTF_DSI_VIDEO_FIFO_OVERFLOW) {
 		pr_warn("%s: unsupported recovery event:%d\n",
 					__func__, event);
 		return -EPERM;
+	}
+
+	if (event == MDP_INTF_DSI_PANEL_DEAD) {
+		mdss_fb_report_panel_dead(ctx->ctl->mfd);
+		return 0;
 	}
 
 	if (atomic_read(&ctx->koff_cnt)) {
@@ -1530,6 +1535,10 @@ static void clk_ctrl_delayed_off_work(struct work_struct *work)
 
 		/* re-assign to have the correct order in the context */
 		ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
+
+		if (!sctl)
+			goto exit;
+
 		sctx = (struct mdss_mdp_cmd_ctx *) sctl->intf_ctx[MASTER_CTX];
 		if (!ctx || !sctx) {
 			pr_err("invalid %s %s\n",
@@ -1637,6 +1646,10 @@ static void clk_ctrl_gate_work(struct work_struct *work)
 
 		/* re-assign to have the correct order in the context */
 		ctx = (struct mdss_mdp_cmd_ctx *) ctl->intf_ctx[MASTER_CTX];
+
+		if (!sctl)
+			goto exit;
+
 		sctx = (struct mdss_mdp_cmd_ctx *) sctl->intf_ctx[MASTER_CTX];
 		if (!ctx || !sctx) {
 			pr_err("%s ERROR invalid %s %s\n", __func__,

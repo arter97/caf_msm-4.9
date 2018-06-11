@@ -50,6 +50,7 @@
 		qcom,governor-per-policy;
 
 		qcom,cpufreq-table-0 =
+			 <  960000 >,
 			 < 1305600 >,
 			 < 1497600 >,
 			 < 1708800 >,
@@ -238,6 +239,7 @@
 
 	qcom,speed0-bin-v0-c1 =
 		<          0 0>,
+		<  960000000 1>,
 		< 1305600000 1>,
 		< 1497600000 2>,
 		< 1708800000 3>,
@@ -258,6 +260,7 @@
 
 	qcom,speed1-bin-v0-c1 =
 		<          0 0>,
+		<  960000000 1>,
 		< 1305600000 1>,
 		< 1497600000 2>,
 		< 1708800000 3>,
@@ -310,10 +313,10 @@
 	reg = <0x001a94400 0x400>,
 		<0x0184d074 0x8>;
 	reg-names = "pll_base", "gdsc_base";
-	/delete-property/ qcom,dsi-pll-ssc-en;
-	/delete-property/ qcom,dsi-pll-ssc-mode;
-	/delete-property/ qcom,ssc-frequency-hz;
-	/delete-property/ qcom,ssc-ppm;
+	qcom,dsi-pll-ssc-en;
+	qcom,dsi-pll-ssc-mode = "down-spread";
+	qcom,ssc-frequency-hz = <31500>;
+	qcom,ssc-ppm = <5000>;
 };
 
 &mdss_dsi1_pll {
@@ -321,10 +324,10 @@
 	reg = <0x001a96400 0x400>,
 		<0x0184d074 0x8>;
 	reg-names = "pll_base", "gdsc_base";
-	/delete-property/ qcom,dsi-pll-ssc-en;
-	/delete-property/ qcom,dsi-pll-ssc-mode;
-	/delete-property/ qcom,ssc-frequency-hz;
-	/delete-property/ qcom,ssc-ppm;
+	qcom,dsi-pll-ssc-en;
+	qcom,dsi-pll-ssc-mode = "down-spread";
+	qcom,ssc-frequency-hz = <31500>;
+	qcom,ssc-ppm = <5000>;
 };
 
 &mdss_dsi {

@@ -56,6 +56,7 @@ enum print_reason {
 #define CTM_VOTER			"CTM_VOTER"
 #define SW_QC3_VOTER			"SW_QC3_VOTER"
 #define AICL_RERUN_VOTER		"AICL_RERUN_VOTER"
+#define SW_ICL_MAX_VOTER		"SW_ICL_MAX_VOTER"
 #define QNOVO_VOTER			"QNOVO_VOTER"
 #define BATT_PROFILE_VOTER		"BATT_PROFILE_VOTER"
 #define OTG_DELAY_VOTER			"OTG_DELAY_VOTER"
@@ -65,8 +66,6 @@ enum print_reason {
 #define PL_FCC_LOW_VOTER		"PL_FCC_LOW_VOTER"
 #define WBC_VOTER			"WBC_VOTER"
 #define HW_LIMIT_VOTER			"HW_LIMIT_VOTER"
-#define DYNAMIC_RP_VOTER		"DYNAMIC_RP_VOTER"
-#define DEFAULT_100MA_VOTER		"DEFAULT_100MA_VOTER"
 #define FORCE_RECHARGE_VOTER		"FORCE_RECHARGE_VOTER"
 
 #define BOOST_BACK_STORM_COUNT	3
@@ -234,6 +233,7 @@ struct smb_params {
 	struct smb_chg_param	fcc;
 	struct smb_chg_param	fv;
 	struct smb_chg_param	usb_icl;
+	struct smb_chg_param	icl_max_stat;
 	struct smb_chg_param	icl_stat;
 	struct smb_chg_param	otg_cl;
 	struct smb_chg_param	jeita_cc_comp_hot;
@@ -272,6 +272,7 @@ struct smb_charger {
 	int			otg_delay_ms;
 	int			*weak_chg_icl_ua;
 	struct qpnp_vadc_chip	*vadc_dev;
+	bool			pd_not_supported;
 
 	/* locks */
 	struct mutex		lock;
@@ -462,6 +463,8 @@ int smblib_get_prop_batt_temp(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_batt_charge_counter(struct smb_charger *chg,
 				union power_supply_propval *val);
+int smblib_get_prop_batt_cycle_count(struct smb_charger *chg,
+				union power_supply_propval *val);
 int smblib_set_prop_input_suspend(struct smb_charger *chg,
 				const union power_supply_propval *val);
 int smblib_set_prop_batt_capacity(struct smb_charger *chg,
@@ -537,6 +540,7 @@ int smblib_stat_sw_override_cfg(struct smb_charger *chg, bool override);
 int smblib_configure_wdog(struct smb_charger *chg, bool enable);
 int smblib_force_vbus_voltage(struct smb_charger *chg, u8 val);
 int smblib_configure_hvdcp_apsd(struct smb_charger *chg, bool enable);
+int smblib_icl_override(struct smb_charger *chg, bool override);
 
 int smblib_init(struct smb_charger *chg);
 int smblib_deinit(struct smb_charger *chg);

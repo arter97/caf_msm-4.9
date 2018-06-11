@@ -1016,7 +1016,7 @@
 
 #include "sdm632-coresight.dtsi"
 
-/* GPU Overrides*/
+/* GPU Overrides */
 &msm_gpu {
 
 	qcom,ca-target-pwrlevel = <4>;
@@ -1029,6 +1029,7 @@
 		#size-cells = <0>;
 
 		compatible = "qcom,gpu-pwrlevels";
+
 		/* TURBO LD0 */
 		qcom,gpu-pwrlevel@0 {
 			reg = <0>;
@@ -1099,6 +1100,7 @@
 			qcom,bus-min = <1>;
 			qcom,bus-max = <4>;
 		};
+
 		/* XO */
 		qcom,gpu-pwrlevel@8 {
 			reg = <8>;

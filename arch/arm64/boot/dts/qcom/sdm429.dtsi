@@ -125,6 +125,29 @@
 			/delete-node/ skin_cpu7;
 		};
 	};
+
+	aoss0-lowf {
+		cooling-maps {
+			/delete-node/ cpu4_vdd_cdev;
+			/delete-node/ cpu5_vdd_cdev;
+			/delete-node/ cpu6_vdd_cdev;
+			/delete-node/ cpu7_vdd_cdev;
+		};
+	};
+
+	pmi-vbat-lvl0 {
+		cooling-maps {
+			/delete-node/ vbat_map0;
+			/delete-node/ vbat_map1;
+		};
+	};
+
+	soc {
+		cooling-maps {
+			/delete-node/ soc_map0;
+			/delete-node/ soc_map1;
+		};
+	};
 };
 
 &clock_gcc {
@@ -216,4 +239,10 @@
 	clock-names = "pclk0_src", "byte0_src", "pclk1_src",
 		"byte1_src";
 	#clock-cells = <1>;
+};
+
+/* GPU overrides */
+&msm_gpu {
+	/* Update GPU chip ID*/
+	qcom,chipid = <0x05000400>;
 };
