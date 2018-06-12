@@ -435,7 +435,6 @@ int pfk_kc_init(void)
 	}
 	kc_ready = true;
 	kc_spin_unlock();
-
 	return 0;
 }
 
@@ -447,8 +446,8 @@ int pfk_kc_init(void)
 int pfk_kc_deinit(void)
 {
 	int res = pfk_kc_clear();
-	kc_ready = false;
 
+	kc_ready = false;
 	return res;
 }
 
