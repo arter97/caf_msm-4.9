@@ -21,9 +21,6 @@ int fscrypt_using_hardware_encryption(const struct inode *inode)
 }
 EXPORT_SYMBOL(fscrypt_using_hardware_encryption);
 
-/*
- * Retrieves encryption key from the inode
- */
 char *fscrypt_get_ice_encryption_key(const struct inode *inode)
 {
 	struct fscrypt_info *ci = NULL;
@@ -38,9 +35,6 @@ char *fscrypt_get_ice_encryption_key(const struct inode *inode)
 	return &(ci->ci_raw_key[0]);
 }
 
-/*
- * Retrieves encryption salt from the inode
- */
 char *fscrypt_get_ice_encryption_salt(const struct inode *inode)
 {
 	struct fscrypt_info *ci = NULL;
@@ -55,9 +49,6 @@ char *fscrypt_get_ice_encryption_salt(const struct inode *inode)
 	return &(ci->ci_raw_key[fscrypt_get_ice_encryption_key_size(inode)]);
 }
 
-/*
- * returns true if the cipher mode in inode is AES XTS
- */
 int fscrypt_is_aes_xts_cipher(const struct inode *inode)
 {
 	struct fscrypt_info *ci = inode->i_crypt_info;
@@ -68,9 +59,6 @@ int fscrypt_is_aes_xts_cipher(const struct inode *inode)
 	return (ci->ci_data_mode == FS_ENCRYPTION_MODE_PRIVATE);
 }
 
-/*
- * returns true if encryption info in both inodes is equal
- */
 bool fscrypt_is_ice_encryption_info_equal(const struct inode *inode1,
 					const struct inode *inode2)
 {
@@ -85,8 +73,9 @@ bool fscrypt_is_ice_encryption_info_equal(const struct inode *inode1,
 	if (inode1 == inode2)
 		return true;
 
-	/* both do not belong to ice, so we don't care, they are equal
-	 *for us
+	/*
+	 * Both do not belong to ice, so we don't care, they are equal
+	 * for us
 	 */
 	if (!fscrypt_should_be_processed_by_ice(inode1) &&
 			!fscrypt_should_be_processed_by_ice(inode2))

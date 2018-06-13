@@ -3,7 +3,6 @@
 #
 
 ccflags-y += -Isecurity/selinux -Isecurity/selinux/include
-#ccflags-y += -Ifs/ext4
 ccflags-y += -Ifs/crypto
 
 obj-$(CONFIG_PFT) += pft.o

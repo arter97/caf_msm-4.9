@@ -43,15 +43,16 @@
 static bool pfk_ext4_ready;
 
 /*
- * pfk_ext4_deinit() - Deinit function, should be invoked by upper PFK layer
+ * Deinit function, should be invoked by upper PFK layer
  */
 void pfk_ext4_deinit(void)
 {
 	pfk_ext4_ready = false;
 }
+EXPORT_SYMBOL(pfk_ext4_deinit);
 
 /*
- * pfk_ecryptfs_init() - Init function, should be invoked by upper PFK layer
+ * Init function, should be invoked by upper PFK layer
  */
 int __init pfk_ext4_init(void)
 {
@@ -60,9 +61,10 @@ int __init pfk_ext4_init(void)
 
 	return 0;
 }
+EXPORT_SYMBOL(pfk_ext4_init);
 
-/**
- * pfk_ecryptfs_is_ready() - driver is initialized and ready.
+/*
+ * Driver is initialized and ready.
  *
  * Return: true if the driver is ready.
  */
@@ -71,32 +73,8 @@ static inline bool pfk_ext4_is_ready(void)
 	return pfk_ext4_ready;
 }
 
-/**
- * pfk_ext4_dump_inode() - dumps all interesting info about inode to the screen
- *
- *
- */
 /*
- * static void pfk_ext4_dump_inode(const struct inode* inode)
- * {
- *	struct ext4_crypt_info *ci = ext4_encryption_info((struct inode*)inode);
- *
- *	pr_debug("dumping inode with address 0x%p\n", inode);
- *	pr_debug("S_ISREG is %d\n", S_ISREG(inode->i_mode));
- *	pr_debug("EXT4_INODE_ENCRYPT flag is %d\n",
- *		ext4_test_inode_flag((struct inode*)inode, EXT4_INODE_ENCRYPT));
- *	if (ci) {
- *		pr_debug("crypt_info address 0x%p\n", ci);
- *		pr_debug("ci->ci_data_mode %d\n", ci->ci_data_mode);
- *	} else {
- *		pr_debug("crypt_info is NULL\n");
- *	}
- * }
- */
-
-/**
- * pfk_is_ext4_type() - return true if inode belongs to ICE EXT4 PFE
- * @inode: inode pointer
+ * Checks if inode belongs to ICE EXT4 PFE
  */
 bool pfk_is_ext4_type(const struct inode *inode)
 {
@@ -105,9 +83,10 @@ bool pfk_is_ext4_type(const struct inode *inode)
 
 	return fscrypt_should_be_processed_by_ice(inode);
 }
+EXPORT_SYMBOL(pfk_is_ext4_type);
 
-/**
- * pfk_ext4_parse_cipher() - parse cipher from inode to enum
+/*
+ * parse cipher from inode to enum
  * @inode: inode
  * @algo: pointer to store the output enum (can be null)
  *
@@ -135,7 +114,6 @@ static int pfk_ext4_parse_cipher(const struct inode *inode,
 
 	return 0;
 }
-
 
 int pfk_ext4_parse_inode(const struct bio *bio,
 	const struct inode *inode,
@@ -196,6 +174,7 @@ int pfk_ext4_parse_inode(const struct bio *bio,
 
 	return 0;
 }
+EXPORT_SYMBOL(pfk_ext4_parse_inode);
 
 bool pfk_ext4_allow_merge_bio(const struct bio *bio1,
 	const struct bio *bio2, const struct inode *inode1,
@@ -210,3 +189,4 @@ bool pfk_ext4_allow_merge_bio(const struct bio *bio1,
 
 	return fscrypt_is_ice_encryption_info_equal(inode1, inode2);
 }
+EXPORT_SYMBOL(pfk_ext4_allow_merge_bio);

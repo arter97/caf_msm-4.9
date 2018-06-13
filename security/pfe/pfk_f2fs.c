@@ -35,23 +35,16 @@
 #include <linux/fs.h>
 #include <linux/errno.h>
 #include <linux/printk.h>
-
 #include "fscrypt_ice.h"
 #include "pfk_f2fs.h"
 
 static bool pfk_f2fs_ready;
 
-/*
- * pfk_f2fs_deinit() - Deinit function, should be invoked by upper PFK layer
- */
 void pfk_f2fs_deinit(void)
 {
 	pfk_f2fs_ready = false;
 }
 
-/*
- * pfk_f2fs_init() - Init function, should be invoked by upper PFK layer
- */
 int __init pfk_f2fs_init(void)
 {
 	pfk_f2fs_ready = true;

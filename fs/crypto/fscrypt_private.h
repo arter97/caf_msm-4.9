@@ -58,7 +58,6 @@ enum ci_mode_info {
 	CI_FNAME_MODE,
 };
 
-
 /*
  * A pointer to this structure is stored in the file system's in-core
  * representation of an inode.

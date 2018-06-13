@@ -947,6 +947,14 @@ static void msm_lastclose(struct drm_device *dev)
 	struct msm_kms *kms = priv->kms;
 	int i;
 
+	/* check for splash status before triggering cleanup
+	 * if we end up here with splash status ON i.e before first
+	 * commit then ignore the last close call
+	 */
+	if (kms && kms->funcs && kms->funcs->check_for_splash
+		&& kms->funcs->check_for_splash(kms))
+		return;
+
 	/*
 	 * clean up vblank disable immediately as this is the last close.
 	 */
@@ -1434,9 +1442,10 @@ static int msm_release(struct inode *inode, struct file *filp)
 	struct drm_minor *minor = file_priv->minor;
 	struct drm_device *dev = minor->dev;
 	struct msm_drm_private *priv = dev->dev_private;
-	struct msm_drm_event *node, *temp;
+	struct msm_drm_event *node, *temp, *tmp_node;
 	u32 count;
 	unsigned long flags;
+	LIST_HEAD(tmp_head);
 
 	spin_lock_irqsave(&dev->event_lock, flags);
 	list_for_each_entry_safe(node, temp, &priv->client_event_list,
@@ -1444,14 +1453,25 @@ static int msm_release(struct inode *inode, struct file *filp)
 		if (node->base.file_priv != file_priv)
 			continue;
 		list_del(&node->base.link);
-		spin_unlock_irqrestore(&dev->event_lock, flags);
-		count = msm_event_client_count(dev, &node->info, true);
+		list_add_tail(&node->base.link, &tmp_head);
+	}
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+
+	list_for_each_entry_safe(node, temp, &tmp_head,
+			base.link) {
+		list_del(&node->base.link);
+		count = msm_event_client_count(dev, &node->info, false);
+
+		list_for_each_entry(tmp_node, &tmp_head, base.link) {
+			if (tmp_node->event.type == node->info.event &&
+				tmp_node->info.object_id ==
+					node->info.object_id)
+				count++;
+		}
 		if (!count)
 			msm_register_event(dev, &node->info, file_priv, false);
 		kfree(node);
-		spin_lock_irqsave(&dev->event_lock, flags);
 	}
-	spin_unlock_irqrestore(&dev->event_lock, flags);
 
 	return drm_release(inode, filp);
 }

@@ -42,7 +42,6 @@
 #include "xattr.h"
 #include "acl.h"
 #include "truncate.h"
-//#include "ext4_ice.h"
 
 #include <trace/events/ext4.h>
 #include <trace/events/android_fs.h>

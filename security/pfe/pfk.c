@@ -37,7 +37,6 @@
  *
  */
 
-
 /* Uncomment the line below to enable debug messages */
 /* #define DEBUG 1 */
 #define pr_fmt(fmt)	"pfk [%s]: " fmt, __func__
@@ -50,19 +49,15 @@
 #include <linux/security.h>
 #include <crypto/algapi.h>
 #include <crypto/ice.h>
-
 #include <linux/pfk.h>
-
 #include "pfk_kc.h"
 #include "objsec.h"
 #include "pfk_ice.h"
 #include "pfk_ext4.h"
 #include "pfk_f2fs.h"
 #include "pfk_internal.h"
-//#include "ext4.h"
 
 static bool pfk_ready;
-
 
 /* might be replaced by a table when more than one cipher is supported */
 #define PFK_SUPPORTED_KEY_SIZE 32
@@ -83,12 +78,12 @@ typedef bool (*pfk_allow_merge_bio_type)(const struct bio *bio1,
 
 static const pfk_parse_inode_type pfk_parse_inode_ftable[] = {
 	/* EXT4_CRYPT_PFE */ &pfk_ext4_parse_inode,
-    /* F2FS_CRYPT_PFE */ &pfk_f2fs_parse_inode,
+	/* F2FS_CRYPT_PFE */ &pfk_f2fs_parse_inode,
 };
 
 static const pfk_allow_merge_bio_type pfk_allow_merge_bio_ftable[] = {
 	/* EXT4_CRYPT_PFE */ &pfk_ext4_allow_merge_bio,
-    /* F2FS_CRYPT_PFE */ &pfk_f2fs_allow_merge_bio,
+	/* F2FS_CRYPT_PFE */ &pfk_f2fs_allow_merge_bio,
 };
 
 static void __exit pfk_exit(void)
@@ -313,7 +308,7 @@ static int pfk_get_key_for_bio(const struct bio *bio,
 	}
 
 	/* Note: the "salt" is really just the second half of the XTS key. */
-	BUILD_BUG_ON(sizeof(key->raw) !=
+	WARN_ON(sizeof(key->raw) !=
 		     PFK_SUPPORTED_KEY_SIZE + PFK_SUPPORTED_SALT_SIZE);
 	key_info->key = &key->raw[0];
 	key_info->key_size = PFK_SUPPORTED_KEY_SIZE;
