@@ -21,6 +21,7 @@
 &soc {
 	qcom,msm-audio-apr {
 		compatible = "qcom,msm-audio-apr";
+		qcom,subsys-name = "apr_adsp";
 		msm_audio_apr_dummy {
 			compatible = "qcom,msm-audio-apr-dummy";
 		};
