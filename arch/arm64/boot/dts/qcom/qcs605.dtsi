@@ -55,7 +55,7 @@
 };
 
 &adsp_mem {
-	size = <0 0x800000>;
+	size = <0 0x12c00000>;
 };
 
 &secure_display_memory {
