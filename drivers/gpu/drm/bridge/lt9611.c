@@ -2070,16 +2070,13 @@ static int lt9611_probe(struct i2c_client *client,
 		goto err_dt_supply;
 	}
 
-	gpio_set_value(pdata->hdmi_en_gpio, 0);
-	msleep(20);
+	lt9611_assert_5v(pdata);
 
 	ret = lt9611_enable_vreg(pdata, true);
 	if (ret) {
 		pr_err("failed to enable vreg\n");
 		goto err_dt_supply;
 	}
-
-	lt9611_assert_5v(pdata);
 
 	lt9611_reset(pdata);
 
