@@ -119,13 +119,13 @@ static inline struct ecryptfs_auth_tok *
 ecryptfs_get_key_payload_data(struct key *key)
 {
 	struct ecryptfs_auth_tok *auth_tok;
-	struct user_key_payload *ukp;
+	const struct user_key_payload *ukp;
 
 	auth_tok = ecryptfs_get_encrypted_key_payload_data(key);
 	if (auth_tok)
 		return auth_tok;
 
-	ukp = user_key_payload_locked(key);
+	ukp = user_key_payload(key);
 	if (!ukp)
 		return ERR_PTR(-EKEYREVOKED);
 
