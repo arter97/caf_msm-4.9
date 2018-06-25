@@ -1710,7 +1710,7 @@ static inline int mdss_mdp_irq_clk_register(struct mdss_data_type *mdata,
 	if (IS_ERR(tmp)) {
 		pr_err("unable to get clk: %s\n", clk_name);
 		rc = PTR_ERR(tmp);
-		devm_clk_put(&mdata->pdev->dev, tmp);
+		mdata->mdp_clk[clk_idx] = NULL;
 		return rc;
 	}
 
