@@ -31,6 +31,7 @@
 #include "mdss_panel.h"
 
 #define PHY_ADDR_4G (1ULL<<32)
+#define ALIGN_UP(x, align) ((DIV_ROUND_UP((x), (align))) * (align))
 
 void mdss_mdp_format_flag_removal(u32 *table, u32 num, u32 remove_bits)
 {
@@ -451,13 +452,13 @@ static int mdss_mdp_get_ubwc_plane_size(struct mdss_mdp_format_params *fmt,
 		}
 
 		/* Y bitstream stride and plane size */
-		ps->ystride[0] = ALIGN(width, y_stride_alignment);
+		ps->ystride[0] = ALIGN_UP(width, y_stride_alignment);
 		ps->ystride[0] = (ps->ystride[0] * y_bpp_numer) / y_bpp_denom;
 		ps->plane_size[0] = ALIGN(ps->ystride[0] *
 			ALIGN(height, y_height_alignment), 4096);
 
 		/* CbCr bitstream stride and plane size */
-		ps->ystride[1] = ALIGN(width / 2, uv_stride_alignment);
+		ps->ystride[1] = ALIGN_UP(width / 2, uv_stride_alignment);
 		ps->ystride[1] = (ps->ystride[1] * uv_bpp_numer) / uv_bpp_denom;
 		ps->plane_size[1] = ALIGN(ps->ystride[1] *
 			ALIGN(height / 2, uv_height_alignment), 4096);
@@ -968,7 +969,9 @@ static int mdss_mdp_put_img(struct mdss_mdp_img_data *data, bool rotator,
 		 * be filled due to map call which will be unmapped above.
 		 *
 		 */
-		pr_debug("skip memory unmapping for secure display content\n");
+		if (data->ihandle)
+			ion_free(iclient, data->ihandle);
+		pr_debug("free memory handle for secure display/camera content\n");
 	} else {
 		return -ENOMEM;
 	}
@@ -1047,19 +1050,18 @@ static int mdss_mdp_get_img(struct msmfb_data *img,
 			ret = 0;
 			goto done;
 		} else {
-			struct ion_handle *ihandle = NULL;
 			struct sg_table *sg_ptr = NULL;
 
+			data->ihandle = ion_import_dma_buf_fd(iclient,
+					img->memory_id);
+			if (IS_ERR_OR_NULL(data->ihandle)) {
+				ret = -EINVAL;
+				pr_err("ion import buffer failed\n");
+				data->ihandle = NULL;
+				goto done;
+			}
 			do {
-				ihandle = ion_import_dma_buf_fd(iclient,
-							     img->memory_id);
-				if (IS_ERR_OR_NULL(ihandle)) {
-					ret = -EINVAL;
-					pr_err("ion import buffer failed\n");
-					break;
-				}
-
-				sg_ptr = ion_sg_table(iclient, ihandle);
+				sg_ptr = ion_sg_table(iclient, data->ihandle);
 				if (sg_ptr == NULL) {
 					pr_err("ion sg table get failed\n");
 					ret = -EINVAL;
@@ -1085,8 +1087,6 @@ static int mdss_mdp_get_img(struct msmfb_data *img,
 				ret = 0;
 			} while (0);
 
-			if (!IS_ERR_OR_NULL(ihandle))
-				ion_free(iclient, ihandle);
 			return ret;
 		}
 	}
