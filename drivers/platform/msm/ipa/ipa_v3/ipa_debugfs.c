@@ -2256,6 +2256,7 @@ void ipa3_debugfs_init(void)
 
 fail:
 	debugfs_remove_recursive(dent);
+	kfree(active_clients_buf);
 }
 
 void ipa3_debugfs_remove(void)
