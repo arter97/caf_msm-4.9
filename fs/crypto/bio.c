@@ -38,8 +38,7 @@ static void completion_pages(struct work_struct *work)
 
 	bio_for_each_segment_all(bv, bio, i) {
 		struct page *page = bv->bv_page;
-
-		if (fscrypt_using_hardware_encryption(page->mapping->host)) {
+		if (fs_is_ice_enabled()) {
 			SetPageUptodate(page);
 		} else {
 			int ret = fscrypt_decrypt_page(page->mapping->host,
