@@ -50,6 +50,8 @@
 
 #define MSM_SENSOR_BYPASS_VIDEO_NODE    1
 
+#define SENSOR_PROBE_WRITE
+
 enum msm_sensor_camera_id_t {
 	CAMERA_0,
 	CAMERA_1,
