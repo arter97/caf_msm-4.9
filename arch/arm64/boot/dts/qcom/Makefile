@@ -142,11 +142,16 @@ ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 		sdm670-pm660a-tasha-codec-cdp-overlay.dtbo \
 		sdm670-aqt1000-cdp-overlay.dtbo \
 		sdm670-pm660a-aqt1000-cdp-overlay.dtbo \
+		sxr1120-lc-mtp-overlay.dtbo \
+		sxr1120-lc-external-codec-mtp-overlay.dtbo \
+		sxr1120-lc-cdp-overlay.dtbo \
+		sxr1120-lc-external-codec-cdp-overlay.dtbo \
 		qcs605-cdp-overlay.dtbo \
 		qcs605-mtp-overlay.dtbo \
 		qcs605-360camera-overlay.dtbo \
 		qcs605-external-codec-mtp-overlay.dtbo \
 		qcs605-lc-mtp-overlay.dtbo \
+		qcs605-lc-cdp-overlay.dtbo \
 		sdm710-cdp-overlay.dtbo \
 		sdm710-mtp-overlay.dtbo \
 		sdm710-qrd-overlay.dtbo \
@@ -168,7 +173,18 @@ ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 		sdm710-tasha-codec-cdp-overlay.dtbo \
 		sdm710-pm660a-tasha-codec-cdp-overlay.dtbo \
 		sdm710-aqt1000-cdp-overlay.dtbo \
-		sdm710-pm660a-aqt1000-cdp-overlay.dtbo
+		sdm710-pm660a-aqt1000-cdp-overlay.dtbo \
+		sxr1130-cdp-overlay.dtbo \
+		sxr1130-external-codec-cdp-overlay.dtbo \
+		sxr1130-mtp-overlay.dtbo \
+		sxr1130-external-codec-mtp-overlay.dtbo \
+		sxr1130-external-codec-pm660a-mtp-overlay.dtbo \
+		sxr1130-pm660a-mtp-overlay.dtbo \
+		sxr1130-usbc-external-codec-cdp-overlay.dtbo \
+		sxr1130-usbc-external-codec-mtp-overlay.dtbo \
+		sxr1130-usbc-external-codec-pm660a-mtp-overlay.dtbo \
+		sxr1130-usbc-mtp-overlay.dtbo \
+		sxr1130-usbc-pm660a-mtp-overlay.dtbo
 
 sdm670-cdp-overlay.dtbo-base := sdm670.dtb
 sdm670-mtp-overlay.dtbo-base := sdm670.dtb
@@ -198,11 +214,16 @@ sda670-mtp-overlay.dtbo-base := sda670.dtb
 sda670-hdk-overlay.dtbo-base := sda670.dtb
 sda670-pm660a-cdp-overlay.dtbo-base := sda670.dtb
 sda670-pm660a-mtp-overlay.dtbo-base := sda670.dtb
+sxr1120-lc-mtp-overlay.dtbo-base := sxr1120-lc.dtb
+sxr1120-lc-external-codec-mtp-overlay.dtbo-base := sxr1120-lc.dtb
+sxr1120-lc-cdp-overlay.dtbo-base := sxr1120-lc.dtb
+sxr1120-lc-external-codec-cdp-overlay.dtbo-base := sxr1120-lc.dtb
 qcs605-cdp-overlay.dtbo-base := qcs605.dtb
 qcs605-mtp-overlay.dtbo-base := qcs605.dtb
 qcs605-external-codec-mtp-overlay.dtbo-base := qcs605.dtb
 qcs605-lc-mtp-overlay.dtbo-base := qcs605-lc.dtb
 qcs605-360camera-overlay.dtbo-base := qcs605.dtb
+qcs605-lc-cdp-overlay.dtbo-base := qcs605-lc-cdp-base.dtb
 sdm710-cdp-overlay.dtbo-base := sdm710.dtb
 sdm710-mtp-overlay.dtbo-base := sdm710.dtb
 sdm710-qrd-overlay.dtbo-base := sdm710.dtb
@@ -225,6 +246,17 @@ sdm710-tasha-codec-cdp-overlay.dtbo-base := sdm710.dtb
 sdm710-pm660a-tasha-codec-cdp-overlay.dtbo-base := sdm710.dtb
 sdm710-aqt1000-cdp-overlay.dtbo-base := sdm710.dtb
 sdm710-pm660a-aqt1000-cdp-overlay.dtbo-base := sdm710.dtb
+sxr1130-cdp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-external-codec-cdp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-external-codec-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-external-codec-pm660a-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-pm660a-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-usbc-external-codec-cdp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-usbc-external-codec-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-usbc-external-codec-pm660a-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-usbc-mtp-overlay.dtbo-base := sxr1130.dtb
+sxr1130-usbc-pm660a-mtp-overlay.dtbo-base := sxr1130.dtb
 
 else
 dtb-$(CONFIG_ARCH_SDM670) += sdm670-rumi.dtb \
@@ -253,10 +285,16 @@ dtb-$(CONFIG_ARCH_SDM670) += sdm670-rumi.dtb \
 	sdm670-pm660a-tasha-codec-cdp.dtb \
 	sda670-pm660a-mtp.dtb \
 	sda670-pm660a-cdp.dtb \
+	sxr1120-lc-mtp.dtb \
+	sxr1120-lc-external-codec-mtp.dtb \
+	sxr1120-lc-cdp.dtb \
+	sxr1120-lc-external-codec-cdp.dtb \
 	qcs605-360camera.dtb \
 	qcs605-mtp.dtb \
 	qcs605-cdp.dtb \
 	qcs605-external-codec-mtp.dtb \
+	qcs605-lc-mtp.dtb \
+	qcs605-lc-cdp.dtb \
 	sdm710-mtp.dtb \
 	sdm710-cdp.dtb \
 	sdm710-qrd.dtb \
@@ -276,7 +314,18 @@ dtb-$(CONFIG_ARCH_SDM670) += sdm670-rumi.dtb \
 	sdm710-usbc-pm660a-cdp.dtb \
 	sdm710-usbc-pm660a-mtp.dtb \
 	sdm710-tasha-codec-cdp.dtb \
-	sdm710-pm660a-tasha-codec-cdp.dtb
+	sdm710-pm660a-tasha-codec-cdp.dtb \
+	sxr1130-cdp.dtb \
+	sxr1130-external-codec-cdp.dtb \
+	sxr1130-mtp.dtb \
+	sxr1130-external-codec-mtp.dtb \
+	sxr1130-external-codec-pm660a-mtp.dtb \
+	sxr1130-pm660a-mtp.dtb \
+	sxr1130-usbc-external-codec-cdp.dtb \
+	sxr1130-usbc-external-codec-mtp.dtb \
+	sxr1130-usbc-external-codec-pm660a-mtp.dtb \
+	sxr1130-usbc-mtp.dtb \
+	sxr1130-usbc-pm660a-mtp.dtb
 endif
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)

@@ -11,21 +11,19 @@
  * GNU General Public License for more details.
  */
 
+
 /dts-v1/;
-/plugin/;
 
-#include <dt-bindings/clock/qcom,gcc-sdm845.h>
-#include <dt-bindings/clock/qcom,camcc-sdm845.h>
-#include <dt-bindings/clock/qcom,dispcc-sdm845.h>
-#include <dt-bindings/clock/qcom,rpmh.h>
-#include <dt-bindings/interrupt-controller/arm-gic.h>
-
-#include "qcs605-lc-mtp.dtsi"
-#include "qcs605-lc-audio-overlay.dtsi"
+#include "sxr1130.dtsi"
+#include "sdm670-mtp.dtsi"
+#include "sdm670-external-codec.dtsi"
+#include "sdm670-ext-cdc-usbc-audio.dtsi"
 
 / {
-	model = "Qualcomm Technologies, Inc. QC605 LC Groot + PM8005 MTP";
-	compatible = "qcom,qcs605-mtp", "qcom,qcs605", "qcom,mtp";
-	qcom,msm-id = <347 0x0>;
-	qcom,board-id = <8 4>;
+	model = "Qualcomm Technologies, Inc. SXR1130 PM660+PM660L, USB-C Audio, Ext. Audio Codec MTP";
+	compatible = "qcom,sxr1130-mtp", "qcom,sxr1130", "qcom,mtp";
+	qcom,board-id = <8 3>;
+	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>,
+		       <0x0001001b 0x0102001a 0x0 0x0>,
+		       <0x0001001b 0x0201011a 0x0 0x0>;
 };
