@@ -776,6 +776,7 @@
 		      <0x17a60000 0x100000>;    /* GICR * 8 */
 		interrupts = <1 9 4>;
 		interrupt-parent = <&intc>;
+		ignored-save-restore-irqs = <38>;
 	};
 
 	pdc: interrupt-controller@b220000{
@@ -4050,6 +4051,7 @@
 };
 
 &gpu_cx_gdsc {
+	parent-supply = <&pm8998_s9_level>;
 	status = "ok";
 };
 
