@@ -1386,7 +1386,7 @@
 		};
 	};
 
-	mem_dump {
+	mem_dump: mem_dump {
 		compatible = "qcom,mem-dump";
 		memory-region = <&dump_mem>;
 
@@ -1674,7 +1674,7 @@
 		};
 	};
 
-	qcom,chd_sliver {
+	qcom,chd_silver {
 		compatible = "qcom,core-hang-detect";
 		label = "silver";
 		qcom,threshold-arr = <0x17e00058 0x17e10058 0x17e20058
