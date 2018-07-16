@@ -1,5 +1,4 @@
-/*
- * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,11 +8,15 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
  */
 
-#include "sdm845-audio-overlay.dtsi"
+#if defined(CONFIG_QTI_RPMH_API) && defined(CONFIG_QTI_RPM_STATS_LOG)
 
-&snd_934x {
-	qcom,us-euro-gpios = <&tavil_us_euro_sw>;
-};
+void msm_rpmh_master_stats_update(void);
 
+#else
+
+static inline void msm_rpmh_master_stats_update(void) {}
+
+#endif
