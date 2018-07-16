@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,22 +11,23 @@
  */
 
 #include "ext4_ice.h"
+#include <linux/fscrypt.h>
 
 /*
  * Retrieves encryption key from the inode
  */
 char *ext4_get_ice_encryption_key(const struct inode *inode)
 {
-	struct fscrypt_info *ci = NULL;
-
-	if (!inode)
-		return NULL;
-
-	ci = inode->i_crypt_info;
-	if (!ci)
-		return NULL;
-
-	return &(ci->ci_raw_key[0]);
+	/*
+	 * struct fscrypt_info *ci;
+	 * if (!inode)
+	 *	return NULL;
+	 * ci = inode->i_crypt_info;
+	 * if (!ci)
+	 *	return NULL;
+	 * return &(ci->ci_raw_key[0]);
+	 */
+	return fscrypt_get_ice_encryption_key(inode);
 }
 
 /*
@@ -34,16 +35,16 @@ char *ext4_get_ice_encryption_key(const struct inode *inode)
  */
 char *ext4_get_ice_encryption_salt(const struct inode *inode)
 {
-	struct fscrypt_info *ci = NULL;
-
-	if (!inode)
-		return NULL;
-
-	ci = inode->i_crypt_info;
-	if (!ci)
-		return NULL;
-
-	return &(ci->ci_raw_key[ext4_get_ice_encryption_key_size(inode)]);
+	/*
+	 * struct fscrypt_info *ci;
+	 * if (!inode)
+	 *	return NULL;
+	 * ci = inode->i_crypt_info;
+	 * if (!ci)
+	 *	return NULL;
+	 * return &(ci->ci_raw_key[ext4_get_ice_encryption_key_size(inode)]);
+	 */
+	return fscrypt_get_ice_encryption_salt(inode);
 }
 
 /*
@@ -51,13 +52,14 @@ char *ext4_get_ice_encryption_salt(const struct inode *inode)
  */
 int ext4_is_aes_xts_cipher(const struct inode *inode)
 {
-	struct fscrypt_info *ci = NULL;
-
-	ci = inode->i_crypt_info;
-	if (!ci)
-		return 0;
-
-	return (ci->ci_data_mode == FS_ENCRYPTION_MODE_PRIVATE);
+	/*
+	 * struct fscrypt_info *ci;
+	 * ci = inode->i_crypt_info;
+	 * if (!ci)
+	 *	return 0;
+	 * return (ci->ci_data_mode == FS_ENCRYPTION_MODE_PRIVATE);
+	 */
+	return fscrypt_is_aes_xts_cipher(inode);
 }
 
 /*

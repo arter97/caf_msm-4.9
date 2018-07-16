@@ -1,4 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,7 +14,7 @@
 #define _EXT4_ICE_H
 
 #include "ext4.h"
-#include <linux/fscrypto.h>
+#define EXT4_256_XTS_KEY_SIZE 64
 
 #ifdef CONFIG_EXT4_FS_ICE_ENCRYPTION
 static inline int ext4_should_be_processed_by_ice(const struct inode *inode)
@@ -41,13 +41,13 @@ int ext4_is_ice_encryption_info_equal(const struct inode *inode1,
 static inline size_t ext4_get_ice_encryption_key_size(
 	const struct inode *inode)
 {
-	return FS_AES_256_XTS_KEY_SIZE / 2;
+	return EXT4_256_XTS_KEY_SIZE / 2;
 }
 
 static inline size_t ext4_get_ice_encryption_salt_size(
 	const struct inode *inode)
 {
-	return FS_AES_256_XTS_KEY_SIZE / 2;
+	return EXT4_256_XTS_KEY_SIZE / 2;
 }
 
 #else
@@ -99,6 +99,10 @@ static inline int ext4_is_aes_xts_cipher(const struct inode *inode)
 	return 0;
 }
 
+static int fs_using_hardware_encryption(struct inode *inode)
+{
+	return -EOPNOTSUPP;
+}
 #endif
 
 #endif	/* _EXT4_ICE_H */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,8 +25,26 @@
 #include <soc/qcom/scm.h>
 #include <soc/qcom/qseecomi.h>
 #include "iceregs.h"
-#include <linux/pfk.h>
 
+#ifdef CONFIG_PFK
+#include <linux/pfk.h>
+#else
+#include <linux/bio.h>
+static inline int pfk_load_key_start(const struct bio *bio,
+	struct ice_crypto_setting *ice_setting, bool *is_pfe, bool async)
+{
+	return 0;
+}
+
+static inline int pfk_load_key_end(const struct bio *bio, bool *is_pfe)
+{
+	return 0;
+}
+
+static inline void pfk_clear_on_reset(void)
+{
+}
+#endif
 
 #define TZ_SYSCALL_CREATE_SMC_ID(o, s, f) \
 	((uint32_t)((((o & 0x3f) << 24) | (s & 0xff) << 8) | (f & 0xff)))
@@ -1455,7 +1473,6 @@ static int qcom_ice_config_start(struct platform_device *pdev,
 		/* It is not an error to have a request with no  bio */
 		return 0;
 	}
-    //pr_err("%s bio is %pK\n", __func__, req->bio);
 
 	ret = pfk_load_key_start(req->bio, &pfk_crypto_data, &is_pfe, async);
 	if (is_pfe) {

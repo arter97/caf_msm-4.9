@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -309,13 +309,13 @@ int pfk_load_key_start(const struct bio *bio,
 		pr_err("ice setting is NULL\n");
 		return -EINVAL;
 	}
-//pr_err("%s %d\n", __func__, __LINE__);
+
 	inode = pfk_bio_get_inode(bio);
 	if (!inode) {
 		*is_pfe = false;
 		return -EINVAL;
 	}
-    //pr_err("%s %d\n", __func__, __LINE__);
+
 	which_pfe = pfk_get_pfe_type(inode);
 	if (which_pfe == INVALID_PFE) {
 		*is_pfe = false;
@@ -324,16 +324,16 @@ int pfk_load_key_start(const struct bio *bio,
 
 	pr_debug("parsing file %s with PFE %d\n",
 		inode_to_filename(inode), which_pfe);
-//pr_err("%s %d\n", __func__, __LINE__);
+
 	ret = (*(pfk_parse_inode_ftable[which_pfe]))
 			(bio, inode, &key_info, &algo_mode, is_pfe);
 	if (ret != 0)
 		return ret;
-//pr_err("%s %d\n", __func__, __LINE__);
+
 	ret = pfk_key_size_to_key_type(key_info.key_size, &key_size_type);
 	if (ret != 0)
 		return ret;
-//pr_err("%s %d\n", __func__, __LINE__);
+
 	ret = pfk_kc_load_key_start(key_info.key, key_info.key_size,
 			key_info.salt, key_info.salt_size, &key_index, async);
 	if (ret) {
@@ -370,7 +370,7 @@ int pfk_load_key_start(const struct bio *bio,
 int pfk_load_key_end(const struct bio *bio, bool *is_pfe)
 {
 	int ret = 0;
-	struct pfk_key_info key_info = {0};
+	struct pfk_key_info key_info = {NULL, NULL, 0, 0};
 	enum pfe_type which_pfe = INVALID_PFE;
 	struct inode *inode = NULL;
 
