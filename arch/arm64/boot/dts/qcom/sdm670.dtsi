@@ -479,10 +479,10 @@
 		#size-cells = <2>;
 		ranges;
 
-		hyp_region: hyp_region@85700000 {
+		hyp_region: hyp_region@85600000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0 0x85700000 0 0x600000>;
+			reg = <0 0x85600000 0 0x800000>;
 		};
 
 		xbl_region: xbl_region@85e00000 {
