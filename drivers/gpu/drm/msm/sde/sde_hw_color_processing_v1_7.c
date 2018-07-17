@@ -680,7 +680,7 @@ void sde_setup_dspp_pcc_v1_7(struct sde_hw_dspp *ctx, void *cfg)
 	void  __iomem *base;
 
 	if (!hw_cfg  || (hw_cfg->len != sizeof(*pcc)  && hw_cfg->payload)) {
-		DRM_ERROR("invalid params hw %p payload %p payloadsize %d \"\
+		DRM_ERROR("invalid params hw %pK payload %pK payloadsize %d \"\
 			  exp size %zd\n",
 			   hw_cfg, ((hw_cfg) ? hw_cfg->payload : NULL),
 			   ((hw_cfg) ? hw_cfg->len : 0), sizeof(*pcc));
@@ -951,8 +951,9 @@ void sde_read_dspp_hist_v1_7(struct sde_hw_dspp *ctx, void *cfg)
 	offset = ctx->cap->sblk->hist.base + PA_HIST_DATA_DSPP_OFF;
 	offset_ctl = ctx->cap->sblk->hist.base + PA_HIST_CTRL_DSPP_OFF;
 
+	/* collect hist data for given DSPPs */
 	for (i = 0; i < HIST_V_SIZE; i++)
-		hist_data->data[i] = SDE_REG_READ(&ctx->hw, offset + i * 4) &
+		hist_data->data[i] += SDE_REG_READ(&ctx->hw, offset + i * 4) &
 					REG_MASK(24);
 
 	/* unlock hist buffer */

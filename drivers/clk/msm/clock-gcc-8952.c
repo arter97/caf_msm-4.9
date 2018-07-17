@@ -216,6 +216,7 @@ static struct pll_clk a53ss_c0_pll = {
 	.config_reg = (void __iomem *)APCS_C0_PLL_USER_CTL,
 	.status_reg = (void __iomem *)APCS_C0_PLL_STATUS,
 	.freq_tbl = apcs_c0_pll_freq,
+	.config_ctl_reg = (void __iomem *)APCS_C0_PLL_CONFIG_CTL,
 	.masks = {
 		.vco_mask = BM(29, 28),
 		.pre_div_mask = BIT(12),
@@ -283,6 +284,7 @@ static struct pll_clk a53ss_c1_pll = {
 	.config_reg = (void __iomem *)APCS_C1_PLL_USER_CTL,
 	.status_reg = (void __iomem *)APCS_C1_PLL_STATUS,
 	.freq_tbl = apcs_c1_pll_freq,
+	.config_ctl_reg = (void __iomem *)APCS_C1_PLL_CONFIG_CTL,
 	.masks = {
 		.vco_mask = BM(29, 28),
 		.pre_div_mask = BIT(12),
@@ -4407,6 +4409,11 @@ static int msm_gcc_probe(struct platform_device *pdev)
 	if (compat_bin2 || compat_bin4 || compat_bin5)
 		nbases = APCS_C0_PLL_BASE;
 
+	if (compat_bin5 || compat_bin6) {
+		a53ss_c0_pll.c.ops = &clk_ops_acpu_pll;
+		a53ss_c1_pll.c.ops = &clk_ops_acpu_pll;
+	}
+
 	ret = get_mmio_addr(pdev, nbases);
 	if (ret)
 		return ret;
@@ -4498,6 +4505,7 @@ static int msm_gcc_probe(struct platform_device *pdev)
 			vdd_hf_pll.num_levels = VDD_HF_PLL_NUM_439;
 			vdd_hf_pll.cur_level = VDD_HF_PLL_NUM_439;
 
+			gpll3_clk_src.test_ctl_hi_val = 0x400000;
 			gpll3_clk_src.vco_tbl = p_vco;
 			gpll3_clk_src.num_vco = ARRAY_SIZE(p_vco);
 			gpll3_clk_src.c.fmax[VDD_DIG_LOW] = 800000000;

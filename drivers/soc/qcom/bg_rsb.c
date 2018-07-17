@@ -33,7 +33,7 @@
 
 #define BGRSB_GLINK_INTENT_SIZE 0x04
 #define BGRSB_MSG_SIZE 0x08
-#define TIMEOUT_MS 500
+#define TIMEOUT_MS 2000
 
 #define BGRSB_LDO15_VTG_MIN_UV 3300000
 #define BGRSB_LDO15_VTG_MAX_UV 3300000
@@ -121,6 +121,8 @@ struct bgrsb_priv {
 	struct completion tx_done;
 
 	struct device *ldev;
+
+	struct wakeup_source bgrsb_ws;
 
 	wait_queue_head_t link_state_wait;
 
@@ -462,6 +464,7 @@ static int bgrsb_tx_msg(struct bgrsb_priv *dev, void  *msg, size_t len)
 	if (!dev->chnl_state)
 		return -ENODEV;
 
+	__pm_stay_awake(&dev->bgrsb_ws);
 	mutex_lock(&dev->glink_mutex);
 	init_completion(&dev->tx_done);
 	init_completion(&dev->bg_resp_cmplt);
@@ -507,6 +510,7 @@ static int bgrsb_tx_msg(struct bgrsb_priv *dev, void  *msg, size_t len)
 
 err_ret:
 	mutex_unlock(&dev->glink_mutex);
+	__pm_relax(&dev->bgrsb_ws);
 	return rc;
 }
 
@@ -544,7 +548,7 @@ static void bgrsb_bgup_work(struct work_struct *work)
 
 		rc = wait_event_timeout(dev->link_state_wait,
 				(dev->chnl_state == true),
-					msecs_to_jiffies(TIMEOUT_MS*2));
+					msecs_to_jiffies(TIMEOUT_MS));
 		if (rc == 0) {
 			pr_err("Glink channel connection time out\n");
 			return;
@@ -574,7 +578,7 @@ static void bgrsb_glink_bgup_work(struct work_struct *work)
 
 		rc = wait_event_timeout(dev->link_state_wait,
 					(dev->chnl_state == true),
-						msecs_to_jiffies(TIMEOUT_MS*2));
+						msecs_to_jiffies(TIMEOUT_MS));
 		if (rc == 0) {
 			pr_err("Glink channel connection time out\n");
 			return;
@@ -904,6 +908,9 @@ static int bg_rsb_probe(struct platform_device *pdev)
 	if (!dev)
 		return -ENOMEM;
 
+	/* Add wake lock for PM suspend */
+	wakeup_source_init(&dev->bgrsb_ws, "BGRSB_wake_lock");
+
 	dev->bgrsb_current_state = BGRSB_STATE_UNKNOWN;
 	rc = bgrsb_init(dev);
 	if (rc)
@@ -964,13 +971,14 @@ static int bg_rsb_remove(struct platform_device *pdev)
 	destroy_workqueue(dev->bgrsb_event_wq);
 	destroy_workqueue(dev->bgrsb_wq);
 	input_free_device(dev->input);
+	wakeup_source_trash(&dev->bgrsb_ws);
 
 	return 0;
 }
 
-static int bg_rsb_resume(struct platform_device *pdev)
+static int bg_rsb_resume(struct device *pldev)
 {
-	int rc;
+	struct platform_device *pdev = to_platform_device(pldev);
 	struct bgrsb_priv *dev = platform_get_drvdata(pdev);
 
 	if (dev->bgrsb_current_state == BGRSB_STATE_RSB_CONFIGURED)
@@ -978,12 +986,6 @@ static int bg_rsb_resume(struct platform_device *pdev)
 
 	if (dev->bgrsb_current_state == BGRSB_STATE_INIT) {
 		if (bgrsb_ldo_work(dev, BGRSB_ENABLE_LDO11) == 0) {
-			rc = bgrsb_configr_rsb(dev, true);
-			if (rc != 0) {
-				pr_err("BG failed to configure RSB %d\n", rc);
-				bgrsb_ldo_work(dev, BGRSB_DISABLE_LDO11);
-				return rc;
-			}
 			dev->bgrsb_current_state = BGRSB_STATE_RSB_CONFIGURED;
 			pr_debug("RSB Cofigured\n");
 			return 0;
@@ -993,8 +995,9 @@ static int bg_rsb_resume(struct platform_device *pdev)
 	return -EINVAL;
 }
 
-static int bg_rsb_suspend(struct platform_device *pdev, pm_message_t state)
+static int bg_rsb_suspend(struct device *pldev)
 {
+	struct platform_device *pdev = to_platform_device(pldev);
 	struct bgrsb_priv *dev = platform_get_drvdata(pdev);
 
 	if (dev->bgrsb_current_state == BGRSB_STATE_INIT)
@@ -1021,15 +1024,19 @@ static const struct of_device_id bg_rsb_of_match[] = {
 	{ }
 };
 
+static const struct dev_pm_ops pm_rsb = {
+	.resume		= bg_rsb_resume,
+	.suspend	= bg_rsb_suspend,
+};
+
 static struct platform_driver bg_rsb_driver = {
 	.driver = {
 		.name = "bg-rsb",
 		.of_match_table = bg_rsb_of_match,
+		.pm = &pm_rsb,
 	},
 	.probe		= bg_rsb_probe,
 	.remove		= bg_rsb_remove,
-	.resume		= bg_rsb_resume,
-	.suspend	= bg_rsb_suspend,
 };
 
 module_platform_driver(bg_rsb_driver);

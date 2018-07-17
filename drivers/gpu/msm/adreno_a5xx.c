@@ -386,7 +386,7 @@ static void a5xx_protect_init(struct adreno_device *adreno_dev)
 	iommu_regs = kgsl_mmu_get_prot_regs(&device->mmu);
 	if (iommu_regs)
 		adreno_set_protected_registers(adreno_dev, &index,
-				iommu_regs->base, iommu_regs->range);
+				iommu_regs->base, ilog2(iommu_regs->range));
 }
 
 /*
@@ -2281,6 +2281,7 @@ static int _me_init_ucode_workarounds(struct adreno_device *adreno_dev)
 	switch (ADRENO_GPUREV(adreno_dev)) {
 	case ADRENO_REV_A510:
 		return 0x00000001; /* Ucode workaround for token end syncs */
+	case ADRENO_REV_A504:
 	case ADRENO_REV_A505:
 	case ADRENO_REV_A506:
 	case ADRENO_REV_A530:

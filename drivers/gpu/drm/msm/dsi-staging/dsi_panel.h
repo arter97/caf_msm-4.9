@@ -129,6 +129,7 @@ enum esd_check_status_mode {
 
 struct drm_panel_esd_config {
 	bool esd_enabled;
+	bool cmd_channel;
 
 	enum esd_check_status_mode status_mode;
 	struct dsi_panel_cmd_set status_cmd;
@@ -179,6 +180,7 @@ struct dsi_panel {
 	bool ulps_enabled;
 	bool ulps_suspend_enabled;
 	bool allow_phy_power_off;
+	atomic_t esd_recovery_pending;
 
 	bool panel_initialized;
 	bool te_using_watchdog_timer;

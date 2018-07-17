@@ -997,7 +997,6 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 	struct ffs_epfile *epfile = file->private_data;
 	struct usb_request *req;
 	struct ffs_ep *ep;
-	struct ffs_data *ffs = epfile->ffs;
 	char *data = NULL;
 	ssize_t ret, data_len = -EINVAL;
 	int halt;
@@ -1096,7 +1095,7 @@ static ssize_t ffs_epfile_io(struct file *file, struct ffs_io_data *io_data)
 			data_len = usb_ep_align_maybe(gadget, ep->ep, data_len);
 		spin_unlock_irq(&epfile->ffs->eps_lock);
 
-		extra_buf_alloc = ffs->gadget->extra_buf_alloc;
+		extra_buf_alloc = gadget->extra_buf_alloc;
 		if (!io_data->read)
 			data = kmalloc(data_len + extra_buf_alloc,
 					GFP_KERNEL);
@@ -3734,7 +3733,7 @@ static int ffs_func_setup(struct usb_function *f,
 
 	ffs_log("exit");
 
-	return 0;
+	return USB_GADGET_DELAYED_STATUS;
 }
 
 static bool ffs_func_req_match(struct usb_function *f,

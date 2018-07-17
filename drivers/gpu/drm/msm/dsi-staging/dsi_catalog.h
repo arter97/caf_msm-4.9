@@ -108,7 +108,8 @@ void dsi_phy_hw_v3_0_toggle_resync_fifo(struct dsi_phy_hw *phy);
 
 /* DSI controller common ops */
 u32 dsi_ctrl_hw_cmn_get_interrupt_status(struct dsi_ctrl_hw *ctrl);
-void dsi_ctrl_hw_cmn_debug_bus(struct dsi_ctrl_hw *ctrl);
+void dsi_ctrl_hw_cmn_debug_bus(struct dsi_ctrl_hw *ctrl, u32 *entries,
+			       u32 size);
 void dsi_ctrl_hw_cmn_clear_interrupt_status(struct dsi_ctrl_hw *ctrl, u32 ints);
 void dsi_ctrl_hw_cmn_enable_status_interrupts(struct dsi_ctrl_hw *ctrl,
 					     u32 ints);
@@ -222,5 +223,7 @@ void dsi_ctrl_hw_kickoff_non_embedded_mode(struct dsi_ctrl_hw *ctrl,
 
 /* Definitions specific to 2.2 DSI controller hardware */
 bool dsi_ctrl_hw_22_get_cont_splash_status(struct dsi_ctrl_hw *ctrl);
+
+void dsi_ctrl_hw_cmn_set_continuous_clk(struct dsi_ctrl_hw *ctrl, bool enable);
 
 #endif /* _DSI_CATALOG_H_ */

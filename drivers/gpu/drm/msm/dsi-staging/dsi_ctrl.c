@@ -243,6 +243,8 @@ static int dsi_ctrl_debugfs_init(struct dsi_ctrl *dsi_ctrl,
 						dsi_ctrl->cell_index);
 	sde_dbg_reg_register_base(dbg_name, dsi_ctrl->hw.base,
 				msm_iomap_size(dsi_ctrl->pdev, "dsi_ctrl"));
+	sde_dbg_reg_register_dump_range(dbg_name, dbg_name, 0,
+				msm_iomap_size(dsi_ctrl->pdev, "dsi_ctrl"), 0);
 error_remove_dir:
 	debugfs_remove(dir);
 error:
@@ -271,6 +273,8 @@ static int dsi_ctrl_check_state(struct dsi_ctrl *dsi_ctrl,
 {
 	int rc = 0;
 	struct dsi_ctrl_state_info *state = &dsi_ctrl->current_state;
+
+	SDE_EVT32(dsi_ctrl->cell_index, op);
 
 	switch (op) {
 	case DSI_CTRL_OP_POWER_STATE_CHANGE:
@@ -461,7 +465,7 @@ static int dsi_ctrl_init_regmap(struct platform_device *pdev,
 	}
 
 	ctrl->hw.base = ptr;
-	pr_debug("[%s] map dsi_ctrl registers to %p\n", ctrl->name,
+	pr_debug("[%s] map dsi_ctrl registers to %pK\n", ctrl->name,
 		 ctrl->hw.base);
 
 	switch (ctrl->version) {
@@ -1235,9 +1239,10 @@ kickoff:
 			}
 		}
 
-		if (dsi_ctrl->hw.ops.mask_error_intr)
+		if (dsi_ctrl->hw.ops.mask_error_intr &&
+		    !dsi_ctrl->esd_check_underway)
 			dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
-					BIT(DSI_FIFO_OVERFLOW), false);
+						BIT(DSI_FIFO_OVERFLOW), false);
 		dsi_ctrl->hw.ops.reset_cmd_fifo(&dsi_ctrl->hw);
 
 		/*
@@ -1268,6 +1273,7 @@ static int dsi_set_max_return_size(struct dsi_ctrl *dsi_ctrl,
 		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
 		.tx_len = 2,
 		.tx_buf = tx,
+		.flags = rx_msg->flags,
 	};
 
 	rc = dsi_message_tx(dsi_ctrl, &msg, flags);
@@ -1338,10 +1344,20 @@ static int dsi_message_rx(struct dsi_ctrl *dsi_ctrl,
 	u32 current_read_len = 0, total_bytes_read = 0;
 	bool short_resp = false;
 	bool read_done = false;
-	u32 dlen, diff, rlen = msg->rx_len;
+	u32 dlen, diff, rlen;
 	unsigned char *buff;
 	char cmd;
+	struct dsi_cmd_desc *of_cmd;
 
+	if (!msg) {
+		pr_err("Invalid msg\n");
+		rc = -EINVAL;
+		goto error;
+	}
+
+	of_cmd = container_of(msg, struct dsi_cmd_desc, msg);
+
+	rlen = msg->rx_len;
 	if (msg->rx_len <= 2) {
 		short_resp = true;
 		rd_pkt_size = msg->rx_len;
@@ -1783,15 +1799,19 @@ static struct platform_driver dsi_ctrl_driver = {
 	.driver = {
 		.name = "drm_dsi_ctrl",
 		.of_match_table = msm_dsi_of_match,
+		.suppress_bind_attrs = true,
 	},
 };
 
 #if defined(CONFIG_DEBUG_FS)
 
-void dsi_ctrl_debug_dump(void)
+void dsi_ctrl_debug_dump(u32 *entries, u32 size)
 {
 	struct list_head *pos, *tmp;
 	struct dsi_ctrl *ctrl = NULL;
+
+	if (!entries || !size)
+		return;
 
 	mutex_lock(&dsi_ctrl_list_lock);
 	list_for_each_safe(pos, tmp, &dsi_ctrl_list) {
@@ -1800,7 +1820,7 @@ void dsi_ctrl_debug_dump(void)
 		n = list_entry(pos, struct dsi_ctrl_list_item, list);
 		ctrl = n->ctrl;
 		pr_err("dsi ctrl:%d\n", ctrl->cell_index);
-		ctrl->hw.ops.debug_bus(&ctrl->hw);
+		ctrl->hw.ops.debug_bus(&ctrl->hw, entries, size);
 	}
 	mutex_unlock(&dsi_ctrl_list_lock);
 }
@@ -2584,6 +2604,16 @@ void dsi_ctrl_isr_configure(struct dsi_ctrl *dsi_ctrl, bool enable)
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 
+void dsi_ctrl_set_continuous_clk(struct dsi_ctrl *dsi_ctrl, bool enable)
+{
+	if (!dsi_ctrl)
+		return;
+
+	mutex_lock(&dsi_ctrl->ctrl_lock);
+	dsi_ctrl->hw.ops.set_continuous_clk(&dsi_ctrl->hw, enable);
+	mutex_unlock(&dsi_ctrl->ctrl_lock);
+}
+
 int dsi_ctrl_soft_reset(struct dsi_ctrl *dsi_ctrl)
 {
 	if (!dsi_ctrl)
@@ -2869,7 +2899,8 @@ int dsi_ctrl_cmd_tx_trigger(struct dsi_ctrl *dsi_ctrl, u32 flags)
 						dsi_ctrl->cell_index);
 			}
 		}
-		if (dsi_ctrl->hw.ops.mask_error_intr)
+		if (dsi_ctrl->hw.ops.mask_error_intr &&
+				!dsi_ctrl->esd_check_underway)
 			dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
 					BIT(DSI_FIFO_OVERFLOW), false);
 
@@ -3367,7 +3398,8 @@ u32 dsi_ctrl_collect_misr(struct dsi_ctrl *dsi_ctrl)
 	return misr;
 }
 
-void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl)
+void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl, u32 idx,
+		bool mask_enable)
 {
 	if (!dsi_ctrl || !dsi_ctrl->hw.ops.error_intr_ctrl
 			|| !dsi_ctrl->hw.ops.clear_error_status) {
@@ -3380,9 +3412,23 @@ void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl)
 	 * register
 	 */
 	mutex_lock(&dsi_ctrl->ctrl_lock);
-	dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, false);
-	dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
+	if (idx & BIT(DSI_ERR_INTR_ALL)) {
+		/*
+		 * The behavior of mask_enable is different in ctrl register
+		 * and mask register and hence mask_enable is manipulated for
+		 * selective error interrupt masking vs total error interrupt
+		 * masking.
+		 */
+
+		dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, !mask_enable);
+		dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
 					DSI_ERROR_INTERRUPT_COUNT);
+	} else {
+		dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw, idx,
+								mask_enable);
+		dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
+					DSI_ERROR_INTERRUPT_COUNT);
+	}
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 

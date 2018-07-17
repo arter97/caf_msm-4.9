@@ -29,7 +29,6 @@
 #include "include/msm_csiphy_5_0_hwreg.h"
 #include "include/msm_csiphy_5_0_1_hwreg.h"
 #include "include/msm_csiphy_10_0_0_hwreg.h"
-
 #include "cam_hw_ops.h"
 
 #define DBG_CSIPHY 0
@@ -59,6 +58,7 @@
 #define MBPS                                      1000000
 #define SNPS_INTERPHY_OFFSET                      0x800
 #define SET_THE_BIT(x)                            (0x1 << x)
+#define SNPS_MAX_DATA_RATE_PER_LANE               2500000000ULL
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
@@ -186,7 +186,15 @@ static int msm_csiphy_snps_2_lane_config(
 	void __iomem *csiphybase;
 
 	csiphybase = csiphy_dev->base;
+
+	if (csiphy_params->data_rate >
+		SNPS_MAX_DATA_RATE_PER_LANE * num_lanes) {
+		pr_err("unsupported data rate\n");
+		return -EINVAL;
+	}
+
 	local_data_rate = csiphy_params->data_rate;
+
 	if (mode == TWO_LANE_PHY_A)
 		offset = 0x0;
 	else if (mode == TWO_LANE_PHY_B)
@@ -209,14 +217,7 @@ static int msm_csiphy_snps_2_lane_config(
 		diff = diff_i;
 	}
 
-	if (i == (sizeof(snps_v100_freq_values)/
-		sizeof(snps_v100_freq_values[0]))) {
-		if (local_data_rate >
-			snps_v100_freq_values[--i].default_bit_rate) {
-			pr_err("unsupported data rate\n");
-			return -EINVAL;
-		}
-	}
+	csiphy_dev->snps_programmed_data_rate = csiphy_params->data_rate;
 
 	if (mode == TWO_LANE_PHY_A) {
 		msm_camera_io_w(csiphy_dev->ctrl_reg->csiphy_snps_reg.
@@ -322,8 +323,11 @@ static int msm_csiphy_snps_lane_config(
 		mode = AGGREGATE_MODE;
 		num_lanes = 4;
 		if (csiphy_dev->snps_state != NOT_CONFIGURED) {
-			pr_err("%s: invalid request\n", __func__);
-			return -EINVAL;
+			if (csiphy_dev->snps_programmed_data_rate !=
+				csiphy_params->data_rate)
+				pr_err("reconfiguring snps phy");
+			else
+				return 0;
 		}
 		csiphy_dev->snps_state = CONFIGURED_AGGREGATE_MODE;
 		clk_mux_reg &= ~0xff;
@@ -332,34 +336,38 @@ static int msm_csiphy_snps_lane_config(
 	} else if (lane_mask == LANE_MASK_PHY_A) { /* PHY A */
 		/* 2 lane config */
 		num_lanes = 2;
+		mode = TWO_LANE_PHY_A;
 		if (csiphy_dev->snps_state == NOT_CONFIGURED) {
-			mode = TWO_LANE_PHY_A;
 			csiphy_dev->snps_state = CONFIGURED_TWO_LANE_PHY_A;
 		} else if (csiphy_dev->snps_state ==
 			CONFIGURED_TWO_LANE_PHY_B) {
 			/* 2 lane + 2 lane config */
-			mode = TWO_LANE_PHY_A;
 			csiphy_dev->snps_state = CONFIGURED_COMBO_MODE;
 		} else {
-			pr_err("%s: invalid request\n", __func__);
-			return -EINVAL;
+			if (csiphy_dev->snps_programmed_data_rate !=
+				csiphy_params->data_rate)
+				pr_err("reconfiguring snps phy");
+			else
+				return 0;
 		}
 		clk_mux_reg &= ~0xf;
 		clk_mux_reg |= (uint32_t)csiphy_params->csid_core;
 	} else if (lane_mask == LANE_MASK_PHY_B) { /* PHY B */
 		/* 2 lane config */
 		num_lanes = 2;
+		mode = TWO_LANE_PHY_B;
 		if (csiphy_dev->snps_state == NOT_CONFIGURED) {
-			mode = TWO_LANE_PHY_B;
 			csiphy_dev->snps_state = CONFIGURED_TWO_LANE_PHY_B;
 		} else if (csiphy_dev->snps_state ==
 			CONFIGURED_TWO_LANE_PHY_A) {
 			/* 2 lane + 2 lane config */
-			mode = TWO_LANE_PHY_B;
 			csiphy_dev->snps_state = CONFIGURED_COMBO_MODE;
 		} else {
-			pr_err("%s: invalid request\n", __func__);
-			return -EINVAL;
+			if (csiphy_dev->snps_programmed_data_rate !=
+				csiphy_params->data_rate)
+				pr_err("reconfiguring snps phy");
+			else
+				return 0;
 		}
 		clk_mux_reg &= ~0xf0;
 		clk_mux_reg |= csiphy_params->csid_core << 4;
@@ -1239,9 +1247,7 @@ static int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 		return rc;
 	}
 
-	clk_rate = (csiphy_params->csiphy_clk > 0)
-			? csiphy_params->csiphy_clk :
-			csiphy_dev->csiphy_max_clk;
+	clk_rate = csiphy_dev->csiphy_max_clk;
 	clk_rate = msm_camera_clk_set_rate(&csiphy_dev->pdev->dev,
 		csiphy_dev->csiphy_clk[csiphy_dev->csiphy_clk_index],
 		clk_rate);
@@ -1660,6 +1666,7 @@ static int msm_csiphy_init(struct csiphy_device *csiphy_dev)
 		csiphy_dev->hw_version);
 	csiphy_dev->csiphy_state = CSIPHY_POWER_UP;
 	csiphy_dev->snps_state = NOT_CONFIGURED;
+	csiphy_dev->snps_programmed_data_rate = 0;
 	return 0;
 
 csiphy_enable_clk_fail:
@@ -1699,10 +1706,8 @@ static int msm_csiphy_init(struct csiphy_device *csiphy_dev)
 
 	CDBG("%s:%d called\n", __func__, __LINE__);
 	if (csiphy_dev->csiphy_state == CSIPHY_POWER_UP) {
-		pr_err("%s: csiphy invalid state %d\n", __func__,
+		pr_err("%s: csiphy current state %d\n", __func__,
 			csiphy_dev->csiphy_state);
-		rc = -EINVAL;
-		return rc;
 	}
 
 	CDBG("%s:%d called\n", __func__, __LINE__);
@@ -1766,6 +1771,7 @@ static int msm_csiphy_init(struct csiphy_device *csiphy_dev)
 		csiphy_dev->hw_version);
 	csiphy_dev->csiphy_state = CSIPHY_POWER_UP;
 	csiphy_dev->snps_state = NOT_CONFIGURED;
+	csiphy_dev->snps_programmed_data_rate = 0;
 	return 0;
 
 csiphy_enable_clk_fail:
@@ -1915,6 +1921,7 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 
 	csiphy_dev->csiphy_state = CSIPHY_POWER_DOWN;
 	csiphy_dev->snps_state = NOT_CONFIGURED;
+	csiphy_dev->snps_programmed_data_rate = 0;
 
 	if (cam_config_ahb_clk(NULL, 0, CAM_AHB_CLIENT_CSIPHY,
 		 CAM_AHB_SUSPEND_VOTE) < 0)
@@ -2047,6 +2054,7 @@ static int msm_csiphy_release(struct csiphy_device *csiphy_dev, void *arg)
 
 	csiphy_dev->csiphy_state = CSIPHY_POWER_DOWN;
 	csiphy_dev->snps_state = NOT_CONFIGURED;
+	csiphy_dev->snps_programmed_data_rate = 0;
 
 	if (cam_config_ahb_clk(NULL, 0, CAM_AHB_CLIENT_CSIPHY,
 		 CAM_AHB_SUSPEND_VOTE) < 0)
@@ -2079,7 +2087,10 @@ static int32_t msm_csiphy_cmd(struct csiphy_device *csiphy_dev, void *arg)
 			rc = -EFAULT;
 			break;
 		}
-		csiphy_dev->csiphy_sof_debug = SOF_DEBUG_DISABLE;
+		if (csiphy_dev->csiphy_sof_debug == SOF_DEBUG_ENABLE) {
+			csiphy_dev->csiphy_sof_debug = SOF_DEBUG_DISABLE;
+			rc = msm_camera_enable_irq(csiphy_dev->irq, false);
+		}
 		rc = msm_csiphy_lane_config(csiphy_dev, &csiphy_params);
 		break;
 	case CSIPHY_RELEASE:

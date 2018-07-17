@@ -5710,6 +5710,9 @@ static int group_idle_state(struct energy_env *eenv, int cpu_idx)
 	for_each_cpu(i, sched_group_cpus(sg))
 		state = min(state, idle_get_state_idx(cpu_rq(i)));
 
+	if (unlikely(state == INT_MAX))
+		return -EINVAL;
+
 	/* Take non-cpuidle idling into account (active idle/arch_cpu_idle()) */
 	state++;
 
@@ -5776,7 +5779,7 @@ end:
  * The required scaling will be performed just one time, by the calling
  * functions, once we accumulated the contributons for all the SGs.
  */
-static void calc_sg_energy(struct energy_env *eenv)
+static int calc_sg_energy(struct energy_env *eenv)
 {
 	struct sched_group *sg = eenv->sg;
 	int busy_energy, idle_energy;
@@ -5805,6 +5808,11 @@ static void calc_sg_energy(struct energy_env *eenv)
 
 		/* Compute IDLE energy */
 		idle_idx = group_idle_state(eenv, cpu_idx);
+		if (unlikely(idle_idx < 0))
+			return idle_idx;
+		if (idle_idx > sg->sge->nr_idle_states - 1)
+			idle_idx = sg->sge->nr_idle_states - 1;
+
 		idle_power = sg->sge->idle_states[idle_idx].power;
 
 		idle_energy   = SCHED_CAPACITY_SCALE - sg_util;
@@ -5813,6 +5821,7 @@ static void calc_sg_energy(struct energy_env *eenv)
 		total_energy = busy_energy + idle_energy;
 		eenv->cpu[cpu_idx].energy += total_energy;
 	}
+	return 0;
 }
 
 /*
@@ -5874,7 +5883,8 @@ static int compute_energy(struct energy_env *eenv)
 				 * CPUs in the current visited SG.
 				 */
 				eenv->sg = sg;
-				calc_sg_energy(eenv);
+				if (calc_sg_energy(eenv))
+					return -EINVAL;
 
 				/* remove CPUs we have just visited */
 				if (!sd->child) {
@@ -6261,7 +6271,7 @@ boosted_task_util(struct task_struct *p)
 
 static unsigned long capacity_spare_wake(int cpu, struct task_struct *p)
 {
-	return capacity_orig_of(cpu) - cpu_util_wake(cpu, p);
+	return max_t(long, capacity_of(cpu) - cpu_util_wake(cpu, p), 0);
 }
 
 /*
@@ -6919,6 +6929,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	int target_cpu = -1;
 	int cpu, i;
 	unsigned int active_cpus_count = 0;
+	int isolated_candidate = -1;
 
 	*backup_cpu = -1;
 
@@ -6964,13 +6975,16 @@ retry:
 			unsigned long wake_util, new_util, min_capped_util;
 
 			cpumask_clear_cpu(i, &search_cpus);
+
+			if (!cpu_online(i) || cpu_isolated(i))
+				continue;
+
+			isolated_candidate = i;
+
 			if (avoid_prev_cpu && i == task_cpu(p))
 				continue;
 
-			if (!cpu_online(i) || cpu_isolated(i) || is_reserved(i))
-				continue;
-
-			if (walt_cpu_high_irqload(i))
+			if (walt_cpu_high_irqload(i) || is_reserved(i))
 				continue;
 
 			trace_sched_cpu_util(i);
@@ -7255,6 +7269,12 @@ retry:
 		*backup_cpu = prefer_idle
 		? best_active_cpu
 		: best_idle_cpu;
+
+	if (target_cpu == -1 && cpu_isolated(task_cpu(p)) &&
+			isolated_candidate != -1) {
+		target_cpu = isolated_candidate;
+		fbt_env->avoid_prev_cpu = true;
+	}
 
 	trace_sched_find_best_target(p, prefer_idle, min_util, cpu,
 				     best_idle_cpu, best_active_cpu,
@@ -9689,8 +9709,11 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	if (busiest->group_type == group_imbalanced)
 		goto force_balance;
 
-	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
-	if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
+	/*
+	 * When dst_cpu is idle, prevent SMP nice and/or asymmetric group
+	 * capacities from resulting in underutilization due to avg_load.
+	 */
+	if (env->idle != CPU_NOT_IDLE && group_has_capacity(env, local) &&
 	    busiest->group_no_capacity)
 		goto force_balance;
 
@@ -11800,7 +11823,7 @@ static void walt_check_for_rotation(struct rq *src_rq)
 	if (is_max_capacity_cpu(src_cpu))
 		return;
 
-	wc = ktime_get_ns();
+	wc = sched_ktime_clock();
 	for_each_possible_cpu(i) {
 		struct rq *rq = cpu_rq(i);
 
