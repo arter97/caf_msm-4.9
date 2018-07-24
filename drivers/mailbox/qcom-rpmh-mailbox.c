@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -694,9 +694,10 @@ static int find_match(struct tcs_mbox *tcs, struct tcs_cmd *cmd, int len)
 		}
 		/* sanity check to ensure the seq is same */
 		for (j = 1; j < len; j++) {
-			WARN((tcs->cmd_addr[i + j] != cmd[j].addr),
-				"Message does not match previous sequence.\n");
+			if (tcs->cmd_addr[i + j] != cmd[j].addr) {
+				pr_debug("Message does not match previous sequence.\n");
 				return -EINVAL;
+			}
 		}
 		found = true;
 		break;
@@ -724,12 +725,12 @@ static int find_slots(struct tcs_mbox *tcs, struct tcs_mbox_msg *msg)
 	do {
 		slot = bitmap_find_next_zero_area(tcs->slots, MAX_TCS_SLOTS,
 						n, msg->num_payload, 0);
-		if (slot == MAX_TCS_SLOTS)
+		if (slot >= MAX_TCS_SLOTS)
 			break;
 		n += tcs->ncpt;
 	} while (slot + msg->num_payload - 1 >= n);
 
-	return (slot != MAX_TCS_SLOTS) ? slot : -ENOMEM;
+	return (slot < MAX_TCS_SLOTS) ? slot : -ENOMEM;
 }
 
 static int tcs_mbox_write(struct mbox_chan *chan, struct tcs_mbox_msg *msg,
