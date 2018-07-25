@@ -16,6 +16,7 @@
 #include "sdm845-v2.dtsi"
 #include "sdm845-sde-display.dtsi"
 #include "sdm845-mtp.dtsi"
+#include "sdm845-audio-overlay.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM sdm845 V2 MTP";
