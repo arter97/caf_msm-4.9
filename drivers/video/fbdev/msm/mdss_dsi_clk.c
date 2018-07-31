@@ -160,6 +160,7 @@ static int dsi_link_hs_clk_set_rate(
 	if (ctrl->panel_data.panel_info.cont_splash_enabled)
 		return 0;
 
+	pr_debug("set hs byte clock with %u\n", link_hs_clks->byte_clk_rate);
 	rc = clk_set_rate(link_hs_clks->byte_clk, link_hs_clks->byte_clk_rate);
 	if (rc) {
 		pr_err("clk_set_rate failed for byte_clk rc = %d\n", rc);
