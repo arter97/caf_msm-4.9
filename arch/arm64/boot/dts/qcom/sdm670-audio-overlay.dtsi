@@ -14,6 +14,7 @@
 #include "sdm670-wsa881x.dtsi"
 #include "sdm670-lpi.dtsi"
 #include <dt-bindings/clock/qcom,audio-ext-clk.h>
+#include <dt-bindings/clock/qcom,rpmh.h>
 
 &tavil_snd {
 	qcom,msm-mi2s-master = <1>, <1>, <1>, <1>, <1>;

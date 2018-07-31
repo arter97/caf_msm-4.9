@@ -770,13 +770,6 @@ static int cam_jpeg_mgr_flush(void *hw_mgr_priv,
 			} else {
 				CAM_ERR(CAM_JPEG, "process_cmd null ");
 			}
-			rc = hw_mgr->devices[dev_type][0]->hw_ops.process_cmd(
-				hw_mgr->devices[dev_type][0]->hw_priv,
-				CAM_JPEG_CMD_SET_IRQ_CB,
-				&irq_cb, sizeof(irq_cb));
-			if (rc)
-				CAM_ERR(CAM_JPEG,
-					"CMD_SET_IRQ_CB failed %d", rc);
 
 			if (hw_mgr->devices[dev_type][0]->hw_ops.stop) {
 				rc = hw_mgr->devices[dev_type][0]->hw_ops.stop(
@@ -1178,7 +1171,7 @@ static int cam_jpeg_setup_workqs(void)
 		"jpeg_command_queue",
 		CAM_JPEG_WORKQ_NUM_TASK,
 		&g_jpeg_hw_mgr.work_process_frame,
-		CRM_WORKQ_USAGE_NON_IRQ);
+		CRM_WORKQ_USAGE_NON_IRQ, 0);
 	if (rc) {
 		CAM_ERR(CAM_JPEG, "unable to create a worker %d", rc);
 		goto work_process_frame_failed;
@@ -1188,7 +1181,7 @@ static int cam_jpeg_setup_workqs(void)
 		"jpeg_message_queue",
 		CAM_JPEG_WORKQ_NUM_TASK,
 		&g_jpeg_hw_mgr.work_process_irq_cb,
-		CRM_WORKQ_USAGE_IRQ);
+		CRM_WORKQ_USAGE_IRQ, 0);
 	if (rc) {
 		CAM_ERR(CAM_JPEG, "unable to create a worker %d", rc);
 		goto work_process_irq_cb_failed;
