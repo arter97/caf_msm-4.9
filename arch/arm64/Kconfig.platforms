@@ -145,6 +145,12 @@ config ARCH_SDM670
 	  This enables support for the SDM670 chipset. If you do not
 	  wish to build a kernel that runs on this chipset, say 'N' here.
 
+config ARCH_SDM670_VM
+	bool "Enable Support for Qualcomm Technologies Inc. SDM670 VM"
+	help
+	  This enables support for VM on sdm670 chipset. If you do not
+	  wish to build a kernel that runs on this chipset, say 'N' here.
+
 config ARCH_MSM8953
 	bool "Enable Support for Qualcomm Technologies Inc. MSM8953"
 	depends on ARCH_QCOM
