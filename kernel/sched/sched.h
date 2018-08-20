@@ -1107,6 +1107,12 @@ static inline void sched_ttwu_pending(void) { }
 #include "stats.h"
 #include "auto_group.h"
 
+#define NO_BOOST 0
+#define FULL_THROTTLE_BOOST 1
+#define CONSERVATIVE_BOOST 2
+#define RESTRAINED_BOOST 3
+
+
 enum sched_boost_policy {
 	SCHED_BOOST_NONE,
 	SCHED_BOOST_ON_BIG,
@@ -2422,11 +2428,6 @@ extern void set_preferred_cluster(struct related_thread_group *grp);
 extern void add_new_task_to_grp(struct task_struct *new);
 extern unsigned int update_freq_aggregate_threshold(unsigned int threshold);
 
-#define NO_BOOST 0
-#define FULL_THROTTLE_BOOST 1
-#define CONSERVATIVE_BOOST 2
-#define RESTRAINED_BOOST 3
-
 static inline int cpu_capacity(int cpu)
 {
 	return cpu_rq(cpu)->cluster->capacity;
@@ -2827,7 +2828,6 @@ static inline int alloc_related_thread_groups(void) { return 0; }
 #define trace_sched_cpu_load_wakeup(...)
 
 static inline void walt_fixup_cum_window_demand(struct rq *rq, s64 delta) { }
-
 static inline void update_cpu_cluster_capacity(const cpumask_t *cpus) { }
 
 #ifdef CONFIG_SMP
