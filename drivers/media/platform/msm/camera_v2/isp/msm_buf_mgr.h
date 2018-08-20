@@ -197,7 +197,7 @@ struct msm_isp_buf_mgr {
 
 
 	/*Add secure mode*/
-	int secure_enable;
+	enum smmu_attach_mode secure_enable;
 
 	int attach_ref_cnt;
 	enum msm_isp_buf_mgr_state attach_state;
