@@ -2829,7 +2829,11 @@ static inline int alloc_related_thread_groups(void) { return 0; }
 
 static inline void walt_fixup_cum_window_demand(struct rq *rq, s64 delta) { }
 static inline void update_cpu_cluster_capacity(const cpumask_t *cpus) { }
-
+static inline bool
+task_in_cum_window_demand(struct rq *rq, struct task_struct *p)
+{
+	return 0;
+}
 #ifdef CONFIG_SMP
 static inline unsigned long thermal_cap(int cpu)
 {
