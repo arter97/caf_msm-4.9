@@ -4851,9 +4851,6 @@ static inline void hrtick_update(struct rq *rq)
 #ifdef CONFIG_SMP
 static unsigned long capacity_orig_of(int cpu);
 static unsigned long cpu_util(int cpu);
-unsigned long boosted_cpu_util(int cpu);
-#else
-#define boosted_cpu_util(cpu) cpu_util_freq(cpu)
 #endif
 
 #ifdef CONFIG_SMP
@@ -4865,7 +4862,7 @@ static void update_capacity_of(int cpu)
 		return;
 
 	/* Convert scale-invariant capacity to cpu. */
-	req_cap = boosted_cpu_util(cpu);
+	req_cap = boosted_cpu_util(cpu, NULL);
 	req_cap = req_cap * SCHED_CAPACITY_SCALE / capacity_orig_of(cpu);
 	set_cfs_cpu_capacity(cpu, true, req_cap);
 }
@@ -6324,9 +6321,9 @@ schedtune_task_margin(struct task_struct *task)
 #endif /* CONFIG_SCHED_TUNE */
 
 unsigned long
-boosted_cpu_util(int cpu)
+boosted_cpu_util(int cpu, struct sched_walt_cpu_load *walt_load)
 {
-	unsigned long util = cpu_util_freq(cpu, NULL);
+	unsigned long util = cpu_util_freq(cpu, walt_load);
 	long margin = schedtune_cpu_margin(util, cpu);
 
 	trace_sched_boost_cpu(cpu, util, margin);
@@ -6885,6 +6882,25 @@ bias_to_prev_cpu(struct task_struct *p, struct cpumask *rtg_target)
 	return true;
 }
 
+#ifdef CONFIG_SCHED_WALT
+static inline struct cpumask *find_rtg_target(struct task_struct *p)
+{
+	struct related_thread_group *grp;
+	struct cpumask *rtg_target = NULL;
+
+	grp = task_related_thread_group(p);
+	if (grp && grp->preferred_cluster)
+		rtg_target = &grp->preferred_cluster->cpus;
+
+	return rtg_target;
+}
+#else
+static inline struct cpumask *find_rtg_target(struct task_struct *p)
+{
+	return NULL;
+}
+#endif
+
 unsigned int sched_smp_overlap_capacity = SCHED_CAPACITY_SCALE;
 
 static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
@@ -6913,7 +6929,6 @@ static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
 	bool need_idle;
 	enum sched_boost_policy placement_boost = task_sched_boost(p) ?
 				sched_boost_policy() : SCHED_BOOST_NONE;
-	struct related_thread_group *grp;
 	cpumask_t search_cpus;
 	int prev_cpu = task_cpu(p);
 	int start_cpu = walt_start_cpu(prev_cpu);
@@ -6935,9 +6950,8 @@ static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
 	need_idle = wake_to_idle(p) || schedtune_prefer_idle(p);
 	if (need_idle)
 		sync = 0;
-	grp = task_related_thread_group(p);
-	if (grp && grp->preferred_cluster)
-		rtg_target = &grp->preferred_cluster->cpus;
+
+	rtg_target = find_rtg_target(p);
 
 	if (sync && bias_to_waker_cpu(p, cpu, rtg_target)) {
 		trace_sched_task_util_bias_to_waker(p, prev_cpu,
