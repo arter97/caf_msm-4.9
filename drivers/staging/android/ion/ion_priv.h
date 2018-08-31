@@ -2,7 +2,7 @@
  * drivers/staging/android/ion/ion_priv.h
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017, 2022, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -548,5 +548,8 @@ struct ion_handle *ion_handle_get_by_id(struct ion_client *client,
 int ion_handle_put(struct ion_handle *handle);
 
 void show_ion_usage(struct ion_device *dev);
+
+int ion_share_dma_buf_fd_nolock(struct ion_client *client,
+		struct ion_handle *handle);
 
 #endif /* _ION_PRIV_H */
