@@ -549,4 +549,7 @@ int ion_handle_put(struct ion_handle *handle);
 
 void show_ion_usage(struct ion_device *dev);
 
+int ion_share_dma_buf_fd_nolock(struct ion_client *client,
+		struct ion_handle *handle);
+
 #endif /* _ION_PRIV_H */
