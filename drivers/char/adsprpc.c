@@ -296,6 +296,7 @@ struct fastrpc_apps {
 	spinlock_t hlock;
 	struct ion_client *client;
 	struct device *dev;
+	struct device *mdev;
 	unsigned int latency;
 	bool glink;
 	bool legacy;
@@ -2582,11 +2583,11 @@ static int fastrpc_session_alloc_locked(struct fastrpc_channel_ctx *chan,
 			goto bail;
 		chan->session[idx].smmu.faults = 0;
 	} else {
-		VERIFY(err, me->dev != NULL);
+		VERIFY(err, me->mdev != NULL);
 		if (err)
 			goto bail;
-		chan->session[0].dev = me->dev;
-		chan->session[0].smmu.dev = me->dev;
+		chan->session[0].dev = me->mdev;
+		chan->session[0].smmu.dev = me->mdev;
 	}
 
 	*session = &chan->session[idx];
@@ -3517,6 +3518,7 @@ static const struct of_device_id fastrpc_match_table[] = {
 	{ .compatible = "qcom,msm-fastrpc-legacy-compute", },
 	{ .compatible = "qcom,msm-fastrpc-legacy-compute-cb", },
 	{ .compatible = "qcom,msm-adsprpc-mem-region", },
+	{ .compatible = "qcom,msm-mdsprpc-mem-region", },
 	{}
 };
 
@@ -3776,6 +3778,48 @@ static int fastrpc_probe(struct platform_device *pdev)
 
 			VERIFY(err, !hyp_assign_phys(range.addr, range.size,
 					srcVM, 1, destVM, destVMperm, 4));
+			if (err)
+				goto bail;
+			me->range.addr = range.addr;
+			me->range.size = range.size;
+		}
+		return 0;
+	}
+
+	if (of_device_is_compatible(dev->of_node,
+					"qcom,msm-mdsprpc-mem-region")) {
+		me->mdev = dev;
+		range.addr = 0;
+		range.size = 0;
+		ion_node = of_find_compatible_node(NULL, NULL, "qcom,msm-ion");
+		if (ion_node) {
+			for_each_available_child_of_node(ion_node, node) {
+				if (of_property_read_u32(node, "reg", &val))
+					continue;
+				if (val != ION_ADSP_HEAP_ID)
+					continue;
+				ion_pdev = of_find_device_by_node(node);
+				if (!ion_pdev)
+					break;
+				cma = dev_get_cma_area(&ion_pdev->dev);
+				if (cma) {
+					range.addr = cma_get_base(cma);
+					range.size = (size_t)cma_get_size(cma);
+				}
+				break;
+			}
+		}
+		if (range.addr && !of_property_read_bool(dev->of_node,
+							"restrict-access")) {
+			int srcVM[1] = {VMID_HLOS};
+			int destVM[3] = {VMID_HLOS, VMID_MSS_MSA, VMID_ADSP_Q6};
+			int destVMperm[3] = {PERM_READ | PERM_WRITE | PERM_EXEC,
+					PERM_READ | PERM_WRITE | PERM_EXEC,
+					PERM_READ | PERM_WRITE | PERM_EXEC,
+						};
+
+			VERIFY(err, !hyp_assign_phys(range.addr, range.size,
+				srcVM, 1, destVM, destVMperm, 3));
 			if (err)
 				goto bail;
 			me->range.addr = range.addr;
