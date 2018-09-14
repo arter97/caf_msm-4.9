@@ -36,6 +36,7 @@
 #define CAM_OIS        (1 << 20)
 #define CAM_RES        (1 << 21)
 
+#define CAM_HYP        (1 << 26)
 #define STR_BUFFER_MAX_LENGTH  1024
 
 /*
