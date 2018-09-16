@@ -26,4 +26,13 @@
 		#interrupt-cells = <3>;
 		interrupt-parent = <&intc>;
 	};
+
+	vm_wdt: qcom,vm-wdt@17980000{
+		compatible = "qcom,vm-wdt";
+		reg = <0x0 0x17980000 0x0 0x1000>;
+		reg-names = "wdt-base";
+		interrupts = <0 0 0>, <0 1 0>;
+		qcom,bark-time = <11000>;
+		qcom,pet-time = <9360>;
+	};
 };
