@@ -28,6 +28,8 @@
 #include <media/videobuf2-core.h>
 #include <media/msmb_generic_buf_mgr.h>
 
+#include <soc/qcom/secure_buffer.h>
+
 #include "msm.h"
 #include "msm_buf_mgr.h"
 #include "cam_smmu_api.h"
@@ -1187,12 +1189,32 @@ int msm_isp_smmu_attach(struct msm_isp_buf_mgr *buf_mgr,
 		 * non-secure mode
 		 */
 		if (buf_mgr->attach_ref_cnt == 0) {
-			if (cmd->security_mode == SECURE_MODE)
+			if (cmd->security_mode == SECURE_MODE) {
 				rc = cam_smmu_ops(buf_mgr->iommu_hdl,
 					CAM_SMMU_ATTACH_SEC_VFE_NS_STATS);
-			else
+			} else {
+				/*
+				 * Secure the CB in Slave side mode where
+				 * S1 mappings are there
+				 */
+				if (cmd->security_mode == SECURE_SLAVE_MODE) {
+					int secure_vmid = VMID_CP_CAMERA;
+
+					rc = cam_smmu_set_attr(
+						buf_mgr->iommu_hdl, 0,
+						&secure_vmid);
+					if (rc) {
+						pr_err("%s: Failed to set domain attribute\n",
+							__func__);
+						goto err1;
+					}
+					/*
+					 * Fall through to non-secure flow
+					 */
+				}
 				rc = cam_smmu_ops(buf_mgr->iommu_hdl,
 					CAM_SMMU_ATTACH);
+			}
 			if (rc < 0) {
 				pr_err("%s: img smmu attach error, rc :%d\n",
 					__func__, rc);

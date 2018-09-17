@@ -199,7 +199,8 @@ struct msm_v4l2_format_data {
 enum smmu_attach_mode {
 	NON_SECURE_MODE = 0x01,
 	SECURE_MODE = 0x02,
-	MAX_PROTECTION_MODE = 0x03,
+	SECURE_SLAVE_MODE = 0x03,
+#define SECURE_SLAVE_MODE SECURE_SLAVE_MODE
 };
 
 struct msm_camera_smmu_attach_type {

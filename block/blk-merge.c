@@ -8,7 +8,6 @@
 #include <linux/scatterlist.h>
 #include <linux/pfk.h>
 #include <trace/events/block.h>
-
 #include "blk.h"
 
 static struct bio *blk_bio_discard_split(struct request_queue *q,
@@ -876,6 +875,8 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 
 int blk_try_merge(struct request *rq, struct bio *bio)
 {
+	if (blk_rq_dun(rq) || bio_dun(bio))
+		return ELEVATOR_NO_MERGE;
 	if (blk_rq_pos(rq) + blk_rq_sectors(rq) == bio->bi_iter.bi_sector)
 		return ELEVATOR_BACK_MERGE;
 	else if (blk_rq_pos(rq) - bio_sectors(bio) == bio->bi_iter.bi_sector)

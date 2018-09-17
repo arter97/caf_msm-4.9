@@ -12,6 +12,7 @@
 
 #define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
 #include <linux/io.h>
@@ -30,10 +31,11 @@
 #include <media/msmb_camera.h>
 #include <media/msmb_generic_buf_mgr.h>
 #include <media/msmb_pproc.h>
+#include <soc/qcom/secure_buffer.h>
+
 #include "msm_cpp.h"
 #include "msm_isp_util.h"
 #include "msm_camera_io_util.h"
-#include <linux/debugfs.h>
 #include "cam_smmu_api.h"
 
 #define MSM_CPP_DRV_NAME "msm_cpp"
@@ -3650,6 +3652,26 @@ STREAM_BUFF_END:
 				rc = cam_smmu_ops(cpp_dev->iommu_hdl,
 					CAM_SMMU_ATTACH_SEC_CPP);
 			} else {
+				if (cpp_dev->security_mode ==
+						SECURE_SLAVE_MODE) {
+					/*
+					 * Secure the CB in Slave side
+					 * mode where S1 mappings are there
+					 */
+					int secure_vmid = VMID_CP_CAMERA;
+
+					rc = cam_smmu_set_attr(
+						cpp_dev->iommu_hdl, 0,
+						&secure_vmid);
+					if (rc < 0) {
+						pr_err("%s: Failed to set attribute\n",
+							 __func__);
+						break;
+					}
+					/*
+					 * Fall through to non-secure flow
+					 */
+				}
 				rc = cam_smmu_ops(cpp_dev->iommu_hdl,
 					CAM_SMMU_ATTACH);
 			}
