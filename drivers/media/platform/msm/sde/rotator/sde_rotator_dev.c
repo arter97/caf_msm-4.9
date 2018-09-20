@@ -980,6 +980,7 @@ struct sde_rotator_ctx *sde_rotator_ctx_open(
 			ctx, sde_rotator_queue_init);
 		if (IS_ERR_OR_NULL(ctx->fh.m2m_ctx)) {
 			ret = PTR_ERR(ctx->fh.m2m_ctx);
+			ctx->fh.m2m_ctx = NULL;
 			goto error_m2m_init;
 		}
 	}
@@ -1076,6 +1077,10 @@ error_alloc_workqueue:
 error_create_sysfs:
 	kobject_put(&ctx->kobj);
 error_kobj_init:
+	if (ctx->file) {
+		v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
+		ctx->fh.m2m_ctx = NULL;
+	}
 error_m2m_init:
 	if (ctx->file) {
 		v4l2_fh_del(&ctx->fh);
@@ -1122,10 +1127,12 @@ static int sde_rotator_ctx_release(struct sde_rotator_ctx *ctx,
 	if (ctx->file) {
 		v4l2_ctrl_handler_free(&ctx->ctrl_handler);
 		SDEDEV_DBG(rot_dev->dev, "release streams s:%d\n", session_id);
-		v4l2_m2m_streamoff(file, ctx->fh.m2m_ctx,
+		if (ctx->fh.m2m_ctx) {
+			v4l2_m2m_streamoff(file, ctx->fh.m2m_ctx,
 				V4L2_BUF_TYPE_VIDEO_OUTPUT);
-		v4l2_m2m_streamoff(file, ctx->fh.m2m_ctx,
+			v4l2_m2m_streamoff(file, ctx->fh.m2m_ctx,
 				V4L2_BUF_TYPE_VIDEO_CAPTURE);
+		}
 	}
 	mutex_unlock(&rot_dev->lock);
 	SDEDEV_DBG(rot_dev->dev, "release submit work s:%d\n", session_id);
@@ -1160,9 +1167,12 @@ static int sde_rotator_ctx_release(struct sde_rotator_ctx *ctx,
 	sysfs_remove_group(&ctx->kobj, &sde_rotator_fs_attr_group);
 	kobject_put(&ctx->kobj);
 	if (ctx->file) {
-		v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
-		v4l2_fh_del(&ctx->fh);
-		v4l2_fh_exit(&ctx->fh);
+		if (ctx->fh.m2m_ctx)
+			v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
+		if (ctx->fh.vdev) {
+			v4l2_fh_del(&ctx->fh);
+			v4l2_fh_exit(&ctx->fh);
+		}
 	}
 	kfree(ctx->vbinfo_out);
 	kfree(ctx->vbinfo_cap);
