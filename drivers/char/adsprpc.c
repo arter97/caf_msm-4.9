@@ -616,20 +616,21 @@ static int fastrpc_mmap_find(struct fastrpc_file *fl, int fd,
 	return -ENOTTY;
 }
 
-static int dma_alloc_memory(dma_addr_t *region_phys, void **vaddr, size_t size,
+static int dma_alloc_memory(dma_addr_t *region_phys, size_t size,
 			unsigned long dma_attrs)
 {
 	struct fastrpc_apps *me = &gfa;
+	void *vaddr = NULL;
 
 	if (me->dev == NULL) {
 		pr_err("device adsprpc-mem is not initialized\n");
 		return -ENODEV;
 	}
-	*vaddr = dma_alloc_attrs(me->dev, size, region_phys, GFP_KERNEL,
+	vaddr = dma_alloc_attrs(me->dev, size, region_phys, GFP_KERNEL,
 								dma_attrs);
-	if (IS_ERR_OR_NULL(*vaddr)) {
-		pr_err("adsprpc: %s: %s: dma_alloc_attrs failed for size 0x%zx, returned %p\n",
-				current->comm, __func__, size, (*vaddr));
+	if (!vaddr) {
+		pr_err("ADSPRPC: Failed to allocate %x remote heap memory\n",
+						(unsigned int)size);
 		return -ENOMEM;
 	}
 	return 0;
@@ -768,7 +769,6 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd,
 	struct fastrpc_mmap *map = NULL;
 	unsigned long attrs;
 	dma_addr_t region_phys = 0;
-	void *region_vaddr = NULL;
 	unsigned long flags;
 	int err = 0, vmid;
 
@@ -791,12 +791,12 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd,
 
 		map->apps = me;
 		map->fl = NULL;
-		VERIFY(err, !dma_alloc_memory(&region_phys, &region_vaddr, len, dma_attrs));
+		VERIFY(err, !dma_alloc_memory(&region_phys, len, dma_attrs));
 		if (err)
 			goto bail;
 		map->phys = (uintptr_t)region_phys;
 		map->size = len;
-		map->va = (uintptr_t)region_vaddr;
+		map->va = (uintptr_t)map->phys;
 	} else if (mflags == FASTRPC_DMAHANDLE_NOMAP) {
 		ion_phys_addr_t iphys;
 
@@ -2625,15 +2625,14 @@ static int fastrpc_internal_mmap(struct fastrpc_file *fl,
 								1, &rbuf);
 		if (err)
 			goto bail;
-		err = fastrpc_mmap_on_dsp(fl, ud->flags, 0,
+		rbuf->virt = NULL;
+		err = fastrpc_mmap_on_dsp(fl, ud->flags,
+				(uintptr_t)rbuf->virt,
 				rbuf->phys, rbuf->size, &raddr);
 		if (err)
 			goto bail;
 		rbuf->raddr = raddr;
 	} else {
-
-		uintptr_t va_to_dsp;
-
 		mutex_lock(&fl->fl_map_mutex);
 		if (!fastrpc_mmap_find(fl, ud->fd, (uintptr_t)ud->vaddrin,
 				 ud->size, ud->flags, 1, &map)) {
@@ -2641,20 +2640,13 @@ static int fastrpc_internal_mmap(struct fastrpc_file *fl,
 			mutex_unlock(&fl->map_mutex);
 			return 0;
 		}
-
 		VERIFY(err, !fastrpc_mmap_create(fl, ud->fd, 0,
 				(uintptr_t)ud->vaddrin, ud->size,
 				 ud->flags, &map));
 		mutex_unlock(&fl->fl_map_mutex);
 		if (err)
 			goto bail;
-
-		if (ud->flags == ADSP_MMAP_HEAP_ADDR ||
-				ud->flags == ADSP_MMAP_REMOTE_HEAP_ADDR)
-			va_to_dsp = 0;
-		else
-			va_to_dsp = (uintptr_t)map->va;
-		VERIFY(err, 0 == fastrpc_mmap_on_dsp(fl, ud->flags, va_to_dsp,
+		VERIFY(err, 0 == fastrpc_mmap_on_dsp(fl, ud->flags, map->va,
 				map->phys, map->size, &raddr));
 		if (err)
 			goto bail;
