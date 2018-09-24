@@ -255,7 +255,6 @@ struct dwc3_msm {
 	struct notifier_block	id_nb;
 	struct notifier_block	eud_event_nb;
 	struct notifier_block	host_restart_nb;
-	struct notifier_block	self_power_nb;
 
 	struct notifier_block	host_nb;
 	bool			xhci_ss_compliance_enable;
@@ -297,8 +296,6 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 						unsigned int value);
 static int dwc3_restart_usb_host_mode(struct notifier_block *nb,
 					unsigned long event, void *ptr);
-static int dwc3_notify_pd_status(struct notifier_block *nb,
-				unsigned long event, void *ptr);
 
 /**
  *
@@ -1340,7 +1337,7 @@ static void gsi_set_clear_dbell(struct usb_ep *ep,
 */
 static bool gsi_check_ready_to_suspend(struct usb_ep *ep, bool f_suspend)
 {
-	u32	timeout = 1500;
+	u32	timeout = 500;
 	u32	reg = 0;
 	struct dwc3_ep *dep = to_dwc3_ep(ep);
 	struct dwc3 *dwc = dep->dwc;
@@ -1353,6 +1350,7 @@ static bool gsi_check_ready_to_suspend(struct usb_ep *ep, bool f_suspend)
 			"Unable to suspend GSI ch. WR_CTRL_STATE != 0\n");
 			return false;
 		}
+		usleep_range(20, 22);
 	}
 	/* Check for U3 only if we are not handling Function Suspend */
 	if (!f_suspend) {
@@ -2029,6 +2027,11 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned int event,
 	case DWC3_CONTROLLER_NOTIFY_DISABLE_UPDXFER:
 		dwc3_msm_dbm_disable_updxfer(dwc, value);
 		break;
+	case DWC3_CONTROLLER_NOTIFY_CLEAR_DB:
+		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_NOTIFY_CLEAR_DB\n");
+		dwc3_msm_write_reg_field(mdwc->base,
+			GSI_GENERAL_CFG_REG, BLOCK_GSI_WR_GO_MASK, true);
+		break;
 	default:
 		dev_dbg(mdwc->dev, "unknown dwc3 event\n");
 		break;
@@ -2142,6 +2145,7 @@ static int dwc3_msm_prepare_suspend(struct dwc3_msm *mdwc)
 		reg = dwc3_msm_read_reg(mdwc->base, PWR_EVNT_IRQ_STAT_REG);
 		if (reg & PWR_EVNT_LPM_IN_L2_MASK)
 			break;
+		usleep_range(20, 30);
 	}
 	if (!(reg & PWR_EVNT_LPM_IN_L2_MASK))
 		dev_err(mdwc->dev, "could not transition HS PHY to L2\n");
@@ -2321,6 +2325,13 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc, bool hibernation)
 		pr_err("%s(): Trying to go in LPM with state:%d\n",
 					__func__, dwc->gadget.state);
 		pr_err("%s(): LPM is not performed.\n", __func__);
+		mutex_unlock(&mdwc->suspend_resume_mutex);
+		return -EBUSY;
+	}
+
+	if (!mdwc->in_host_mode && (mdwc->vbus_active && !mdwc->suspend)) {
+		dev_dbg(mdwc->dev,
+			"Received wakeup event before the core suspend\n");
 		mutex_unlock(&mdwc->suspend_resume_mutex);
 		return -EBUSY;
 	}
@@ -2703,6 +2714,14 @@ static void dwc3_resume_work(struct work_struct *w)
 					ORIENTATION_CC2 : ORIENTATION_CC1;
 
 		dbg_event(0xFF, "cc_state", mdwc->typec_orientation);
+
+		ret = extcon_get_property(mdwc->extcon_vbus, EXTCON_USB,
+					EXTCON_PROP_USB_PD_CONTRACT, &val);
+
+		if (!ret)
+			dwc->gadget.self_powered = val.intval;
+		else
+			dwc->gadget.self_powered = 0;
 	}
 
 	/*
@@ -3057,18 +3076,11 @@ static int dwc3_msm_extcon_register(struct dwc3_msm *mdwc, int start_idx)
 	if (!IS_ERR(edev)) {
 		mdwc->extcon_vbus = edev;
 		mdwc->vbus_nb.notifier_call = dwc3_msm_vbus_notifier;
-		mdwc->self_power_nb.notifier_call = dwc3_notify_pd_status;
 		ret = extcon_register_notifier(edev, EXTCON_USB,
 				&mdwc->vbus_nb);
 		if (ret < 0) {
 			dev_err(mdwc->dev, "failed to register notifier for USB\n");
 			return ret;
-		}
-		ret = extcon_register_blocking_notifier(edev, EXTCON_USB,
-							&mdwc->self_power_nb);
-		if (ret < 0) {
-			dev_err(mdwc->dev, "failed to register blocking notifier\n");
-			goto err1;
 		}
 	}
 
@@ -3141,8 +3153,8 @@ err:
 	return ret;
 }
 
-#define SMMU_BASE	0x60000000 /* Device address range base */
-#define SMMU_SIZE	0x90000000 /* Device address range size */
+#define SMMU_BASE	0x90000000 /* Device address range base */
+#define SMMU_SIZE	0x60000000 /* Device address range size */
 
 static int dwc3_msm_init_iommu(struct dwc3_msm *mdwc)
 {
@@ -4169,28 +4181,6 @@ static int dwc3_otg_start_peripheral(struct dwc3_msm *mdwc, int on)
 		atomic_read(&mdwc->dev->power.usage_count));
 
 	return 0;
-}
-
-static int dwc3_notify_pd_status(struct notifier_block *nb,
-				unsigned long event, void *ptr)
-{
-	struct dwc3_msm *mdwc;
-	struct dwc3 *dwc;
-	int ret = 0;
-	union extcon_property_value val;
-
-	mdwc = container_of(nb, struct dwc3_msm, self_power_nb);
-	dwc = platform_get_drvdata(mdwc->dwc3);
-
-	ret = extcon_get_property(mdwc->extcon_vbus, EXTCON_USB,
-					EXTCON_PROP_USB_PD_CONTRACT, &val);
-
-	if (!ret)
-		dwc->gadget.self_powered = val.intval;
-	else
-		dwc->gadget.self_powered = 0;
-
-	return ret;
 }
 
 /* speed: 0 - USB_SPEED_HIGH, 1 - USB_SPEED_SUPER */

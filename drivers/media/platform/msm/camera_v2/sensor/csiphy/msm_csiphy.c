@@ -30,6 +30,7 @@
 #include "include/msm_csiphy_5_0_1_hwreg.h"
 #include "include/msm_csiphy_10_0_0_hwreg.h"
 #include "cam_hw_ops.h"
+#include <media/adsp-shmem-device.h>
 
 #define DBG_CSIPHY 0
 #define SOF_DEBUG_ENABLE 1
@@ -282,6 +283,27 @@ static int msm_csiphy_snps_2_lane_config(
 		csiphybase + csiphy_dev->ctrl_reg->csiphy_snps_reg.
 		mipi_csiphy_rx_cb_2_00.addr + offset);
 
+	if (local_data_rate <= 1500) {
+		msm_camera_io_w(csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane0_ddl_2_00.data,
+			csiphybase + csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane0_ddl_2_00.addr + offset);
+
+		msm_camera_io_w(csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane0_ddl_3_00.data,
+			csiphybase + csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane0_ddl_3_00.addr + offset);
+
+		msm_camera_io_w(csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane_1_10_00.data,
+			csiphybase + csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane_1_10_00.addr + offset);
+
+		msm_camera_io_w(csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane_1_11_00.data,
+			csiphybase + csiphy_dev->ctrl_reg->csiphy_snps_reg.
+			mipi_csiphy_rx_lane_1_11_00.addr + offset);
+	}
 	return 0;
 }
 
@@ -2141,11 +2163,15 @@ static long msm_csiphy_subdev_ioctl(struct v4l2_subdev *sd,
 		rc = msm_csiphy_get_subdev_id(csiphy_dev, arg);
 		break;
 	case VIDIOC_MSM_CSIPHY_IO_CFG:
-		rc = msm_csiphy_cmd(csiphy_dev, arg);
+		rc = 0;
+		if (adsp_shmem_get_state() == CAMERA_STATUS_END)
+			rc = msm_csiphy_cmd(csiphy_dev, arg);
 		break;
 	case VIDIOC_MSM_CSIPHY_RELEASE:
 	case MSM_SD_SHUTDOWN:
-		rc = msm_csiphy_release(csiphy_dev, arg);
+		rc = 0;
+		if (adsp_shmem_get_state() == CAMERA_STATUS_END)
+			rc = msm_csiphy_release(csiphy_dev, arg);
 		break;
 	case MSM_SD_NOTIFY_FREEZE:
 		if (!csiphy_dev || !csiphy_dev->ctrl_reg ||

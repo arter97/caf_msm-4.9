@@ -2211,6 +2211,7 @@ static int icnss_driver_event_server_arrive(void *data)
 
 err_setup_msa:
 	icnss_assign_msa_perm_all(penv, ICNSS_MSA_PERM_HLOS_ALL);
+	clear_bit(ICNSS_MSA0_ASSIGNED, &penv->state);
 err_power_on:
 	icnss_hw_power_off(penv);
 fail:
@@ -2507,11 +2508,19 @@ out:
 static int icnss_driver_event_early_crash_ind(struct icnss_priv *priv,
 					      void *data)
 {
+	struct icnss_uevent_fw_down_data fw_down_data = {0};
 	int ret = 0;
 
 	if (!test_bit(ICNSS_WLFW_EXISTS, &priv->state)) {
 		icnss_ignore_qmi_timeout(false);
 		goto out;
+	}
+
+	if (test_bit(ICNSS_FW_READY, &priv->state) &&
+	    !test_bit(ICNSS_DRIVER_UNLOADING, &priv->state)) {
+		fw_down_data.crashed = true;
+		icnss_call_driver_uevent(priv, ICNSS_UEVENT_FW_DOWN,
+					 &fw_down_data);
 	}
 
 	priv->early_crash_ind = true;

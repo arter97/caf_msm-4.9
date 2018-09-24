@@ -3099,7 +3099,7 @@ static int cam_icp_mgr_send_config_io(struct cam_icp_hw_ctx_data *ctx_data,
 	task_data->type = ICP_WORKQ_TASK_MSG_TYPE;
 	task->process_cb = cam_icp_mgr_process_cmd;
 	size_in_words = (*(uint32_t *)task_data->data) >> 2;
-	CAM_INFO(CAM_ICP, "size_in_words %u", size_in_words);
+	CAM_DBG(CAM_ICP, "size_in_words %u", size_in_words);
 	rc = cam_req_mgr_workq_enqueue_task(task, &icp_hw_mgr,
 		CRM_TASK_PRIORITY_0);
 	if (rc)
@@ -3175,8 +3175,8 @@ static int cam_icp_mgr_config_hw(void *hw_mgr_priv, void *config_hw_args)
 	frame_info = (struct icp_frame_info *)config_args->priv;
 	req_id = frame_info->request_id;
 	idx = cam_icp_clk_idx_from_req_id(ctx_data, req_id);
-	ctx_data->hfi_frame_process.fw_process_flag[idx] = true;
 	cam_icp_mgr_ipe_bps_clk_update(hw_mgr, ctx_data, idx);
+	ctx_data->hfi_frame_process.fw_process_flag[idx] = true;
 
 	CAM_DBG(CAM_ICP, "req_id %llu, io config %llu", req_id,
 		frame_info->io_config);
@@ -3841,19 +3841,15 @@ static int cam_icp_mgr_hw_flush(void *hw_priv, void *hw_flush_args)
 		return -EINVAL;
 	}
 
-	CAM_DBG(CAM_REQ, "ctx_id %d req %lld Flush type %d",
-		ctx_data->ctx_id,
-		*(int64_t *)flush_args->flush_req_pending[0],
-		flush_args->flush_type);
+	CAM_DBG(CAM_REQ, "ctx_id %d Flush type %d",
+		ctx_data->ctx_id, flush_args->flush_type);
 
 	switch (flush_args->flush_type) {
 	case CAM_FLUSH_TYPE_ALL:
 		mutex_lock(&hw_mgr->hw_mgr_mutex);
-		if (!hw_mgr->recovery) {
-			if (flush_args->num_req_active) {
-				mutex_unlock(&hw_mgr->hw_mgr_mutex);
-				cam_icp_mgr_abort_handle(ctx_data);
-			}
+		if (!hw_mgr->recovery && flush_args->num_req_active) {
+			mutex_unlock(&hw_mgr->hw_mgr_mutex);
+			cam_icp_mgr_abort_handle(ctx_data);
 		} else {
 			mutex_unlock(&hw_mgr->hw_mgr_mutex);
 		}

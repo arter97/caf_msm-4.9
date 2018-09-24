@@ -15,6 +15,7 @@
 		compatible = "qcom,sdxpoorwills-pinctrl";
 		reg = <0x3900000 0x300000>,
 			<0xB204900 0x280>;
+		reg-names = "pinctrl_regs", "pdc_regs";
 		interrupts = <0 212 0>;
 		gpio-controller;
 		#gpio-cells = <2>;
@@ -1680,6 +1681,21 @@
 					drive-strength = <2>;
 					output-low;
 					bias-pull-down;
+				};
+			};
+		};
+
+		emac {
+			emac_pin_pps_0: emac_pin_pps_0 {
+				mux {
+					pins = "gpio89";
+					function = "emac_pps";
+				};
+
+				config {
+					pins = "gpio89";
+					drive-strength = <8>;	/* 8 mA */
+					bias-disable;		/* NO PULL*/
 				};
 			};
 		};
