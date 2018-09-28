@@ -434,7 +434,7 @@ int cam_isp_add_io_buffers(
 	bool                                  fill_fence)
 {
 	int rc = 0;
-	uint64_t                            io_addr[CAM_PACKET_MAX_PLANES];
+	dma_addr_t                          io_addr[CAM_PACKET_MAX_PLANES];
 	struct cam_buf_io_cfg              *io_cfg;
 	struct cam_isp_resource_node       *res;
 	struct cam_ife_hw_mgr_res          *hw_mgr_res;
@@ -469,11 +469,12 @@ int cam_isp_add_io_buffers(
 
 	for (i = 0; i < prepare->packet->num_io_configs; i++) {
 		CAM_DBG(CAM_ISP, "======= io config idx %d ============", i);
-		CAM_DBG(CAM_ISP, "i %d resource_type:%d fence:%d",
-			i, io_cfg[i].resource_type, io_cfg[i].fence);
-		CAM_DBG(CAM_ISP, "format: %d", io_cfg[i].format);
-		CAM_DBG(CAM_ISP, "direction %d",
+		CAM_DBG(CAM_REQ,
+			"i %d req_id %llu resource_type:%d fence:%d direction %d",
+			i, prepare->packet->header.request_id,
+			io_cfg[i].resource_type, io_cfg[i].fence,
 			io_cfg[i].direction);
+		CAM_DBG(CAM_ISP, "format: %d", io_cfg[i].format);
 
 		if (io_cfg[i].direction == CAM_BUF_OUTPUT) {
 			res_id_out = io_cfg[i].resource_type & 0xFF;

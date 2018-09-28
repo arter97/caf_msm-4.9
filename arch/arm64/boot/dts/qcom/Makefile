@@ -439,6 +439,8 @@ dtb-$(CONFIG_ARCH_SDM632) += sdm632-rumi.dtb \
 
 endif
 
+dtb-$(CONFIG_ARCH_SDM670_VM) += sdm670-vm.dtb
+
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
 clean-files	:= *.dtb

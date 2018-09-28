@@ -749,9 +749,14 @@ DECLARE_EVENT_CLASS(sched_task_util,
 		__entry->target_cpu		= target_cpu;
 		__entry->ediff			= ediff;
 		__entry->need_idle		= need_idle;
+#ifdef CONFIG_WALT
 		__entry->latency		= p->ravg.mark_start ?
 						  ktime_get_ns() -
 						  p->ravg.mark_start : 0;
+#else
+		__entry->latency		= 0;
+#endif
+
 	),
 
 	TP_printk("comm=%s pid=%d task_cpu=%d task_util=%lu nominated_cpu=%d target_cpu=%d energy_diff=%d need_idle=%d latency=%llu",
