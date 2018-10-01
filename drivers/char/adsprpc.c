@@ -427,10 +427,8 @@ static struct fastrpc_channel_ctx gcinfo[NUM_CHANNELS] = {
 	},
 };
 
-#if 0
 static int hlosvm[1] = {VMID_HLOS};
 static int hlosvmperm[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
-#endif
 
 static inline int64_t getnstimediff(struct timespec *start)
 {
@@ -2124,12 +2122,10 @@ static int fastrpc_init_process(struct fastrpc_file *fl,
 				goto bail;
 			phys = mem->phys;
 			size = mem->size;
-#if 0
 			VERIFY(err, !hyp_assign_phys(phys, (uint64_t)size,
 				hlosvm, 1, me->channel[fl->cid].rhvm.vmid,
 				me->channel[fl->cid].rhvm.vmperm,
 				me->channel[fl->cid].rhvm.vmcount));
-#endif
 			if (err) {
 				pr_err("ADSPRPC: hyp_assign_phys fail err %d",
 							 err);
@@ -2173,13 +2169,11 @@ bail:
 	if (err && (init->flags == FASTRPC_INIT_CREATE_STATIC))
 		me->staticpd_flags = 0;
 	if (mem && err) {
-#if 0
 		if (mem->flags == ADSP_MMAP_REMOTE_HEAP_ADDR)
 			hyp_assign_phys(mem->phys, (uint64_t)mem->size,
 					me->channel[fl->cid].rhvm.vmid,
 					me->channel[fl->cid].rhvm.vmcount,
 					hlosvm, hlosvmperm, 1);
-#endif
 		mutex_lock(&fl->fl_map_mutex);
 		fastrpc_mmap_free(mem, 0);
 		mutex_unlock(&fl->fl_map_mutex);
@@ -2224,9 +2218,7 @@ static int fastrpc_mmap_on_dsp(struct fastrpc_file *fl, uint32_t flags,
 			       struct fastrpc_mmap *map)
 {
 	struct fastrpc_ioctl_invoke_crc ioctl;
-#if 0
 	struct fastrpc_apps *me = &gfa;
-#endif
 	struct smq_phy_page page;
 	int num = 1;
 	remote_arg_t ra[3];
@@ -2279,14 +2271,12 @@ static int fastrpc_mmap_on_dsp(struct fastrpc_file *fl, uint32_t flags,
 		err = scm_call2(SCM_SIP_FNID(SCM_SVC_PIL,
 			TZ_PIL_PROTECT_MEM_SUBSYS_ID), &desc);
 	} else if (flags == ADSP_MMAP_REMOTE_HEAP_ADDR) {
-#if 0
 		VERIFY(err, !hyp_assign_phys(map->phys, (uint64_t)map->size,
 				hlosvm, 1, me->channel[fl->cid].rhvm.vmid,
 				me->channel[fl->cid].rhvm.vmperm,
 				me->channel[fl->cid].rhvm.vmcount));
 		if (err)
 			goto bail;
-#endif
 	}
 bail:
 	return err;
@@ -3757,7 +3747,6 @@ static int fastrpc_probe(struct platform_device *pdev)
 					"qcom,msm-adsprpc-mem-region")) {
 		me->dev = dev;
 		range.addr = 0;
-		range.size = 0;
 		ion_node = of_find_compatible_node(NULL, NULL, "qcom,msm-ion");
 		if (ion_node) {
 			for_each_available_child_of_node(ion_node, node) {
@@ -3776,23 +3765,23 @@ static int fastrpc_probe(struct platform_device *pdev)
 				break;
 			}
 		}
-		pr_err("%s: range start: %llx, size : %llx\n", __func__, range.addr, range.size);
 		if (range.addr && !of_property_read_bool(dev->of_node,
 							 "restrict-access")) {
 			int srcVM[1] = {VMID_HLOS};
-			int destVM[3] = {VMID_HLOS, VMID_MSS_MSA, VMID_ADSP_Q6};
-			int destVMperm[3] = {PERM_READ | PERM_WRITE | PERM_EXEC,
+			int destVM[4] = {VMID_HLOS, VMID_MSS_MSA, VMID_SSC_Q6,
+						VMID_ADSP_Q6};
+			int destVMperm[4] = {PERM_READ | PERM_WRITE | PERM_EXEC,
+				PERM_READ | PERM_WRITE | PERM_EXEC,
 				PERM_READ | PERM_WRITE | PERM_EXEC,
 				PERM_READ | PERM_WRITE | PERM_EXEC,
 				};
 
 			VERIFY(err, !hyp_assign_phys(range.addr, range.size,
-					srcVM, 1, destVM, destVMperm, 3));
+					srcVM, 1, destVM, destVMperm, 4));
 			if (err)
 				goto bail;
 			me->range.addr = range.addr;
 			me->range.size = range.size;
-			pr_err("%s: hyp_assign for start: %llx, size : %llx\n", __func__, me->range.addr, me->range.size);
 		}
 		return 0;
 	}
