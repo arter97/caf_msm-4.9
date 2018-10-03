@@ -147,6 +147,7 @@ config ARCH_SDM670
 
 config ARCH_SDM670_VM
 	bool "Enable Support for Qualcomm Technologies Inc. SDM670 VM"
+	select QCOM_VM_WDT if WATCHDOG
 	help
 	  This enables support for VM on sdm670 chipset. If you do not
 	  wish to build a kernel that runs on this chipset, say 'N' here.
