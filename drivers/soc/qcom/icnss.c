@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3153,6 +3153,8 @@ EXPORT_SYMBOL(icnss_disable_irq);
 
 int icnss_get_soc_info(struct device *dev, struct icnss_soc_info *info)
 {
+	char *fw_build_timestamp = NULL;
+
 	if (!penv || !dev) {
 		icnss_pr_err("Platform driver not initialized\n");
 		return -EINVAL;
@@ -3165,10 +3167,14 @@ int icnss_get_soc_info(struct device *dev, struct icnss_soc_info *info)
 	info->board_id = penv->board_info.board_id;
 	info->soc_id = penv->soc_info.soc_id;
 	info->fw_version = penv->fw_version_info.fw_version;
-	strlcpy(info->fw_build_timestamp,
-		penv->fw_version_info.fw_build_timestamp,
-		QMI_WLFW_MAX_TIMESTAMP_LEN_V01 + 1);
+	fw_build_timestamp = penv->fw_version_info.fw_build_timestamp;
 
+	if (!fw_build_timestamp) {
+		fw_build_timestamp[QMI_WLFW_MAX_TIMESTAMP_LEN_V01] = '\0';
+		strlcpy(info->fw_build_timestamp,
+			penv->fw_version_info.fw_build_timestamp,
+			QMI_WLFW_MAX_TIMESTAMP_LEN_V01 + 1);
+	}
 	return 0;
 }
 EXPORT_SYMBOL(icnss_get_soc_info);
