@@ -107,7 +107,8 @@ static int dsi_phy_regmap_init(struct platform_device *pdev,
 
 	phy->hw.base = ptr;
 
-	pr_debug("[%s] map dsi_phy registers to %p\n", phy->name, phy->hw.base);
+	pr_debug("[%s] map dsi_phy registers to %pK\n",
+		phy->name, phy->hw.base);
 
 	return rc;
 }
@@ -901,6 +902,26 @@ int dsi_phy_disable(struct msm_dsi_phy *phy)
 	mutex_unlock(&phy->phy_lock);
 
 	return rc;
+}
+
+/**
+ * dsi_phy_set_clamp_state() - configure clamps for DSI lanes
+ * @phy:        DSI PHY handle.
+ * @enable:     boolean to specify clamp enable/disable.
+ *
+ * Return: error code.
+ */
+int dsi_phy_set_clamp_state(struct msm_dsi_phy *phy, bool enable)
+{
+	if (!phy)
+		return -EINVAL;
+
+	pr_debug("[%s] enable=%d\n", phy->name, enable);
+
+	if (phy->hw.ops.clamp_ctrl)
+		phy->hw.ops.clamp_ctrl(&phy->hw, enable);
+
+	return 0;
 }
 
 /**
