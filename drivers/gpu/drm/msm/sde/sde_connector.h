@@ -323,6 +323,8 @@ struct sde_connector_evt {
  * @bl_device: backlight device node
  * @status_work: work object to perform status checks
  * @force_panel_dead: variable to trigger forced ESD recovery
+ * @panel_dead: Flag to indicate if panel has gone bad
+ * @esd_status_check: Flag to indicate if ESD thread is scheduled or not
  * @bl_scale_dirty: Flag to indicate PP BL scale value(s) is changed
  * @bl_scale: BL scale value for ABA feature
  * @bl_scale_ad: BL scale value for AD feature
@@ -363,7 +365,7 @@ struct sde_connector {
 	struct backlight_device *bl_device;
 	struct delayed_work status_work;
 	u32 force_panel_dead;
-
+	bool panel_dead;
 	bool esd_status_check;
 
 	bool bl_scale_dirty;
@@ -765,6 +767,12 @@ void sde_connector_helper_bridge_disable(struct drm_connector *connector);
  * @connector: Pointer to DRM connector object
  */
 int sde_connector_esd_status(struct drm_connector *connector);
+
+/**
+ * sde_connector_helper_bridge_enable - helper function for drm bridge enable
+ * @connector: Pointer to DRM connector object
+ */
+void sde_connector_helper_bridge_enable(struct drm_connector *connector);
 
 /**
  * sde_connector_get_panel_vfp - helper to get panel vfp
