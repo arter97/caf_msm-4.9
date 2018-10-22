@@ -294,11 +294,11 @@ void adreno_efuse_speed_bin_array(struct adreno_device *adreno_dev)
 	 */
 	count = of_property_count_u32_elems(device->pdev->dev.of_node,
 				"qcom,gpu-speed-bin-vectors");
-	if (count <= 0)
+
+	if ((count <= 0) || (count % vector_size))
 		return;
 
-	bin_vector = kmalloc(sizeof(count * sizeof(unsigned int)),
-			GFP_KERNEL);
+	bin_vector = kmalloc_array(count, sizeof(unsigned int), GFP_KERNEL);
 	if (bin_vector == NULL) {
 		KGSL_DRV_ERR(device,
 				"Unable to allocate memory for speed-bin vector\n");
@@ -1851,7 +1851,7 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 
 	status = kgsl_mmu_start(device);
 	if (status)
-		goto error_pwr_off;
+		goto error_boot_oob_clear;
 
 	_set_secvid(device);
 
@@ -1993,6 +1993,17 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 		}
 	}
 
+	if (kgsl_gmu_isenabled(device) && adreno_dev->perfctr_ifpc_lo == 0) {
+		ret = adreno_perfcounter_get(adreno_dev,
+				KGSL_PERFCOUNTER_GROUP_GPMU_PWR, 4,
+				&adreno_dev->perfctr_ifpc_lo, NULL,
+				PERFCOUNTER_FLAG_KERNEL);
+		if (ret) {
+			WARN_ONCE(1, "Unable to get perf counter for IFPC\n");
+			adreno_dev->perfctr_ifpc_lo = 0;
+		}
+	}
+
 	/* Clear the busy_data stats - we're starting over from scratch */
 	adreno_dev->busy_data.gpu_busy = 0;
 	adreno_dev->busy_data.bif_ram_cycles = 0;
@@ -2001,6 +2012,7 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	adreno_dev->busy_data.bif_ram_cycles_write_ch1 = 0;
 	adreno_dev->busy_data.bif_starved_ram = 0;
 	adreno_dev->busy_data.bif_starved_ram_ch1 = 0;
+	adreno_dev->busy_data.num_ifpc = 0;
 
 	/* Restore performance counter registers with saved values */
 	adreno_perfcounter_restore(adreno_dev);
@@ -2059,6 +2071,12 @@ error_oob_clear:
 
 error_mmu_off:
 	kgsl_mmu_stop(&device->mmu);
+
+error_boot_oob_clear:
+	if (gpudev->oob_clear &&
+			ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_HFI_USE_REG))
+		gpudev->oob_clear(adreno_dev,
+				OOB_BOOT_SLUMBER_CLEAR_MASK);
 
 error_pwr_off:
 	/* set the state back to original state */
@@ -3424,6 +3442,47 @@ static int adreno_readtimestamp(struct kgsl_device *device,
 	return status;
 }
 
+/**
+ * adreno_device_private_create(): Allocate an adreno_device_private structure
+ */
+static struct kgsl_device_private *adreno_device_private_create(void)
+{
+	struct adreno_device_private *adreno_priv =
+			kzalloc(sizeof(*adreno_priv), GFP_KERNEL);
+
+	if (adreno_priv) {
+		INIT_LIST_HEAD(&adreno_priv->perfcounter_list);
+		return &adreno_priv->dev_priv;
+	}
+	return NULL;
+}
+
+/**
+ * adreno_device_private_destroy(): Destroy an adreno_device_private structure
+ * and release the perfcounters held by the kgsl fd.
+ * @dev_priv: The kgsl device private structure
+ */
+static void adreno_device_private_destroy(struct kgsl_device_private *dev_priv)
+{
+	struct kgsl_device *device = dev_priv->device;
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	struct adreno_device_private *adreno_priv =
+		container_of(dev_priv, struct adreno_device_private,
+		dev_priv);
+	struct adreno_perfcounter_list_node *p, *tmp;
+
+	mutex_lock(&device->mutex);
+	list_for_each_entry_safe(p, tmp, &adreno_priv->perfcounter_list, node) {
+		adreno_perfcounter_put(adreno_dev, p->groupid,
+					p->countable, PERFCOUNTER_FLAG_NONE);
+		list_del(&p->node);
+		kfree(p);
+	}
+	mutex_unlock(&device->mutex);
+
+	kfree(adreno_priv);
+}
+
 static inline s64 adreno_ticks_to_us(u32 ticks, u32 freq)
 {
 	freq /= 1000000;
@@ -3511,6 +3570,17 @@ static void adreno_power_stats(struct kgsl_device *device,
 		stats->ram_time = ram_cycles;
 		stats->ram_wait = starved_ram;
 	}
+
+	if (adreno_dev->perfctr_ifpc_lo != 0) {
+		uint32_t num_ifpc;
+
+		num_ifpc = counter_delta(device, adreno_dev->perfctr_ifpc_lo,
+				&busy->num_ifpc);
+		adreno_dev->ifpc_count += num_ifpc;
+		if (num_ifpc > 0)
+			trace_adreno_ifpc_count(adreno_dev->ifpc_count);
+	}
+
 	if (adreno_dev->lm_threshold_count &&
 			gpudev->count_throttles)
 		gpudev->count_throttles(adreno_dev, adj);
@@ -3705,8 +3775,9 @@ static const struct kgsl_functable adreno_functable = {
 	.snapshot = adreno_snapshot,
 	.irq_handler = adreno_irq_handler,
 	.drain = adreno_drain,
+	.device_private_create = adreno_device_private_create,
+	.device_private_destroy = adreno_device_private_destroy,
 	/* Optional functions */
-	.snapshot_gmu = adreno_snapshot_gmu,
 	.drawctxt_create = adreno_drawctxt_create,
 	.drawctxt_detach = adreno_drawctxt_detach,
 	.drawctxt_destroy = adreno_drawctxt_destroy,

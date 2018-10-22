@@ -377,7 +377,7 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 
 		if (r_config->sequence[i].sleep_ms)
 			usleep_range(r_config->sequence[i].sleep_ms * 1000,
-				     r_config->sequence[i].sleep_ms * 1000);
+				(r_config->sequence[i].sleep_ms * 1000) + 100);
 	}
 
 	if (gpio_is_valid(panel->bl_config.en_gpio)) {
@@ -1559,14 +1559,14 @@ static int dsi_panel_create_cmd_packets(const char *data,
 	return rc;
 error_free_payloads:
 	for (i = i - 1; i >= 0; i--) {
-		cmd--;
-		kfree(cmd->msg.tx_buf);
+		kfree(cmd[i].msg.tx_buf);
+		cmd[i].msg.tx_buf = NULL;
 	}
 
 	return rc;
 }
 
-void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set)
+static void dsi_panel_destroy_cmds_packets_buf(struct dsi_panel_cmd_set *set)
 {
 	u32 i = 0;
 	struct dsi_cmd_desc *cmd;
@@ -1574,9 +1574,15 @@ void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set)
 	for (i = 0; i < set->count; i++) {
 		cmd = &set->cmds[i];
 		kfree(cmd->msg.tx_buf);
+		cmd->msg.tx_buf = NULL;
 	}
+}
 
+static void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set)
+{
+	dsi_panel_destroy_cmds_packets_buf(set);
 	kfree(set->cmds);
+	set->count = 0;
 }
 
 static int dsi_panel_alloc_cmd_packets(struct dsi_panel_cmd_set *cmd,
@@ -1952,6 +1958,7 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 {
 	int rc = 0;
 	const char *bl_type;
+	const char *data;
 	u32 val = 0;
 
 	bl_type = of_get_property(of_node,
@@ -1969,6 +1976,17 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel,
 		pr_debug("[%s] bl-pmic-control-type unknown-%s\n",
 			 panel->name, bl_type);
 		panel->bl_config.type = DSI_BACKLIGHT_UNKNOWN;
+	}
+
+	data = of_get_property(of_node, "qcom,bl-update-flag", NULL);
+	if (!data) {
+		panel->bl_config.bl_update = BL_UPDATE_NONE;
+	} else if (!strcmp(data, "delay_until_first_frame")) {
+		panel->bl_config.bl_update = BL_UPDATE_DELAY_UNTIL_FIRST_FRAME;
+	} else {
+		pr_debug("[%s] No valid bl-update-flag: %s\n",
+						panel->name, data);
+		panel->bl_config.bl_update = BL_UPDATE_NONE;
 	}
 
 	panel->bl_config.bl_scale = MAX_BL_SCALE_LEVEL;
@@ -2069,7 +2087,7 @@ int dsi_dsc_populate_static_param(struct msm_display_dsc_info *dsc)
 	int target_bpp_x16;
 	int data;
 	int final_value, final_scale;
-	int ratio_index;
+	int ratio_index, mod_offset;
 
 	dsc->rc_model_size = 8192;
 
@@ -2141,7 +2159,20 @@ int dsi_dsc_populate_static_param(struct msm_display_dsc_info *dsc)
 		dsc->quant_incr_limit1 = 19;
 	}
 
-	dsc->slice_last_group_size = 3 - (dsc->slice_width % 3);
+	mod_offset = dsc->slice_width % 3;
+	switch (mod_offset) {
+	case 0:
+		dsc->slice_last_group_size = 2;
+		break;
+	case 1:
+		dsc->slice_last_group_size = 0;
+		break;
+	case 2:
+		dsc->slice_last_group_size = 1;
+		break;
+	default:
+		break;
+	}
 
 	dsc->det_thresh_flatness = 7 + 2*(bpc - 8);
 
@@ -3160,10 +3191,13 @@ void dsi_panel_put_mode(struct dsi_display_mode *mode)
 	if (!mode->priv_info)
 		return;
 
+	kfree(mode->priv_info->phy_timing_val);
+
 	for (i = 0; i < DSI_CMD_SET_MAX; i++)
 		dsi_panel_destroy_cmd_packets(&mode->priv_info->cmd_sets[i]);
 
 	kfree(mode->priv_info);
+	mode->priv_info = NULL;
 }
 
 int dsi_panel_get_mode(struct dsi_panel *panel,
@@ -3363,9 +3397,9 @@ int dsi_panel_update_pps(struct dsi_panel *panel)
 	if (rc) {
 		pr_err("[%s] failed to send DSI_CMD_SET_PPS cmds, rc=%d\n",
 			panel->name, rc);
-		goto error;
 	}
 
+	dsi_panel_destroy_cmds_packets_buf(set);
 error:
 	mutex_unlock(&panel->panel_lock);
 	return rc;

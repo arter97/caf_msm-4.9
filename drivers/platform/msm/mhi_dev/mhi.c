@@ -458,8 +458,9 @@ static void mhi_hwc_cb(void *priv, enum ipa_mhi_event_type event,
 
 		mhi_update_state_info(MHI_DEV_UEVENT_CTRL, MHI_STATE_CONNECTED);
 
-		ep_pcie_mask_irq_event(mhi_ctx->phandle,
-				EP_PCIE_INT_EVT_MHI_A7, true);
+		if (!mhi_ctx->mhi_int)
+			ep_pcie_mask_irq_event(mhi_ctx->phandle,
+					EP_PCIE_INT_EVT_MHI_A7, true);
 		break;
 	case IPA_MHI_EVENT_DATA_AVAILABLE:
 		rc = mhi_dev_notify_sm_event(MHI_DEV_EVENT_HW_ACC_WAKEUP);
@@ -1428,7 +1429,7 @@ static void mhi_dev_transfer_completion_cb(void *mreq)
 	ch = client->channel;
 	mhi = ch->ring->mhi_dev;
 	el = req->el;
-	transfer_len = req->len;
+	transfer_len = req->transfer_len;
 	snd_cmpl = req->snd_cmpl;
 	rd_offset = req->rd_offset;
 	ch->curr_ereq->context = ch;
@@ -2141,7 +2142,7 @@ int mhi_dev_read_channel(struct mhi_req *mreq)
 			(mreq->len - usr_buf_remaining);
 		ch->tre_bytes_left -= bytes_to_read;
 		mreq->el = el;
-		mreq->actual_len = bytes_read;
+		mreq->transfer_len = bytes_to_read;
 		mreq->rd_offset = ring->rd_offset;
 		mhi_log(MHI_MSG_VERBOSE, "reading %d bytes from chan %d\n",
 				bytes_to_read, mreq->chan);
@@ -2305,6 +2306,7 @@ int mhi_dev_write_channel(struct mhi_req *wreq)
 		write_to_loc = el->tre.data_buf_ptr;
 		wreq->rd_offset = ring->rd_offset;
 		wreq->el = el;
+		wreq->transfer_len = bytes_to_write;
 		rc = mhi_transfer_device_to_host(write_to_loc,
 						(void *) read_from_loc,
 						bytes_to_write,
@@ -2758,8 +2760,9 @@ static int mhi_dev_resume_mmio_mhi_reinit(struct mhi_dev *mhi_ctx)
 		EP_PCIE_EVENT_PM_D3_COLD |
 		EP_PCIE_EVENT_PM_D0 |
 		EP_PCIE_EVENT_PM_RST_DEAST |
-		EP_PCIE_EVENT_MHI_A7 |
 		EP_PCIE_EVENT_LINKDOWN;
+	if (!mhi_ctx->mhi_int)
+		mhi_ctx->event_reg.events |= EP_PCIE_EVENT_MHI_A7;
 	mhi_ctx->event_reg.user = mhi_ctx;
 	mhi_ctx->event_reg.mode = EP_PCIE_TRIGGER_CALLBACK;
 	mhi_ctx->event_reg.callback = mhi_dev_sm_pcie_handler;
@@ -2902,8 +2905,9 @@ static int mhi_dev_resume_mmio_mhi_init(struct mhi_dev *mhi_ctx)
 		EP_PCIE_EVENT_PM_D3_COLD |
 		EP_PCIE_EVENT_PM_D0 |
 		EP_PCIE_EVENT_PM_RST_DEAST |
-		EP_PCIE_EVENT_MHI_A7 |
 		EP_PCIE_EVENT_LINKDOWN;
+	if (!mhi_ctx->mhi_int)
+		mhi_ctx->event_reg.events |= EP_PCIE_EVENT_MHI_A7;
 	mhi_ctx->event_reg.user = mhi_ctx;
 	mhi_ctx->event_reg.mode = EP_PCIE_TRIGGER_CALLBACK;
 	mhi_ctx->event_reg.callback = mhi_dev_sm_pcie_handler;

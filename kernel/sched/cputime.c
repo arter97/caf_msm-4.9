@@ -84,11 +84,18 @@ EXPORT_SYMBOL_GPL(irqtime_account_irq);
 static cputime_t irqtime_account_update(u64 irqtime, int idx, cputime_t maxtime)
 {
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
+	u64 base = cpustat[idx];
 	cputime_t irq_cputime;
 
-	irq_cputime = nsecs_to_cputime64(irqtime) - cpustat[idx];
+	if (idx == CPUTIME_SOFTIRQ)
+		base = kcpustat_this_cpu->softirq_no_ksoftirqd;
+
+	irq_cputime = nsecs_to_cputime64(irqtime) - base;
 	irq_cputime = min(irq_cputime, maxtime);
 	cpustat[idx] += irq_cputime;
+
+	if (idx == CPUTIME_SOFTIRQ)
+		kcpustat_this_cpu->softirq_no_ksoftirqd += irq_cputime;
 
 	return irq_cputime;
 }
@@ -159,10 +166,8 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	/* Account for user time used */
 	acct_account_cputime(p);
 
-#ifdef CONFIG_CPU_FREQ_TIMES
 	/* Account power usage for user time */
 	cpufreq_acct_update_power(p, cputime);
-#endif
 }
 
 /*
@@ -213,10 +218,9 @@ void __account_system_time(struct task_struct *p, cputime_t cputime,
 
 	/* Account for system time used */
 	acct_account_cputime(p);
-#ifdef CONFIG_CPU_FREQ_TIMES
+
 	/* Account power usage for system time */
 	cpufreq_acct_update_power(p, cputime);
-#endif
 }
 
 /*

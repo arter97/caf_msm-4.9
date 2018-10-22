@@ -100,6 +100,10 @@
 #define IPA_IOCTL_GET_VLAN_MODE                 58
 #define IPA_IOCTL_ADD_BRIDGE_VLAN_MAPPING       59
 #define IPA_IOCTL_DEL_BRIDGE_VLAN_MAPPING       60
+#define IPA_IOCTL_GSB_CONNECT                   61
+#define IPA_IOCTL_GSB_DISCONNECT                62
+
+
 
 /**
  * max size of the header to be inserted
@@ -520,7 +524,20 @@ enum ipa_vlan_bridge_event {
 	BRIDGE_VLAN_MAPPING_MAX
 };
 
-#define IPA_EVENT_MAX_NUM (BRIDGE_VLAN_MAPPING_MAX)
+enum ipa_wlan_fw_ssr_event {
+	WLAN_FWR_SSR_BEFORE_SHUTDOWN = BRIDGE_VLAN_MAPPING_MAX,
+	IPA_WLAN_FW_SSR_EVENT_MAX
+#define IPA_WLAN_FW_SSR_EVENT_MAX IPA_WLAN_FW_SSR_EVENT_MAX
+};
+
+enum ipa_gsb_event {
+	IPA_GSB_CONNECT = IPA_WLAN_FW_SSR_EVENT_MAX,
+	IPA_GSB_DISCONNECT,
+	IPA_GSB_EVENT_MAX,
+#define IPA_GSB_EVENT_MAX IPA_GSB_EVENT_MAX
+};
+
+#define IPA_EVENT_MAX_NUM (IPA_GSB_EVENT_MAX)
 #define IPA_EVENT_MAX ((int)IPA_EVENT_MAX_NUM)
 
 /**
@@ -580,6 +597,9 @@ enum ipa_rm_resource_name {
  * @IPA_HW_v3_5: IPA hardware version 3.5
  * @IPA_HW_v3_5_1: IPA hardware version 3.5.1
  * @IPA_HW_v4_0: IPA hardware version 4.0
+ * @IPA_HW_v4_1: IPA hardware version 4.1
+ * @IPA_HW_v4_2: IPA hardware version 4.2
+ * @IPA_HW_v4_5: IPA hardware version 4.5
  */
 enum ipa_hw_type {
 	IPA_HW_None = 0,
@@ -595,10 +615,16 @@ enum ipa_hw_type {
 	IPA_HW_v3_5 = 12,
 	IPA_HW_v3_5_1 = 13,
 	IPA_HW_v4_0 = 14,
+	IPA_HW_v4_1 = 15,
+	IPA_HW_v4_2 = 16,
+	IPA_HW_v4_5 = 17,
 };
-#define IPA_HW_MAX (IPA_HW_v4_0 + 1)
+#define IPA_HW_MAX (IPA_HW_v4_5 + 1)
 
 #define IPA_HW_v4_0 IPA_HW_v4_0
+#define IPA_HW_v4_1 IPA_HW_v4_1
+#define IPA_HW_v4_2 IPA_HW_v4_2
+#define IPA_HW_v4_5 IPA_HW_v4_5
 
 /**
  * struct ipa_rule_attrib - attributes of a routing/filtering
@@ -1676,6 +1702,14 @@ struct ipa_ioc_l2tp_vlan_mapping_info {
 };
 
 /**
+ * struct ipa_ioc_gsb_info - connect/disconnect
+ * @name: interface name
+ */
+struct ipa_ioc_gsb_info {
+	char name[IPA_RESOURCE_NAME_MAX];
+};
+
+/**
  * struct ipa_msg_meta - Format of the message meta-data.
  * @msg_type: the type of the message
  * @rsvd: reserved bits for future use.
@@ -1811,16 +1845,20 @@ enum ipacm_client_enum {
 	IPACM_CLIENT_MAX
 };
 
+#define IPACM_SUPPORT_OF_LAN_STATS_FOR_ODU_CLIENTS
+
 enum ipacm_per_client_device_type {
 	IPACM_CLIENT_DEVICE_TYPE_USB = 0,
 	IPACM_CLIENT_DEVICE_TYPE_WLAN = 1,
-	IPACM_CLIENT_DEVICE_TYPE_ETH = 2
+	IPACM_CLIENT_DEVICE_TYPE_ETH = 2,
+	IPACM_CLIENT_DEVICE_TYPE_ODU = 3,
+	IPACM_CLIENT_DEVICE_MAX
 };
 
 /**
  * max number of device types supported.
  */
-#define IPACM_MAX_CLIENT_DEVICE_TYPES 3
+#define IPACM_MAX_CLIENT_DEVICE_TYPES IPACM_CLIENT_DEVICE_MAX
 
 /**
  * @lanIface - Name of the lan interface
@@ -2086,6 +2124,14 @@ struct ipa_ioc_bridge_vlan_mapping_info {
 #define IPA_IOC_DEL_BRIDGE_VLAN_MAPPING _IOWR(IPA_IOC_MAGIC, \
 				IPA_IOCTL_DEL_BRIDGE_VLAN_MAPPING, \
 				struct ipa_ioc_bridge_vlan_mapping_info)
+
+#define IPA_IOC_GSB_CONNECT _IOWR(IPA_IOC_MAGIC, \
+				IPA_IOCTL_GSB_CONNECT, \
+				struct ipa_ioc_gsb_info)
+
+#define IPA_IOC_GSB_DISCONNECT _IOWR(IPA_IOC_MAGIC, \
+				IPA_IOCTL_GSB_DISCONNECT, \
+				struct ipa_ioc_gsb_info)
 
 /*
  * unique magic number of the Tethering bridge ioctls

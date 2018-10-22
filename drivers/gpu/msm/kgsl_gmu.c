@@ -450,7 +450,7 @@ int gmu_dcvs_set(struct gmu_device *gmu,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	struct adreno_gpudev *gpudev = ADRENO_GPU_DEVICE(adreno_dev);
 	int perf_idx = INVALID_DCVS_IDX, bw_idx = INVALID_DCVS_IDX;
-	int ret;
+	int ret = 0;
 
 	if (gpu_pwrlevel < gmu->num_gpupwrlevels - 1)
 		perf_idx = gmu->num_gpupwrlevels - gpu_pwrlevel - 1;
@@ -462,23 +462,22 @@ int gmu_dcvs_set(struct gmu_device *gmu,
 		(bw_idx == INVALID_DCVS_IDX))
 		return -EINVAL;
 
-	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_HFI_USE_REG)) {
+	if (ADRENO_QUIRK(adreno_dev, ADRENO_QUIRK_HFI_USE_REG))
 		ret = gpudev->rpmh_gpu_pwrctrl(adreno_dev,
 			GMU_DCVS_NOHFI, perf_idx, bw_idx);
+	else if (test_bit(GMU_HFI_ON, &gmu->flags))
+		ret = hfi_send_dcvs_vote(gmu, perf_idx, bw_idx, ACK_NONBLOCK);
 
-		if (ret) {
-			dev_err_ratelimited(&gmu->pdev->dev,
-				"Failed to set GPU perf idx %d, bw idx %d\n",
-				perf_idx, bw_idx);
+	if (ret) {
+		dev_err_ratelimited(&gmu->pdev->dev,
+			"Failed to set GPU perf idx %d, bw idx %d\n",
+			perf_idx, bw_idx);
 
-			adreno_set_gpu_fault(adreno_dev, ADRENO_GMU_FAULT);
-			adreno_dispatcher_schedule(device);
-		}
-
-		return ret;
+		adreno_set_gpu_fault(adreno_dev, ADRENO_GMU_FAULT);
+		adreno_dispatcher_schedule(device);
 	}
 
-	return hfi_send_dcvs_vote(gmu, perf_idx, bw_idx, ACK_NONBLOCK);
+	return ret;
 }
 
 struct rpmh_arc_vals {
@@ -1662,7 +1661,7 @@ int adreno_gmu_fenced_write(struct adreno_device *adreno_dev,
 	if (!kgsl_gmu_isenabled(KGSL_DEVICE(adreno_dev)))
 		return 0;
 
-	for (i = 0; i < GMU_WAKEUP_RETRY_MAX; i++) {
+	for (i = 0; i < GMU_LONG_WAKEUP_RETRY_LIMIT; i++) {
 		adreno_read_gmureg(adreno_dev, ADRENO_REG_GMU_AHB_FENCE_STATUS,
 			&status);
 
@@ -1677,9 +1676,19 @@ int adreno_gmu_fenced_write(struct adreno_device *adreno_dev,
 
 		/* Try to write the fenced register again */
 		adreno_writereg(adreno_dev, offset, val);
+
+		if (i == GMU_SHORT_WAKEUP_RETRY_LIMIT)
+			dev_err(adreno_dev->dev.dev,
+				"Waited %d usecs to write fenced register 0x%x. Continuing to wait...\n",
+				(GMU_SHORT_WAKEUP_RETRY_LIMIT *
+				GMU_WAKEUP_DELAY_US),
+				reg_offset);
 	}
 
 	dev_err(adreno_dev->dev.dev,
-		"GMU fenced register write timed out: reg 0x%x\n", reg_offset);
+		"Timed out waiting %d usecs to write fenced register 0x%x\n",
+		GMU_LONG_WAKEUP_RETRY_LIMIT * GMU_WAKEUP_DELAY_US,
+		reg_offset);
+
 	return -ETIMEDOUT;
 }

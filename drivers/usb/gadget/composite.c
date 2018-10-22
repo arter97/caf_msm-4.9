@@ -541,8 +541,14 @@ int usb_func_ep_queue(struct usb_function *func, struct usb_ep *ep,
 		} else if (ret < 0 && ret != -ENOTSUPP) {
 			pr_err("Failed to wake function %s from suspend state. ret=%d.\n",
 				func->name ? func->name : "", ret);
+		} else {
+			/*
+			 * Return -EAGAIN to queue the request from
+			 * function driver wakeup function.
+			 */
+			ret = -EAGAIN;
+			goto done;
 		}
-		goto done;
 	}
 
 	if (!func->func_is_suspended)
@@ -594,6 +600,10 @@ static int config_buf(struct usb_configuration *config,
 	c->iConfiguration = config->iConfiguration;
 	c->bmAttributes = USB_CONFIG_ATT_ONE | config->bmAttributes;
 	c->bMaxPower = encode_bMaxPower(speed, config);
+	if (config->cdev->gadget->self_powered) {
+		c->bmAttributes |= USB_CONFIG_ATT_SELFPOWER;
+		c->bMaxPower = 0;
+	}
 
 	/* There may be e.g. OTG descriptors */
 	if (config->descriptors) {
@@ -650,18 +660,10 @@ static int config_desc(struct usb_composite_dev *cdev, unsigned w_value)
 	w_value &= 0xff;
 
 	pos = &cdev->configs;
-	c = cdev->os_desc_config;
-	if (c)
-		goto check_config;
 
 	while ((pos = pos->next) !=  &cdev->configs) {
 		c = list_entry(pos, typeof(*c), list);
 
-		/* skip OS Descriptors config which is handled separately */
-		if (c == cdev->os_desc_config)
-			continue;
-
-check_config:
 		/* ignore configs that won't work at this speed */
 		switch (speed) {
 		case USB_SPEED_SUPER_PLUS:
@@ -1614,6 +1616,9 @@ static int count_ext_prop(struct usb_configuration *c, int interface)
 	struct usb_function *f;
 	int j;
 
+	if (interface >= c->next_interface_id)
+		return -EINVAL;
+
 	f = c->interface[interface];
 	for (j = 0; j < f->os_desc_n; ++j) {
 		struct usb_os_desc *d;
@@ -1632,6 +1637,9 @@ static int len_ext_prop(struct usb_configuration *c, int interface)
 	struct usb_function *f;
 	struct usb_os_desc *d;
 	int j, res;
+
+	if (interface >= c->next_interface_id)
+		return -EINVAL;
 
 	res = 10; /* header length */
 	f = c->interface[interface];
@@ -2025,6 +2033,8 @@ unknown:
 				if (w_length == 0x0A) {
 					count = count_ext_prop(os_desc_cfg,
 						interface);
+					if (count < 0)
+						return count;
 					put_unaligned_le16(count, buf + 8);
 					count = len_ext_prop(os_desc_cfg,
 						interface);
@@ -2034,6 +2044,8 @@ unknown:
 				} else {
 					count = count_ext_prop(os_desc_cfg,
 						interface);
+					if (count < 0)
+						return count;
 					put_unaligned_le16(count, buf + 8);
 					count = len_ext_prop(os_desc_cfg,
 						interface);
@@ -2499,7 +2511,13 @@ void composite_resume(struct usb_gadget *gadget)
 				f->func_wakeup_pending = 0;
 			}
 
-			if (gadget->speed != USB_SPEED_SUPER && f->resume)
+			/*
+			 * Call function resume irrespective of the speed.
+			 * Individual function needs to retain the USB3 Function
+			 * suspend state through out the Device suspend entry
+			 * and exit process.
+			 */
+			if (f->resume)
 				f->resume(f);
 		}
 

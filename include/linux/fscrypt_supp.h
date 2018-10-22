@@ -28,8 +28,7 @@ struct fscrypt_operations {
 	int (*set_context)(struct inode *, const void *, size_t, void *);
 	bool (*dummy_context)(struct inode *);
 	bool (*empty_dir)(struct inode *);
-	unsigned (*max_namelen)(struct inode *);
-	bool (*is_encrypted)(struct inode *);
+	unsigned int max_namelen;
 };
 
 struct fscrypt_ctx {
@@ -74,20 +73,6 @@ static inline struct page *fscrypt_control_page(struct page *page)
 }
 
 extern void fscrypt_restore_control_page(struct page *);
-
-extern const struct dentry_operations fscrypt_d_ops;
-
-static inline void fscrypt_set_d_op(struct dentry *dentry)
-{
-	d_set_d_op(dentry, &fscrypt_d_ops);
-}
-
-static inline void fscrypt_set_encrypted_dentry(struct dentry *dentry)
-{
-	spin_lock(&dentry->d_lock);
-	dentry->d_flags |= DCACHE_ENCRYPTED_WITH_KEY;
-	spin_unlock(&dentry->d_lock);
-}
 
 /* policy.c */
 extern int fscrypt_ioctl_set_policy(struct file *, const void __user *);
@@ -195,13 +180,6 @@ extern void fscrypt_enqueue_decrypt_bio(struct fscrypt_ctx *ctx,
 extern void fscrypt_pullback_bio_page(struct page **, bool);
 extern int fscrypt_zeroout_range(const struct inode *, pgoff_t, sector_t,
 				 unsigned int);
-
-/* fscrypt_ice.c */
-extern int fscrypt_using_hardware_encryption(const struct inode *inode);
-extern void fscrypt_set_ice_dun(const struct inode *inode,
-		struct bio *bio, u64 dun);
-extern bool fscrypt_mergeable_bio(struct bio *bio, u64 dun, bool bio_encrypted);
-
 
 /* hooks.c */
 extern int fscrypt_file_open(struct inode *inode, struct file *filp);
