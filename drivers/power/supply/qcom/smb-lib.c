@@ -1515,6 +1515,7 @@ int smblib_vconn_regulator_is_enabled(struct regulator_dev *rdev)
 #define MAX_RETRY		15
 #define MIN_DELAY_US		2000
 #define MAX_DELAY_US		9000
+#define IPC_DTS_MODEL_PROPERTY_SIZE 55
 static int otg_current[] = {250000, 500000, 1000000, 1500000};
 static int smblib_enable_otg_wa(struct smb_charger *chg)
 {
@@ -1593,6 +1594,9 @@ static int _smblib_vbus_regulator_enable(struct regulator_dev *rdev)
 {
 	struct smb_charger *chg = rdev_get_drvdata(rdev);
 	int rc;
+	int ret;
+	struct device_node *root;
+	char data[IPC_DTS_MODEL_PROPERTY_SIZE+1];
 
 	smblib_dbg(chg, PR_OTG, "halt 1 in 8 mode\n");
 	rc = smblib_masked_write(chg, OTG_ENG_OTG_CFG_REG,
@@ -1608,6 +1612,15 @@ static int _smblib_vbus_regulator_enable(struct regulator_dev *rdev)
 
 	if (chg->wa_flags & OTG_WA) {
 		rc = smblib_enable_otg_wa(chg);
+		root = of_find_node_by_path("/");
+		ret = of_property_read_u8_array(root, "model",
+					data, IPC_DTS_MODEL_PROPERTY_SIZE);
+		data[IPC_DTS_MODEL_PROPERTY_SIZE] = '\0';
+		if (!ret) {
+			if (!strcmp((const char *) data,
+		"Qualcomm Technologies, Inc. QC605 LC Groot + PM8005 IPC\0"))
+				rc = 0;
+		}
 		if (rc < 0)
 			smblib_err(chg, "Couldn't enable OTG rc=%d\n", rc);
 	} else {
