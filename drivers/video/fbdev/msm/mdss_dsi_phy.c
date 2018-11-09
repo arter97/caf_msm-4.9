@@ -894,6 +894,11 @@ int mdss_dsi_phy_calc_timing_param(struct mdss_panel_info *pinfo, u32 phy_rev,
 		}
 		mdss_dsi_phy_update_timing_param_rev_2(pinfo, &t_param);
 		break;
+	case DSI_PHY_REV_12NM:
+		/* TODO: update DSI PHY timing for this DSI PHY version*/
+		pr_debug("phy rev %d does nothing about updating PHY timing\n",
+			 phy_rev);
+		break;
 	default:
 		pr_err("phy rev %d not supported\n", phy_rev);
 		return -EINVAL;

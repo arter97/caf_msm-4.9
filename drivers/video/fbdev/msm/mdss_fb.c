@@ -1809,6 +1809,7 @@ static void mdss_panel_validate_debugfs_info(struct msm_fb_data_type *mfd)
 	struct fb_var_screeninfo *var = &fbi->var;
 	struct mdss_panel_data *pdata = container_of(panel_info,
 				struct mdss_panel_data, panel_info);
+	u64 clk_rate_of_dfs = panel_info->debugfs_info->panel_info.clk_rate;
 
 	if (panel_info->debugfs_info->override_flag) {
 		if (mfd->mdp.off_fnc) {
@@ -1819,6 +1820,11 @@ static void mdss_panel_validate_debugfs_info(struct msm_fb_data_type *mfd)
 
 		pr_debug("Overriding panel_info with debugfs_info\n");
 		panel_info->debugfs_info->override_flag = 0;
+
+		if (clk_rate_of_dfs > 0 &&
+			clk_rate_of_dfs != panel_info->clk_rate)
+			panel_info->clk_rate_update_without_calc = true;
+
 		mdss_panel_debugfsinfo_to_panelinfo(panel_info);
 		if (is_panel_split(mfd) && pdata->next)
 			mdss_fb_validate_split(pdata->panel_info.xres,
@@ -5023,6 +5029,8 @@ int mdss_register_panel(struct platform_device *pdev,
 	}
 
 	pdata->active = true;
+	pdata->panel_info.clk_rate_update_without_calc = false;
+
 	fb_pdev = of_find_device_by_node(node);
 	if (fb_pdev) {
 		rc = mdss_fb_register_extra_panel(fb_pdev, pdata);
