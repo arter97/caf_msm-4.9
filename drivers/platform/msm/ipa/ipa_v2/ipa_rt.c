@@ -1388,6 +1388,7 @@ int ipa2_reset_rt(enum ipa_ip_type ip)
 					IPAERR_RL(
 						"Proc entry already deleted\n");
 					return -EINVAL;
+				}
 			}
 			tbl->rule_cnt--;
 			if (rule->hdr)
