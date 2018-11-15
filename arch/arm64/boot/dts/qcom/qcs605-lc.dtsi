@@ -161,7 +161,6 @@
 };
 
 &clock_cpucc {
-	status = "disabled";
 	/delete-property/ vdd_l3_mx_ao-supply;
 	/delete-property/ vdd_pwrcl_mx_ao-supply;
 	vdd_l3_mx_ao-supply = <&pm660_s2_level_ao>;
