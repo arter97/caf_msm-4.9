@@ -123,6 +123,7 @@
 
 #define	FLASH_LED_REG_MULTI_STROBE_CTRL(base)	(base + 0x71)
 #define	LED3_FLASH_ONCE_ONLY_BIT		BIT(1)
+#define LED1N2_FLASH_ONCE_ONLY_BIT		BIT(0)
 
 #define	FLASH_LED_REG_LPG_INPUT_CTRL(base)	(base + 0x72)
 #define	LPG_INPUT_SEL_BIT			BIT(0)
@@ -425,7 +426,7 @@ led_brightness qpnp_flash_led_brightness_get(struct led_classdev *led_cdev)
 static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
 {
 	int rc, i, addr_offset;
-	u8 val = 0, mask;
+	u8 val = 0, mask, strobe_mask = 0, strobe_ctrl;
 
 	for (i = 0; i < led->num_fnodes; i++) {
 		addr_offset = led->fnode[i].id;
@@ -436,6 +437,57 @@ static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
 			return rc;
 
 		val |= 0x1 << led->fnode[i].id;
+
+		rc = qpnp_flash_led_write(led,
+			FLASH_LED_REG_SAFETY_TMR(led->base + addr_offset),
+			FLASH_LED_SAFETY_TMR_DISABLED);
+		if (rc < 0)
+			return rc;
+
+		if (led->fnode[i].strobe_sel == HW_STROBE) {
+			if (led->fnode[i].id == LED3)
+				strobe_mask |= LED3_FLASH_ONCE_ONLY_BIT;
+			else
+				strobe_mask |= LED1N2_FLASH_ONCE_ONLY_BIT;
+		}
+
+		if (led->fnode[i].id == LED3 &&
+				led->fnode[i].strobe_sel == LPG_STROBE)
+			strobe_mask |= LED3_FLASH_ONCE_ONLY_BIT;
+		/*
+		 * As per the hardware recommendation, to use LED2/LED3 in HW
+		 * strobe mode, LED1 should be set to HW strobe mode as well.
+		 */
+		if (led->fnode[i].strobe_sel == HW_STROBE &&
+		      (led->fnode[i].id == LED2 || led->fnode[i].id == LED3)) {
+			mask = FLASH_HW_STROBE_MASK;
+			addr_offset = led->fnode[LED1].id;
+			/*
+			 * HW_STROBE: enable, TRIGGER: level,
+			 * POLARITY: active high
+			 */
+			strobe_ctrl = BIT(2) | BIT(0);
+			rc = qpnp_flash_led_masked_write(led,
+				FLASH_LED_REG_STROBE_CTRL(
+				led->base + addr_offset),
+				mask, strobe_ctrl);
+			if (rc < 0)
+				return rc;
+		}
+	}
+
+	rc = qpnp_flash_led_masked_write(led,
+		FLASH_LED_REG_MULTI_STROBE_CTRL(led->base),
+		strobe_mask, 0);
+	if (rc < 0)
+		return rc;
+
+	if (led->fnode[LED3].strobe_sel == LPG_STROBE) {
+		rc = qpnp_flash_led_masked_write(led,
+			FLASH_LED_REG_LPG_INPUT_CTRL(led->base),
+			LPG_INPUT_SEL_BIT, LPG_INPUT_SEL_BIT);
+		if (rc < 0)
+			return rc;
 	}
 
 	rc = qpnp_flash_led_write(led,
@@ -629,19 +681,6 @@ static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
 			return rc;
 	}
 
-	if (led->fnode[LED3].strobe_sel == LPG_STROBE) {
-		rc = qpnp_flash_led_masked_write(led,
-			FLASH_LED_REG_MULTI_STROBE_CTRL(led->base),
-			LED3_FLASH_ONCE_ONLY_BIT, 0);
-		if (rc < 0)
-			return rc;
-
-		rc = qpnp_flash_led_masked_write(led,
-			FLASH_LED_REG_LPG_INPUT_CTRL(led->base),
-			LPG_INPUT_SEL_BIT, LPG_INPUT_SEL_BIT);
-		if (rc < 0)
-			return rc;
-	}
 	return 0;
 }
 
@@ -1288,6 +1327,12 @@ static int qpnp_flash_led_switch_disable(struct flash_switch_data *snode)
 		rc = qpnp_flash_led_masked_write(led,
 			FLASH_LED_REG_TGR_CURRENT(led->base + addr_offset),
 			FLASH_LED_CURRENT_MASK, 0);
+		if (rc < 0)
+			return rc;
+
+		rc = qpnp_flash_led_write(led,
+			FLASH_LED_REG_SAFETY_TMR(led->base + addr_offset),
+			FLASH_LED_SAFETY_TMR_DISABLED);
 		if (rc < 0)
 			return rc;
 
