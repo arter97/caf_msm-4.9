@@ -65,7 +65,7 @@
 #define QSEE_CE_CLK_100MHZ		100000000
 #define CE_CLK_DIV			1000000
 
-#define QSEECOM_MAX_SG_ENTRY			512
+#define QSEECOM_MAX_SG_ENTRY			4096
 #define QSEECOM_SG_ENTRY_MSG_BUF_SZ_64BIT	\
 			(QSEECOM_MAX_SG_ENTRY * SG_ENTRY_SZ_64BIT)
 
@@ -182,6 +182,7 @@ struct qseecom_registered_listener_list {
 	size_t sb_length;
 	struct ion_handle *ihandle; /* Retrieve phy addr */
 	wait_queue_head_t          rcv_req_wq;
+	/* rcv_req_flag: -1: not ready; 0: ready and empty; 1: received req */
 	int                        rcv_req_flag;
 	int                        send_resp_flag;
 	bool                       listener_in_use;
@@ -1202,7 +1203,7 @@ static int qseecom_register_listener(struct qseecom_dev_handle *data,
 	if (!new_entry)
 		return -ENOMEM;
 	memcpy(&new_entry->svc, &rcvd_lstnr, sizeof(rcvd_lstnr));
-	new_entry->rcv_req_flag = 0;
+	new_entry->rcv_req_flag = -1;
 
 	new_entry->svc.listener_id = rcvd_lstnr.listener_id;
 	new_entry->sb_length = rcvd_lstnr.sb_size;
@@ -1651,6 +1652,12 @@ static void __qseecom_clean_listener_sglistinfo(
 	}
 }
 
+static int __is_listener_rcv_wq_not_ready(
+			struct qseecom_registered_listener_list *ptr_svc)
+{
+	return ptr_svc->rcv_req_flag == -1;
+}
+
 static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 					struct qseecom_command_scm_resp *resp)
 {
@@ -1668,6 +1675,7 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 	void *cmd_buf = NULL;
 	size_t cmd_len;
 	struct sglist_info *table = NULL;
+	bool not_ready = false;
 
 	while (resp->result == QSEOS_RESULT_INCOMPLETE) {
 		lstnr = resp->data;
@@ -1679,6 +1687,10 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 		list_for_each_entry(ptr_svc,
 				&qseecom.registered_listener_list_head, list) {
 			if (ptr_svc->svc.listener_id == lstnr) {
+				if (__is_listener_rcv_wq_not_ready(ptr_svc)) {
+					not_ready = true;
+					break;
+				}
 				ptr_svc->listener_in_use = true;
 				ptr_svc->rcv_req_flag = 1;
 				wake_up_interruptible(&ptr_svc->rcv_req_wq);
@@ -1718,6 +1730,16 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 			status = QSEOS_RESULT_FAILURE;
 			goto err_resp;
 		}
+
+		if (not_ready) {
+			pr_err("Service %d is not ready to receive request\n",
+					lstnr);
+			rc = -ENOENT;
+			status = QSEOS_RESULT_FAILURE;
+			goto err_resp;
+
+		}
+
 		pr_debug("waking up rcv_req_wq and waiting for send_resp_wq\n");
 
 		/* initialize the new signal mask with all signals*/
@@ -1979,6 +2001,7 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 	void *cmd_buf = NULL;
 	size_t cmd_len;
 	struct sglist_info *table = NULL;
+	bool not_ready = false;
 
 	while (ret == 0 && resp->result == QSEOS_RESULT_INCOMPLETE) {
 		lstnr = resp->data;
@@ -1990,6 +2013,10 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 		list_for_each_entry(ptr_svc,
 				&qseecom.registered_listener_list_head, list) {
 			if (ptr_svc->svc.listener_id == lstnr) {
+				if (__is_listener_rcv_wq_not_ready(ptr_svc)) {
+					not_ready = true;
+					break;
+				}
 				ptr_svc->listener_in_use = true;
 				ptr_svc->rcv_req_flag = 1;
 				wake_up_interruptible(&ptr_svc->rcv_req_wq);
@@ -2029,6 +2056,16 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 			status = QSEOS_RESULT_FAILURE;
 			goto err_resp;
 		}
+
+		if (not_ready) {
+			pr_err("Service %d is not ready to receive request\n",
+					lstnr);
+			rc = -ENOENT;
+			status = QSEOS_RESULT_FAILURE;
+			goto err_resp;
+
+		}
+
 		pr_debug("waking up rcv_req_wq and waiting for send_resp_wq\n");
 
 		/* initialize the new signal mask with all signals*/
@@ -3836,7 +3873,7 @@ static int __qseecom_listener_has_rcvd_req(struct qseecom_dev_handle *data,
 {
 	int ret;
 
-	ret = (svc->rcv_req_flag != 0);
+	ret = (svc->rcv_req_flag == 1);
 	return ret || data->abort || svc->abort;
 }
 
@@ -3851,13 +3888,17 @@ static int qseecom_receive_req(struct qseecom_dev_handle *data)
 		return -ENODATA;
 	}
 
+	if (this_lstnr->rcv_req_flag == -1)
+		this_lstnr->rcv_req_flag = 0;
+
 	while (1) {
 		if (wait_event_freezable(this_lstnr->rcv_req_wq,
 				__qseecom_listener_has_rcvd_req(data,
 				this_lstnr))) {
-			pr_debug("Interrupted: exiting Listener Service = %d\n",
+			pr_warn("Interrupted: exiting Listener Service = %d\n",
 						(uint32_t)data->listener.id);
 			/* woken up for different reason */
+			this_lstnr->rcv_req_flag = -1;
 			return -ERESTARTSYS;
 		}
 
@@ -7699,6 +7740,7 @@ static int qseecom_release(struct inode *inode, struct file *file)
 			data->type, data->mode, data);
 		switch (data->type) {
 		case QSEECOM_LISTENER_SERVICE:
+			pr_warn("release lsnr svc %d\n", data->listener.id);
 			__qseecom_listener_abort_all(1);
 			mutex_lock(&app_access_lock);
 			ret = qseecom_unregister_listener(data);
