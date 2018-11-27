@@ -231,8 +231,13 @@ static int usb_extcon_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, info);
 	device_init_wakeup(dev, true);
 
-	/* Perform initial detection */
-	usb_extcon_detect_cable(&info->wq_detcable.work);
+	if (info->trig_gpiod)
+		/* Schedule with delay to reset ethernet bridge */
+		queue_delayed_work(system_power_efficient_wq,
+			&info->wq_detcable, msecs_to_jiffies(1500));
+	else
+		/* Perform initial detection */
+		usb_extcon_detect_cable(&info->wq_detcable.work);
 
 	return 0;
 }

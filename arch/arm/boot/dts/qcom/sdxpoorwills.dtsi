@@ -65,7 +65,7 @@
 		mss_mem: mss_region@87400000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x87000000 0x8700000>;
+			reg = <0x86c00000 0x8b00000>;
 			label = "mss_mem";
 		};
 
@@ -418,6 +418,8 @@
 				<45 512 0 0>,
 				<45 512 500 800>;
 
+		qcom,pcie-vendor-id = /bits/ 16 <0x17cb>;
+		qcom,pcie-device-id = /bits/ 16 <0x0304>;
 		qcom,pcie-link-speed = <2>;
 		qcom,pcie-phy-ver = <6>;
 		qcom,pcie-active-config;
@@ -910,10 +912,10 @@
 	dcc: dcc_v2@10a2000 {
 		compatible = "qcom,dcc-v2";
 		reg = <0x10a2000 0x1000>,
-		      <0x10ae000 0x2000>;
+		      <0x10ae400 0x1c00>;
 		reg-names = "dcc-base", "dcc-ram-base";
 
-		dcc-ram-offset = <0x6000>;
+		dcc-ram-offset = <0x400>;
 	};
 
 	system_pm {
@@ -934,7 +936,7 @@
 		qcom,ipa-hw-mode = <0>;
 		qcom,ee = <0>;
 		qcom,use-ipa-tethering-bridge;
-		qcom,mhi-event-ring-id-limits = <9 10>; /* start and end */
+		qcom,mhi-event-ring-id-limits = <9 11>; /* start and end */
 		qcom,modem-cfg-emb-pipe-flt;
 		qcom,use-ipa-pm;
 		qcom,wlan-ce-db-over-pcie;
@@ -1389,7 +1391,7 @@
 			compatible = "qcom,ess-switch-qca83xx";
 			qcom,switch-access-mode = "mdio";
 			qcom,ar8327-initvals = <
-				0x00004 0x7600000   /* PAD0_MODE */
+				0x00004 0x4200000   /* PAD0_MODE */
 				0x00008 0x0         /* PAD5_MODE */
 				0x000e4 0xaa545     /* MAC_POWER_SEL */
 				0x000e0 0xc74164de  /* SGMII_CTRL */
