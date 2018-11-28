@@ -58,10 +58,6 @@
 	size = <0 0x800000>;
 };
 
-&secure_display_memory {
-	status = "disabled";
-};
-
 &sp_mem {
 	status = "disabled";
 };
