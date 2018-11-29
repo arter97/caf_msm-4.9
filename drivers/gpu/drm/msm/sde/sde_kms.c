@@ -3060,6 +3060,8 @@ static int sde_kms_hw_init(struct msm_kms *kms)
 	dev->mode_config.max_width = sde_kms->catalog->max_mixer_width * 2;
 	dev->mode_config.max_height = 4096;
 
+	mutex_init(&sde_kms->vblank_ctl_global_lock);
+
 	/*
 	 * Support format modifiers for compression etc.
 	 */
