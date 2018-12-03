@@ -2690,6 +2690,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 	int power_state;
 	u32 mode;
 	struct mdss_panel_info *pinfo;
+	struct mdss_panel_info *var_pinfo;
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -2710,7 +2711,9 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		break;
 	case MDSS_EVENT_CHECK_PARAMS:
 		pr_debug("%s:Entered Case MDSS_EVENT_CHECK_PARAMS\n", __func__);
-		if (mdss_dsi_check_params(ctrl_pdata, arg)) {
+		var_pinfo = (struct mdss_panel_info *)arg;
+		if (mdss_dsi_check_params(ctrl_pdata, arg) ||
+			var_pinfo->clk_rate_update_without_calc) {
 			ctrl_pdata->update_phy_timing = true;
 			/*
 			 * Call to MDSS_EVENT_CHECK_PARAMS expects

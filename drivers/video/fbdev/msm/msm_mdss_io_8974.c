@@ -1340,6 +1340,7 @@ int mdss_dsi_clk_refresh(struct mdss_panel_data *pdata, bool update_phy)
 		return rc;
 	}
 	ctrl_pdata->refresh_clk_rate = false;
+	pinfo->clk_rate_update_without_calc = false;
 	ctrl_pdata->pclk_rate = pdata->panel_info.mipi.dsi_pclk_rate;
 	ctrl_pdata->byte_clk_rate = pdata->panel_info.clk_rate / 8;
 	pr_debug("%s ctrl_pdata->byte_clk_rate=%d ctrl_pdata->pclk_rate=%d\n",
@@ -1679,14 +1680,23 @@ int mdss_dsi_clk_div_config(struct mdss_panel_info *panel_info,
 
 	if (ctrl_pdata->refresh_clk_rate || is_diff_frame_rate(panel_info,
 			frame_rate) || (!panel_info->clk_rate)) {
-		if (lanes > 0) {
-			panel_info->clk_rate = h_period * v_period * frame_rate
-				* bpp * 8;
-			do_div(panel_info->clk_rate, lanes);
-		} else {
-			pr_err("%s: forcing mdss_dsi lanes to 1\n", __func__);
-			panel_info->clk_rate =
-				h_period * v_period * frame_rate * bpp * 8;
+
+		pr_debug("%s: clk_rate_update_without_calc: %s\n", __func__,
+			panel_info->clk_rate_update_without_calc ?
+			"enabled" : "disabled");
+
+		if (!panel_info->clk_rate_update_without_calc) {
+			if (lanes > 0) {
+				panel_info->clk_rate = h_period * v_period
+					* frame_rate * bpp * 8;
+				do_div(panel_info->clk_rate, lanes);
+
+			} else {
+				pr_err("%s: forcing mdss_dsi lanes to 1\n",
+					 __func__);
+				panel_info->clk_rate = h_period * v_period
+					* frame_rate * bpp * 8;
+			}
 		}
 	}
 

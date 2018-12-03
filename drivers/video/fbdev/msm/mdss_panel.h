@@ -631,6 +631,7 @@ struct mdss_panel_info {
 	u32 bl_min;
 	u32 fb_num;
 	u64 clk_rate;
+	bool clk_rate_update_without_calc;
 	u32 clk_min;
 	u64 clk_max;
 	u32 mdp_transfer_time_us;
