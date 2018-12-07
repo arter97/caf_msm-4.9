@@ -151,16 +151,9 @@ int mdp3_ctrl_notify(struct mdp3_session_data *ses, int event)
 	return blocking_notifier_call_chain(&ses->notifier_head, event, ses);
 }
 
-static void mdp3_dispatch_dma_done(struct kthread_work *work)
+static void __mdp3_dispatch_dma_done(struct mdp3_session_data *session)
 {
-	struct mdp3_session_data *session;
-	int cnt = 0;
-
-	pr_debug("%s\n", __func__);
-	session = container_of(work, struct mdp3_session_data,
-				dma_done_work);
-	if (!session)
-		return;
+	int cnt;
 
 	cnt = atomic_read(&session->dma_done_cnt);
 	MDSS_XLOG(cnt);
@@ -169,6 +162,29 @@ static void mdp3_dispatch_dma_done(struct kthread_work *work)
 		atomic_dec(&session->dma_done_cnt);
 		cnt--;
 	}
+}
+
+void mdp3_flush_dma_done(struct mdp3_session_data *session)
+{
+	if (!session)
+		return;
+
+	pr_debug("%s\n", __func__);
+
+	__mdp3_dispatch_dma_done(session);
+}
+
+static void mdp3_dispatch_dma_done(struct kthread_work *work)
+{
+	struct mdp3_session_data *session;
+
+	pr_debug("%s\n", __func__);
+	session = container_of(work, struct mdp3_session_data,
+				dma_done_work);
+	if (!session)
+		return;
+
+	__mdp3_dispatch_dma_done(session);
 }
 
 static void mdp3_dispatch_clk_off(struct work_struct *work)
@@ -2976,14 +2992,17 @@ static int mdp3_vsync_retire_setup(struct msm_fb_data_type *mfd)
 		return -ENOMEM;
 	}
 
-	/* Add retire vsync handler */
-	retire_client.handler = mdp3_vsync_retire_handle_vsync;
-	retire_client.arg = mdp3_session;
+	if (mfd->panel_info->type == MIPI_CMD_PANEL) {
+		/* Add retire vsync handler */
+		retire_client.handler = mdp3_vsync_retire_handle_vsync;
+		retire_client.arg = mdp3_session;
 
-	if (mdp3_session->dma)
-		mdp3_session->dma->retire_client = retire_client;
+		if (mdp3_session->dma)
+			mdp3_session->dma->retire_client = retire_client;
 
-	INIT_WORK(&mdp3_session->retire_work, mdp3_vsync_retire_work_handler);
+		INIT_WORK(&mdp3_session->retire_work,
+			mdp3_vsync_retire_work_handler);
+	}
 
 	return 0;
 }
@@ -3057,6 +3076,7 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 		pr_err("fail to init dma\n");
 		goto init_done;
 	}
+	mdp3_session->dma->session = mdp3_session;
 
 	intf_type = mdp3_ctrl_get_intf_type(mfd);
 	mdp3_session->intf = mdp3_get_display_intf(intf_type);
@@ -3162,13 +3182,10 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	mdp3_session->vsync_before_commit = true;
 	mdp3_session->dyn_pu_state = mfd->panel_info->partial_update_enabled;
 
-	if (mfd->panel_info->mipi.dms_mode ||
-			mfd->panel_info->type == MIPI_CMD_PANEL) {
-		rc = mdp3_vsync_retire_setup(mfd);
-		if (IS_ERR_VALUE(rc)) {
-			pr_err("unable to create vsync timeline\n");
-			goto init_done;
-		}
+	rc = mdp3_vsync_retire_setup(mfd);
+	if (IS_ERR_VALUE(rc)) {
+		pr_err("unable to create vsync timeline\n");
+		goto init_done;
 	}
 init_done:
 	if (IS_ERR_VALUE(rc))

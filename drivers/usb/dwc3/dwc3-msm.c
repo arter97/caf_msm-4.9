@@ -2329,7 +2329,14 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc, bool hibernation)
 		return -EBUSY;
 	}
 
-	if (!mdwc->in_host_mode && (mdwc->vbus_active && !mdwc->suspend)) {
+	/*
+	 * Check if remote wakeup is received and pending before going
+	 * ahead with suspend routine as part of device bus suspend.
+	 */
+
+	if (!mdwc->in_host_mode && (mdwc->vbus_active &&
+		(mdwc->otg_state == OTG_STATE_B_SUSPEND ||
+		mdwc->otg_state == OTG_STATE_B_PERIPHERAL) && !mdwc->suspend)) {
 		dev_dbg(mdwc->dev,
 			"Received wakeup event before the core suspend\n");
 		mutex_unlock(&mdwc->suspend_resume_mutex);
@@ -3728,6 +3735,7 @@ put_psy:
 	if (cpu_to_affin)
 		unregister_cpu_notifier(&mdwc->dwc3_cpu_notifier);
 put_dwc3:
+	platform_device_put(mdwc->dwc3);
 	if (mdwc->bus_perf_client)
 		msm_bus_scale_unregister_client(mdwc->bus_perf_client);
 
@@ -3781,6 +3789,7 @@ static int dwc3_msm_remove(struct platform_device *pdev)
 
 	if (mdwc->hs_phy)
 		mdwc->hs_phy->flags &= ~PHY_HOST_MODE;
+	platform_device_put(mdwc->dwc3);
 	of_platform_depopulate(&pdev->dev);
 
 	pm_runtime_disable(mdwc->dev);
@@ -3862,6 +3871,11 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 					mdwc->core_clk_rate_hs);
 				mdwc->max_rh_port_speed = USB_SPEED_HIGH;
 			} else {
+				clk_set_rate(mdwc->core_clk,
+						mdwc->core_clk_rate);
+				dev_dbg(mdwc->dev,
+					"set ss core clk rate %ld\n",
+					mdwc->core_clk_rate);
 				mdwc->max_rh_port_speed = USB_SPEED_SUPER;
 			}
 

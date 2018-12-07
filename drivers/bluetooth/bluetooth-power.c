@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/of_device.h>
 
 #if defined(CONFIG_CNSS)
 #include <net/cnss.h>
@@ -69,6 +70,7 @@ static int bt_vreg_init(struct bt_power_vreg_data *vreg)
 		rc = PTR_ERR(vreg->reg);
 		pr_err("%s: regulator_get(%s) failed. rc=%d\n",
 			__func__, vreg->name, rc);
+		vreg->reg = NULL;
 		goto out;
 	}
 
@@ -614,6 +616,8 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 static int bt_power_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+	const struct of_device_id *of_id =
+		of_match_device(bt_power_match_table, &pdev->dev);
 
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
@@ -653,6 +657,13 @@ static int bt_power_probe(struct platform_device *pdev)
 		goto free_pdata;
 
 	btpdev = pdev;
+
+	if (of_id) {
+		if (strcmp(of_id->compatible, "qca,qca6174") == 0) {
+			bluetooth_toggle_radio(pdev->dev.platform_data, 0);
+			bluetooth_toggle_radio(pdev->dev.platform_data, 1);
+		}
+	}
 
 	return 0;
 
