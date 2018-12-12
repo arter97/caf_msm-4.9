@@ -87,10 +87,12 @@ static struct lut {
 		.frame_rate = 30,
 		.bitrate = 14,
 		.compression_ratio = {
+			/* FP(1, 28, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 28, 100)),
+					83886),
+			/* FP(1, 23, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 23, 100)),
+					80609),
 		}
 	},
 	{
@@ -98,10 +100,12 @@ static struct lut {
 		.frame_rate = 60,
 		.bitrate = 22,
 		.compression_ratio = {
+			/* FP(1, 28, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 28, 100)),
+					83886),
+			/* FP(1, 23, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 23, 100)),
+					80609),
 		}
 	},
 	{
@@ -109,10 +113,12 @@ static struct lut {
 		.frame_rate = 30,
 		.bitrate = 40,
 		.compression_ratio = {
+			/* FP(1, 28, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 28, 100)),
+					83886),
+			/* FP(1, 23, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 23, 100)),
+					80609),
 		}
 	},
 	{
@@ -120,10 +126,12 @@ static struct lut {
 		.frame_rate = 60,
 		.bitrate = 64,
 		.compression_ratio = {
+			/* FP(1, 28, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 28, 100)),
+					83886),
+			/* FP(1, 23, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 23, 100)),
+					80609),
 		}
 	},
 	{
@@ -131,10 +139,12 @@ static struct lut {
 		.frame_rate = 30,
 		.bitrate = 64,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -142,10 +152,12 @@ static struct lut {
 		.frame_rate = 60,
 		.bitrate = 102,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -153,10 +165,12 @@ static struct lut {
 		.frame_rate = 30,
 		.bitrate = 84,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -164,10 +178,12 @@ static struct lut {
 		.frame_rate = 60,
 		.bitrate = 134,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -175,10 +191,12 @@ static struct lut {
 		.frame_rate = 30,
 		.bitrate = 88,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -186,10 +204,12 @@ static struct lut {
 		.frame_rate = 60,
 		.bitrate = 141,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -197,10 +217,12 @@ static struct lut {
 		.frame_rate = 30,
 		.bitrate = 96,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 	{
@@ -208,10 +230,12 @@ static struct lut {
 		.frame_rate = 60,
 		.bitrate = 154,
 		.compression_ratio = {
+			/* FP(1, 26, 100) */
 			GENERATE_COMPRESSION_PROFILE(8,
-					FP(1, 26, 100)),
+					82575),
+			/* FP(1, 22, 100) */
 			GENERATE_COMPRESSION_PROFILE(10,
-					FP(1, 22, 100)),
+					79953),
 		}
 	},
 };
@@ -330,17 +354,17 @@ static unsigned long __calculate_decoder(struct vidc_bus_vote_data *d,
 	 * measured heuristics and hardcoded numbers taken from the firmware.
 	 */
 	/* Decoder parameters */
-	int width, height, lcu_size, dpb_bpp, opb_bpp, fps, opb_factor;
+	uint32_t width, height, lcu_size, dpb_bpp, opb_bpp, fps;
 	bool unified_dpb_opb, dpb_compression_enabled, opb_compression_enabled,
 		llc_ref_read_l2_cache_enabled = false,
 		llc_vpss_ds_line_buf_enabled = false;
 	fp_t dpb_opb_scaling_ratio, dpb_read_compression_factor,
 		dpb_write_compression_factor, opb_compression_factor,
-		qsmmu_bw_overhead_factor, height_ratio;
+		qsmmu_bw_overhead_factor, height_ratio, opb_factor;
 
 	/* Derived parameters */
-	int lcu_per_frame, tnbr_per_lcu, colocated_bytes_per_lcu;
-	unsigned long bitrate;
+	fp_t lcu_per_frame, tnbr_per_lcu, colocated_bytes_per_lcu;
+	fp_t bitrate;
 
 	fp_t bins_to_bit_factor, dpb_write_factor, ten_bpc_packing_factor,
 		ten_bpc_bpp_factor, vsp_read_factor, vsp_write_factor,
@@ -360,8 +384,8 @@ static unsigned long __calculate_decoder(struct vidc_bus_vote_data *d,
 		fp_t dpb_read, opb_read, total;
 	} llc = {0};
 
-	unsigned long ret = 0;
-	unsigned int integer_part, frac_part;
+	fp_t ret = 0;
+	fp_t integer_part, frac_part;
 
 	width = max(d->input_width, BASELINE_DIMENSIONS.width);
 	height = max(d->input_height, BASELINE_DIMENSIONS.height);
@@ -451,13 +475,13 @@ static unsigned long __calculate_decoder(struct vidc_bus_vote_data *d,
 	ddr.vsp_write = fp_div(fp_mult(FP_INT(bitrate),
 				vsp_write_factor), FP_INT(8));
 
-	ddr.collocated_read = FP_INT(lcu_per_frame *
-			colocated_bytes_per_lcu * fps / bps(1));
-	ddr.collocated_write = FP_INT(lcu_per_frame *
-			colocated_bytes_per_lcu * fps / bps(1));
+	ddr.collocated_read = FP_INT(div64_u64(lcu_per_frame *
+			colocated_bytes_per_lcu * fps,  bps(1)));
+	ddr.collocated_write = FP_INT(div64_u64(lcu_per_frame *
+			colocated_bytes_per_lcu * fps, bps(1)));
 
-	ddr.line_buffer_read = FP_INT(tnbr_per_lcu *
-			lcu_per_frame * fps / bps(1));
+	ddr.line_buffer_read = FP_INT(div64_u64(tnbr_per_lcu *
+			lcu_per_frame * fps, bps(1)));
 	ddr.line_buffer_write = ddr.line_buffer_read;
 
 	bw_for_1x_8bpc = fp_div(FP_INT(width * height), FP_INT(32 * 8));
@@ -594,7 +618,7 @@ static unsigned long __calculate_encoder(struct vidc_bus_vote_data *d,
 	 */
 	/* Encoder Parameters */
 
-	int width, height, fps, dpb_bpp, lcu_per_frame, lcu_size,
+	u32 width, height, fps, dpb_bpp, lcu_per_frame, lcu_size,
 		vertical_tile_width, colocated_bytes_per_lcu, bitrate,
 		ref_overlap_bw_factor;
 	enum hal_uncompressed_format dpb_color_format, original_color_format;
