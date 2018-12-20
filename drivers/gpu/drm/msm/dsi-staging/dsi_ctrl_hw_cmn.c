@@ -1418,17 +1418,20 @@ void dsi_ctrl_hw_cmn_mask_error_intr(struct dsi_ctrl_hw *ctrl, u32 idx, bool en)
 	reg = DSI_R32(ctrl, 0x10c);
 
 	if (idx & BIT(DSI_FIFO_OVERFLOW)) {
-		if (en)
-			reg |= (0xf << 16);
-		else
-			reg &= ~(0xf << 16);
+		if (en) {
+			reg |= (0x1f << 16);
+			reg |= BIT(9);
+		} else {
+			reg &= ~(0x1f << 16);
+			reg &= ~BIT(9);
+		}
 	}
 
 	if (idx & BIT(DSI_FIFO_UNDERFLOW)) {
 		if (en)
-			reg |= (0xf << 26);
+			reg |= (0x1b << 26);
 		else
-			reg &= ~(0xf << 26);
+			reg &= ~(0x1b << 26);
 	}
 
 	if (idx & BIT(DSI_LP_Rx_TIMEOUT)) {
@@ -1436,6 +1439,13 @@ void dsi_ctrl_hw_cmn_mask_error_intr(struct dsi_ctrl_hw *ctrl, u32 idx, bool en)
 			reg |= (0x7 << 23);
 		else
 			reg &= ~(0x7 << 23);
+	}
+
+	if (idx & BIT(DSI_PLL_UNLOCK_ERR)) {
+		if (en)
+			reg |= BIT(28);
+		else
+			reg &= ~BIT(28);
 	}
 
 	DSI_W32(ctrl, 0x10c, reg);
@@ -1490,4 +1500,39 @@ int dsi_ctrl_hw_cmn_wait_for_cmd_mode_mdp_idle(struct dsi_ctrl_hw *ctrl)
 		pr_err("%s: timed out waiting for idle\n", __func__);
 
 	return rc;
+}
+
+void dsi_ctrl_hw_cmn_set_continuous_clk(struct dsi_ctrl_hw *ctrl, bool enable)
+{
+	u32 reg = 0;
+
+	reg = DSI_R32(ctrl, DSI_LANE_CTRL);
+	if (enable)
+		reg |= BIT(28);
+	else
+		reg &= ~BIT(28);
+	DSI_W32(ctrl, DSI_LANE_CTRL, reg);
+	wmb(); /* make sure request is set */
+}
+
+int dsi_ctrl_hw_cmn_wait4dynamic_refresh_done(struct dsi_ctrl_hw *ctrl)
+{
+	int rc;
+	u32 const sleep_us = 1000;
+	u32 const timeout_us = 84000; /* approximately 5 vsyncs */
+	u32 reg = 0, dyn_refresh_done = BIT(28);
+
+	rc = readl_poll_timeout(ctrl->base + DSI_INT_CTRL, reg,
+				(reg & dyn_refresh_done), sleep_us, timeout_us);
+	if (rc) {
+		pr_err("wait4dynamic refresh timedout %d\n", rc);
+		return rc;
+	}
+
+	/* ack dynamic refresh done status */
+	reg = DSI_R32(ctrl, DSI_INT_CTRL);
+	reg |= dyn_refresh_done;
+	DSI_W32(ctrl, DSI_INT_CTRL, reg);
+
+	return 0;
 }

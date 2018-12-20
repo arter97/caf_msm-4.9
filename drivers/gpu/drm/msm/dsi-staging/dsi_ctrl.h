@@ -218,6 +218,7 @@ struct dsi_ctrl_interrupts {
  * @cmd_buffer_size:     Size of command buffer.
  * @vaddr:               CPU virtual address of cmd buffer.
  * @secure_mode:         Indicates if secure-session is in progress
+ * @esd_check_underway:  Indicates if esd status check is in progress
  * @debugfs_root:        Root for debugfs entries.
  * @misr_enable:         Frame MISR enable/disable
  * @misr_cache:          Cached Frame MISR value
@@ -263,6 +264,7 @@ struct dsi_ctrl {
 	u32 cmd_len;
 	void *vaddr;
 	bool secure_mode;
+	bool esd_check_underway;
 
 	/* Debug Information */
 	struct dentry *debugfs_root;
@@ -740,8 +742,11 @@ void dsi_ctrl_isr_configure(struct dsi_ctrl *dsi_ctrl, bool enable);
  * dsi_ctrl_mask_error_status_interrupts() - API to mask dsi ctrl error status
  *                                           interrupts
  * @dsi_ctrl:              DSI controller handle.
+ * @idx:                   id indicating which interrupts to enable/disable.
+ * @mask_enable:           boolean to enable/disable masking.
  */
-void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl);
+void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl, u32 idx,
+						bool mask_enable);
 
 /**
  * dsi_ctrl_irq_update() - Put a irq vote to process DSI error
@@ -764,4 +769,17 @@ int dsi_ctrl_get_host_engine_init_state(struct dsi_ctrl *dsi_ctrl,
  */
 int dsi_ctrl_wait_for_cmd_mode_mdp_idle(struct dsi_ctrl *dsi_ctrl);
 
+/**
+ * dsi_ctrl_set_continuous_clk() - API to set/unset force clock lane HS request.
+ * @dsi_ctrl:                      DSI controller handle.
+ * @enable:			   variable to control continuous clock.
+ */
+void dsi_ctrl_set_continuous_clk(struct dsi_ctrl *dsi_ctrl, bool enable);
+
+/**
+ * dsi_ctrl_wait4dynamic_refresh_done() - Poll for dynamic refresh done
+ *					interrupt.
+ * @dsi_ctrl:                      DSI controller handle.
+ */
+int dsi_ctrl_wait4dynamic_refresh_done(struct dsi_ctrl *ctrl);
 #endif /* _DSI_CTRL_H_ */
