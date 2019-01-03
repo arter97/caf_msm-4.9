@@ -54,7 +54,7 @@ static struct msm_edp *edp_init(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto fail;
 	}
-	DBG("eDP probed=%pK", edp);
+	DBG("eDP probed=%p", edp);
 
 	edp->pdev = pdev;
 	platform_set_drvdata(pdev, edp);
