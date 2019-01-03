@@ -114,7 +114,9 @@ static int fill_dynamic_stats(struct msm_vidc_inst *inst,
 {
 	struct recon_buf *binfo, *nextb;
 	struct vidc_input_cr_data *temp, *next;
-	u32 max_cr = 0, max_cf = 0, max_input_cr = 0;
+	u32 max_cr = MSM_VIDC_MIN_UBWC_COMPRESSION_RATIO;
+	u32 max_cf = MSM_VIDC_MIN_UBWC_COMPLEXITY_FACTOR;
+	u32 max_input_cr = MSM_VIDC_MIN_UBWC_COMPRESSION_RATIO;
 	u32 min_cr = MSM_VIDC_MAX_UBWC_COMPRESSION_RATIO;
 	u32 min_input_cr = MSM_VIDC_MAX_UBWC_COMPRESSION_RATIO;
 	u32 min_cf = MSM_VIDC_MAX_UBWC_COMPLEXITY_FACTOR;
