@@ -263,7 +263,7 @@ static void mdp3_vsync_retire_handle_vsync(void *arg)
 	schedule_work(&mdp3_session->retire_work);
 }
 
-static void mdp3_vsync_retire_signal(struct msm_fb_data_type *mfd, int val)
+void mdp3_vsync_retire_signal(struct msm_fb_data_type *mfd, int val)
 {
 	struct mdp3_session_data *mdp3_session;
 
@@ -273,6 +273,10 @@ static void mdp3_vsync_retire_signal(struct msm_fb_data_type *mfd, int val)
 	if (mdp3_session->retire_cnt > 0) {
 		mdss_inc_timeline(mfd->mdp_sync_pt_data.timeline_retire, val);
 		mdp3_session->retire_cnt -= min(val, mdp3_session->retire_cnt);
+		pr_debug("Retire signaled! timeline val=%d remaining=%d\n",
+			mdss_get_timeline_retire_ts(
+			mfd->mdp_sync_pt_data.timeline_retire),
+			mdp3_session->retire_cnt);
 	}
 	mutex_unlock(&mfd->mdp_sync_pt_data.sync_mutex);
 }
@@ -885,6 +889,13 @@ static int mdp3_ctrl_dma_init(struct msm_fb_data_type *mfd,
 	te.hw_vsync_mode = panel_info->mipi.hw_vsync_mode;
 	te.tear_check_en = panel_info->te.tear_check_en;
 	te.sync_cfg_height = panel_info->te.sync_cfg_height;
+
+	/* For mdp3, max. value of CFG_HEIGHT is 0x7ff,
+	 * for mdp5, max. value of CFG_HEIGHT is 0xffff.
+	 */
+	if (te.sync_cfg_height > 0x7ff)
+		te.sync_cfg_height = 0x7ff;
+
 	te.vsync_init_val = panel_info->te.vsync_init_val;
 	te.sync_threshold_start = panel_info->te.sync_threshold_start;
 	te.sync_threshold_continue = panel_info->te.sync_threshold_continue;
@@ -953,7 +964,7 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 				MDSS_EVENT_UNBLANK, NULL);
 		rc |= panel->event_handler(panel,
 				MDSS_EVENT_PANEL_ON, NULL);
-		if (mdss_fb_is_power_on_ulp(mfd))
+		if (mdss_fb_is_power_on_lp(mfd))
 			rc |= mdp3_enable_panic_ctrl();
 			mdp3_clk_enable(0, 0);
 		}
@@ -1099,7 +1110,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 	 */
 	pm_runtime_get_sync(&mdp3_res->pdev->dev);
 
-	MDSS_XLOG(XLOG_FUNC_ENTRY, __LINE__, mdss_fb_is_power_on_ulp(mfd),
+	MDSS_XLOG(XLOG_FUNC_ENTRY, __LINE__, mdss_fb_is_power_on_lp(mfd),
 		mfd->panel_power_state);
 	panel = mdp3_session->panel;
 
@@ -1240,9 +1251,9 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 		}
 	}
 
-	if (mdss_fb_is_power_on_ulp(mfd) &&
+	if (mdss_fb_is_power_on_lp(mfd) &&
 		(mfd->panel.type == MIPI_CMD_PANEL)) {
-		pr_debug("%s: Disable MDP3 clocks in ULP\n", __func__);
+		pr_debug("%s: Disable MDP3 clocks in LP\n", __func__);
 		if (!mdp3_session->clk_on)
 			mdp3_ctrl_clk_enable(mfd, 1);
 		/*
@@ -1252,7 +1263,7 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 		rc = mdp3_session->dma->stop(mdp3_session->dma,
 					mdp3_session->intf);
 		if (rc)
-			pr_warn("fail to stop the MDP3 dma in ULP\n");
+			pr_warn("fail to stop the MDP3 dma in LP\n");
 		/* Wait to ensure TG to turn off */
 		msleep(20);
 		/*
@@ -3037,7 +3048,7 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	mdp3_interface->lut_update = NULL;
 	mdp3_interface->configure_panel = mdp3_update_panel_info;
 	mdp3_interface->input_event_handler = NULL;
-	mdp3_interface->signal_retire_fence = NULL;
+	mdp3_interface->signal_retire_fence = mdp3_vsync_retire_signal;
 	mdp3_interface->is_twm_en = mdp3_is_twm_en;
 
 	mdp3_session = kzalloc(sizeof(struct mdp3_session_data), GFP_KERNEL);
