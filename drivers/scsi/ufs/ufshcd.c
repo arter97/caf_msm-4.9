@@ -3382,6 +3382,7 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 	int tag;
 	struct completion wait;
 	unsigned long flags;
+	bool has_read_lock = false;
 
 	/*
 	 * May get invoked from shutdown and IOCTL contexts.
@@ -3389,8 +3390,10 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 	 * In error recovery context, it may come with lock acquired.
 	 */
 
-	if (!ufshcd_is_shutdown_ongoing(hba) && !ufshcd_eh_in_progress(hba))
+	if (!ufshcd_is_shutdown_ongoing(hba) && !ufshcd_eh_in_progress(hba)) {
 		down_read(&hba->lock);
+		has_read_lock = true;
+	}
 
 	/*
 	 * Get free slot, sleep if slots are unavailable.
@@ -3423,7 +3426,7 @@ static int ufshcd_exec_dev_cmd(struct ufs_hba *hba,
 out_put_tag:
 	ufshcd_put_dev_cmd_tag(hba, tag);
 	wake_up(&hba->dev_cmd.tag_wq);
-	if (!ufshcd_is_shutdown_ongoing(hba) && !ufshcd_eh_in_progress(hba))
+	if (has_read_lock)
 		up_read(&hba->lock);
 	return err;
 }
@@ -7431,7 +7434,7 @@ static void ufshcd_set_active_icc_lvl(struct ufs_hba *hba)
 		dev_err(hba->dev,
 			"%s: Failed reading power descriptor.len = %d ret = %d",
 			__func__, buff_len, ret);
-		return;
+		goto out;
 	}
 
 	icc_level = ufshcd_find_max_sup_active_icc_level(hba, desc_buf,
@@ -7445,6 +7448,9 @@ static void ufshcd_set_active_icc_lvl(struct ufs_hba *hba)
 		dev_err(hba->dev,
 			"%s: Failed configuring bActiveICCLevel = %d ret = %d",
 			__func__, icc_level, ret);
+
+out:
+	kfree(desc_buf);
 }
 
 /**
@@ -7802,7 +7808,7 @@ out:
 
 static int ufs_read_device_desc_data(struct ufs_hba *hba)
 {
-	int err;
+	int err = 0;
 	u8 *desc_buf = NULL;
 
 	if (hba->desc_size.dev_desc) {
@@ -7816,7 +7822,7 @@ static int ufs_read_device_desc_data(struct ufs_hba *hba)
 	}
 	err = ufshcd_read_device_desc(hba, desc_buf, hba->desc_size.dev_desc);
 	if (err)
-		return err;
+		goto out;
 
 	/*
 	 * getting vendor (manufacturerID) and Bank Index in big endian
@@ -7828,8 +7834,9 @@ static int ufs_read_device_desc_data(struct ufs_hba *hba)
 	hba->dev_info.b_device_sub_class =
 		desc_buf[DEVICE_DESC_PARAM_DEVICE_SUB_CLASS];
 	hba->dev_info.i_product_name = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
-
-	return 0;
+out:
+	kfree(desc_buf);
+	return err;
 }
 
 static void ufshcd_init_desc_sizes(struct ufs_hba *hba)
@@ -8528,6 +8535,11 @@ static int ufshcd_config_vreg(struct device *dev,
 	BUG_ON(!vreg);
 
 	if (regulator_count_voltages(reg) > 0) {
+		uA_load = on ? vreg->max_uA : 0;
+		ret = ufshcd_config_vreg_load(dev, vreg, uA_load);
+		if (ret)
+			goto out;
+
 		min_uV = on ? vreg->min_uV : 0;
 		ret = regulator_set_voltage(reg, min_uV, vreg->max_uV);
 		if (ret) {
@@ -8535,11 +8547,6 @@ static int ufshcd_config_vreg(struct device *dev,
 					__func__, name, ret);
 			goto out;
 		}
-
-		uA_load = on ? vreg->max_uA : 0;
-		ret = ufshcd_config_vreg_load(dev, vreg, uA_load);
-		if (ret)
-			goto out;
 	}
 out:
 	return ret;
