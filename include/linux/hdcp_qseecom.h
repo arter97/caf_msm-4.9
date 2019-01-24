@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -217,6 +217,7 @@ struct hdcp_register_data {
 int hdcp_library_register(struct hdcp_register_data *data);
 void hdcp_library_deregister(void *phdcpcontext);
 bool hdcp1_check_if_supported_load_app(void);
+void hdcp1_unload_app(void);
 int hdcp1_set_keys(uint32_t *aksv_msb, uint32_t *aksv_lsb);
 int hdcp1_set_enc(bool enable);
 void hdcp1_cache_repeater_topology(void *hdcp1_cached_tp);
