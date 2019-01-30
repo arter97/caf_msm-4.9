@@ -1,4 +1,5 @@
-/* Copyright (c) 2012-2016, 2018 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, 2018-2019 The Linux Foundation. All rights
+ * reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3428,7 +3429,7 @@ static int __response_handler(struct venus_hfi_device *device)
 
 	packets = device->response_pkt;
 
-	raw_packet = kzalloc(VIDC_IFACEQ_VAR_HUGE_PKT_SIZE, GFP_TEMPORARY);
+	raw_packet = kzalloc(VIDC_IFACEQ_VAR_HUGE_PKT_SIZE, GFP_KERNEL);
 	if (!raw_packet || !packets) {
 		dprintk(VIDC_ERR, "%s: Failed to allocate memory\n",  __func__);
 		kfree(raw_packet);
