@@ -226,6 +226,7 @@ struct sde_kms {
 	void **dp_displays;
 
 	bool has_danger_ctrl;
+	struct mutex vblank_ctl_global_lock;
 
 	bool first_kickoff;
 };
