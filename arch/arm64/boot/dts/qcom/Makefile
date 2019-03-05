@@ -3,7 +3,8 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= apq8096-db820c.dtb
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
-dtb-$(CONFIG_ARCH_SDM845) += sdm845-v2-mtp.dtb
+dtb-$(CONFIG_ARCH_SDM845) += sdm845-v2-mtp.dtb \
+	sdm845-v2-robotics.dtb
 dtb-$(CONFIG_ARCH_SDM845_VM) += sdm845-vm.dtb
 else
 dtb-$(CONFIG_ARCH_SDM845) += sdm845-sim.dtb \
@@ -12,6 +13,7 @@ dtb-$(CONFIG_ARCH_SDM845) += sdm845-sim.dtb \
 	sdm845-cdp.dtb \
 	sdm845-v2-rumi.dtb \
 	sdm845-v2-mtp.dtb \
+	sdm845-v2-robotics.dtb \
 	sdm845-v2-cdp.dtb \
 	sdm845-qrd.dtb \
 	sdm845-v2-qrd.dtb \
