@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -265,6 +265,8 @@ retry_write:
 		return -EINVAL;
 	}
 
+	reinit_completion(&ipc_dev->write_done);
+
 	if (usb_ep_queue(in, req, GFP_KERNEL)) {
 		wait_event_interruptible(ipc_dev->state_wq, ipc_dev->online ||
 				ipc_dev->current_state == IPC_DISCONNECTED);
@@ -331,6 +333,8 @@ retry_read:
 		ipc_dev->pending_reads--;
 		return -EINVAL;
 	}
+
+	reinit_completion(&ipc_dev->read_done);
 
 	if (usb_ep_queue(out, req, GFP_KERNEL)) {
 		wait_event_interruptible(ipc_dev->state_wq, ipc_dev->online ||
@@ -407,7 +411,6 @@ static void ipc_function_work(struct work_struct *w)
 			break;
 
 		ctxt->current_state = IPC_CONNECTED;
-		ctxt->online = 1;
 		ctxt->pdev = platform_device_alloc("ipc_bridge", -1);
 		if (!ctxt->pdev)
 			goto pdev_fail;
@@ -431,9 +434,9 @@ static void ipc_function_work(struct work_struct *w)
 		if (ctxt->connected)
 			break;
 
-		platform_device_unregister(ctxt->pdev);
 		ctxt->current_state = IPC_DISCONNECTED;
 		wake_up(&ctxt->state_wq);
+		platform_device_unregister(ctxt->pdev);
 		break;
 	default:
 		pr_debug("%s: Unknown current state\n", __func__);
@@ -442,7 +445,6 @@ static void ipc_function_work(struct work_struct *w)
 	return;
 
 pdev_fail:
-	ctxt->online = 0;
 	ctxt->current_state = IPC_DISCONNECTED;
 	return;
 }
@@ -591,6 +593,7 @@ static int ipc_set_alt(struct usb_function *f, unsigned int intf,
 
 	spin_lock_irqsave(&ctxt->lock, flags);
 	ctxt->connected = 1;
+	ctxt->online = 1;
 	spin_unlock_irqrestore(&ctxt->lock, flags);
 	schedule_work(&ctxt->func_work);
 
@@ -604,6 +607,7 @@ static void ipc_disable(struct usb_function *f)
 
 	pr_debug("%s: Disabling\n", __func__);
 	spin_lock_irqsave(&ctxt->lock, flags);
+	ctxt->online = 0;
 	ctxt->connected = 0;
 	spin_unlock_irqrestore(&ctxt->lock, flags);
 	schedule_work(&ctxt->func_work);
@@ -671,21 +675,24 @@ static ssize_t debug_read_stats(struct file *file, char __user *ubuf,
 	int temp = 0;
 	unsigned long flags;
 
-	if (ipc_dev) {
-		spin_lock_irqsave(&ipc_dev->lock, flags);
-		temp += scnprintf(buf + temp, PAGE_SIZE - temp,
-				"endpoints: %s, %s\n"
-				"bytes to host: %lu\n"
-				"bytes to mdm:  %lu\n"
-				"pending writes:  %u\n"
-				"pending reads: %u\n",
-				ipc_dev->in->name, ipc_dev->out->name,
-				ipc_dev->bytes_to_host,
-				ipc_dev->bytes_to_mdm,
-				ipc_dev->pending_writes,
-				ipc_dev->pending_reads);
-		spin_unlock_irqrestore(&ipc_dev->lock, flags);
+	if (!ipc_dev || !ipc_dev->in || !ipc_dev->out) {
+		pr_err("ipc_dev instance, or EPs not yet initialised\n");
+		return 0;
 	}
+
+	spin_lock_irqsave(&ipc_dev->lock, flags);
+	temp += scnprintf(buf + temp, PAGE_SIZE - temp,
+			"endpoints: %s, %s\n"
+			"bytes to host: %lu\n"
+			"bytes to mdm:  %lu\n"
+			"pending writes:  %u\n"
+			"pending reads: %u\n",
+			ipc_dev->in->name, ipc_dev->out->name,
+			ipc_dev->bytes_to_host,
+			ipc_dev->bytes_to_mdm,
+			ipc_dev->pending_writes,
+			ipc_dev->pending_reads);
+	spin_unlock_irqrestore(&ipc_dev->lock, flags);
 
 	return simple_read_from_buffer(ubuf, count, ppos, buf, temp);
 }
@@ -695,12 +702,15 @@ static ssize_t debug_reset_stats(struct file *file, const char __user *buf,
 {
 	unsigned long flags;
 
-	if (ipc_dev) {
-		spin_lock_irqsave(&ipc_dev->lock, flags);
-		ipc_dev->bytes_to_host = 0;
-		ipc_dev->bytes_to_mdm = 0;
-		spin_unlock_irqrestore(&ipc_dev->lock, flags);
+	if (!ipc_dev) {
+		pr_err("ipc_dev instance not yet initialised\n");
+		return count;
 	}
+
+	spin_lock_irqsave(&ipc_dev->lock, flags);
+	ipc_dev->bytes_to_host = 0;
+	ipc_dev->bytes_to_mdm = 0;
+	spin_unlock_irqrestore(&ipc_dev->lock, flags);
 
 	return count;
 }

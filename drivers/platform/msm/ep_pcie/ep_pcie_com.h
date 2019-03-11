@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -234,6 +234,7 @@ enum ep_pcie_res {
 	EP_PCIE_RES_DM_CORE,
 	EP_PCIE_RES_ELBI,
 	EP_PCIE_RES_IATU,
+	EP_PCIE_RES_TCSR_PERST,
 	EP_PCIE_MAX_RES,
 };
 
@@ -325,11 +326,13 @@ struct ep_pcie_dev_t {
 	void __iomem                 *dm_core;
 	void __iomem                 *elbi;
 	void __iomem                 *iatu;
+	void __iomem		     *tcsr_perst_en;
 
 	struct msm_bus_scale_pdata   *bus_scale_table;
 	u32                          bus_client;
 	u16                          vendor_id;
 	u16                          device_id;
+	u32                          subsystem_id;
 	u32                          link_speed;
 	bool                         active_config;
 	bool                         aggregated_irq;

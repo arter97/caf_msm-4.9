@@ -282,7 +282,8 @@ static int smb5_chg_config_init(struct smb5 *chip)
 		break;
 	case PMI632_SUBTYPE:
 		chip->chg.smb_version = PMI632_SUBTYPE;
-		chg->wa_flags |= WEAK_ADAPTER_WA | USBIN_OV_WA;
+		chg->wa_flags |= WEAK_ADAPTER_WA | USBIN_OV_WA |
+					CHG_TERMINATION_WA;
 		if (pmic_rev_id->rev4 >= 2)
 			chg->wa_flags |= MOISTURE_PROTECTION_WA;
 		chg->param = smb5_pmi632_params;
@@ -1366,6 +1367,8 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		rc = smblib_get_prop_from_bms(chg,
 				POWER_SUPPLY_PROP_CURRENT_NOW, val);
+		if (!rc)
+			val->intval *= (-1);
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		val->intval = get_client_vote(chg->fcc_votable,

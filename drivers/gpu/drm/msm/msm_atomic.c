@@ -124,7 +124,8 @@ static inline bool _msm_seamless_for_crtc(struct drm_atomic_state *state,
 	int conn_cnt = 0;
 
 	if (msm_is_mode_seamless(&crtc_state->mode) ||
-		msm_is_mode_seamless_vrr(&crtc_state->adjusted_mode))
+		msm_is_mode_seamless_vrr(&crtc_state->adjusted_mode) ||
+		msm_is_mode_seamless_dyn_clk(&crtc_state->adjusted_mode))
 		return true;
 
 	if (msm_is_mode_seamless_dms(&crtc_state->adjusted_mode) && !enable)
@@ -168,6 +169,10 @@ static inline bool _msm_seamless_for_conn(struct drm_connector *connector,
 			&connector->encoder->crtc->state->adjusted_mode))
 		return true;
 
+	if (msm_is_mode_seamless_dyn_clk(
+			 &connector->encoder->crtc->state->adjusted_mode))
+		return true;
+
 	if (msm_is_mode_seamless_dms(
 			&connector->encoder->crtc->state->adjusted_mode))
 		return true;
@@ -194,7 +199,12 @@ static void msm_atomic_wait_for_commit_done(
 		if (old_state->legacy_cursor_update)
 			continue;
 
+		if (drm_crtc_vblank_get(crtc))
+			continue;
+
 		kms->funcs->wait_for_crtc_commit_done(kms, crtc);
+
+		drm_crtc_vblank_put(crtc);
 	}
 }
 

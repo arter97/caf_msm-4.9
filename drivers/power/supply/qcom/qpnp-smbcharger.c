@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, 2018 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, 2018-2019 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -308,6 +308,7 @@ enum pmic_subtype {
 	PMI8950		= 17,
 	PMI8996		= 19,
 	PMI8937		= 55,
+	PMI8940		= 64,
 };
 
 enum smbchg_wa {
@@ -4043,6 +4044,11 @@ static void smbchg_chg_led_brightness_set(struct led_classdev *cdev,
 	u8 reg;
 	int rc;
 
+	if (!is_bms_psy_present(chip)) {
+		dev_err(chip->dev, "Couldn't access bms psy\n");
+		return;
+	}
+
 	reg = (value > LED_OFF) ? CHG_LED_ON << CHG_LED_SHIFT :
 		CHG_LED_OFF << CHG_LED_SHIFT;
 	pval.intval = value > LED_OFF ? 1 : 0;
@@ -4089,6 +4095,11 @@ static void smbchg_chg_led_blink_set(struct smbchg_chip *chip,
 	union power_supply_propval pval = {0, };
 	u8 reg;
 	int rc;
+
+	if (!is_bms_psy_present(chip)) {
+		dev_err(chip->dev, "Couldn't access bms psy\n");
+		return;
+	}
 
 	pval.intval = (blinking == 0) ? 0 : 1;
 	power_supply_set_property(chip->bms_psy, POWER_SUPPLY_PROP_HI_POWER,
@@ -6065,6 +6076,7 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = get_prop_batt_current_now(chip);
+		val->intval *= (-1);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = get_prop_batt_voltage_now(chip);
@@ -8086,6 +8098,8 @@ static int smbchg_check_chg_version(struct smbchg_chip *chip)
 	case PMI8950:
 		chip->wa_flags |= SMBCHG_RESTART_WA;
 	case PMI8937:
+	/* fall through */
+	case PMI8940:
 		chip->wa_flags |= SMBCHG_BATT_OV_WA;
 		if (pmic_rev_id->rev4 < 2) /* PMI8950 1.0 */ {
 			chip->wa_flags |= SMBCHG_AICL_DEGLITCH_WA;
@@ -8100,7 +8114,9 @@ static int smbchg_check_chg_version(struct smbchg_chip *chip)
 			ARRAY_SIZE(aicl_rerun_period_schg_lite);
 
 		chip->schg_version = QPNP_SCHG_LITE;
-		if (pmic_rev_id->pmic_subtype == PMI8937)
+		/* PMI8937/PMI8940 doesn't support HVDCP */
+		if ((pmic_rev_id->pmic_subtype == PMI8937)
+			|| (pmic_rev_id->pmic_subtype == PMI8940))
 			chip->hvdcp_not_supported = true;
 		break;
 	case PMI8996:

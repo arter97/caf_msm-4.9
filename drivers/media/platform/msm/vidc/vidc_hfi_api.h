@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -66,6 +66,9 @@
 
 /* 16 encoder and 16 decoder sessions */
 #define VIDC_MAX_SESSIONS               32
+#define VIDC_MAX_DECODE_SESSIONS        16
+#define VIDC_MAX_ENCODE_SESSIONS        16
+
 
 enum vidc_status {
 	VIDC_ERR_NONE = 0x0,
@@ -1403,8 +1406,8 @@ struct vidc_bus_vote_data {
 	enum hal_domain domain;
 	enum hal_video_codec codec;
 	enum hal_uncompressed_format color_formats[2];
-	u32 num_formats; /* 1 = DPB-OPB unified; 2 = split */
-	u32 input_height, input_width, fps;
+	int num_formats; /* 1 = DPB-OPB unified; 2 = split */
+	u32 input_height, input_width, fps, bitrate;
 	u32 output_height, output_width;
 	uint64_t compression_ratio;
 	uint64_t complexity_factor;

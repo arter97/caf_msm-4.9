@@ -1,4 +1,4 @@
-/* Copyright (c) 2015,2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015,2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +43,7 @@
 
 #define MHI_UCI_ASYNC_READ_TIMEOUT	msecs_to_jiffies(100)
 #define MHI_UCI_ASYNC_WRITE_TIMEOUT	msecs_to_jiffies(100)
+#define MHI_UCI_AT_CTRL_READ_TIMEOUT	msecs_to_jiffies(1000)
 
 enum uci_dbg_level {
 	UCI_DBG_VERBOSE = 0x0,
@@ -83,6 +84,8 @@ struct chan_attr {
 	void (*tre_notif_cb)(struct mhi_dev_client_cb_reason *reason);
 	/* Write completion - false if not needed */
 	bool wr_cmpl;
+	/* Uevent broadcast of channel state */
+	bool state_bcast;
 
 };
 
@@ -146,7 +149,10 @@ static const struct chan_attr uci_chan_attr_table[] = {
 		MAX_NR_TRBS_PER_CHAN,
 		MHI_DIR_OUT,
 		NULL,
-		NULL
+		NULL,
+		NULL,
+		false,
+		true
 	},
 	{
 		MHI_CLIENT_MBIM_IN,
@@ -162,7 +168,10 @@ static const struct chan_attr uci_chan_attr_table[] = {
 		MAX_NR_TRBS_PER_CHAN,
 		MHI_DIR_OUT,
 		NULL,
-		NULL
+		NULL,
+		NULL,
+		false,
+		true
 	},
 	{
 		MHI_CLIENT_QMI_IN,
@@ -298,6 +307,7 @@ struct uci_client {
 	struct mhi_req *wreqs;
 	struct list_head wr_req_list;
 	struct completion read_done;
+	struct completion at_ctrl_read_done;
 	struct completion *write_done;
 	int (*send)(struct uci_client*, void*, u32);
 	int (*read)(struct uci_client*, struct mhi_req*, int*);
@@ -1143,6 +1153,71 @@ error_memcpy:
 
 }
 
+void mhi_uci_chan_state_notify_all(struct mhi_dev *mhi,
+		enum mhi_ctrl_info ch_state)
+{
+	unsigned int i;
+	const struct chan_attr *chan_attrib;
+
+	for (i = 0; i < ARRAY_SIZE(uci_chan_attr_table); i++) {
+		chan_attrib = &uci_chan_attr_table[i];
+		if (chan_attrib->state_bcast) {
+			uci_log(UCI_DBG_ERROR, "Calling notify for ch %d\n",
+					chan_attrib->chan_id);
+			mhi_uci_chan_state_notify(mhi, chan_attrib->chan_id,
+					ch_state);
+		}
+	}
+}
+EXPORT_SYMBOL(mhi_uci_chan_state_notify_all);
+
+void mhi_uci_chan_state_notify(struct mhi_dev *mhi,
+		enum mhi_client_channel ch_id, enum mhi_ctrl_info ch_state)
+{
+	struct uci_client *uci_handle;
+	char *buf[2];
+	int rc;
+
+	if (ch_id < 0 || ch_id >= MHI_MAX_SOFTWARE_CHANNELS) {
+		uci_log(UCI_DBG_ERROR, "Invalid chan %d\n", ch_id);
+		return;
+	}
+
+	uci_handle = &uci_ctxt.client_handles[CHAN_TO_CLIENT(ch_id)];
+	if (!uci_handle->out_chan_attr ||
+		!uci_handle->out_chan_attr->state_bcast) {
+		uci_log(UCI_DBG_VERBOSE, "Uevents not enabled for chan %d\n",
+				ch_id);
+		return;
+	}
+
+	if (ch_state == MHI_STATE_CONNECTED) {
+		buf[0] = kasprintf(GFP_KERNEL,
+				"MHI_CHANNEL_STATE_%d=CONNECTED", ch_id);
+		buf[1] = NULL;
+	} else if (ch_state == MHI_STATE_DISCONNECTED) {
+		buf[0] = kasprintf(GFP_KERNEL,
+				"MHI_CHANNEL_STATE_%d=DISCONNECTED", ch_id);
+		buf[1] = NULL;
+	} else {
+		uci_log(UCI_DBG_ERROR, "Unsupported chan state %d\n", ch_state);
+		return;
+	}
+
+	if (!buf[0]) {
+		uci_log(UCI_DBG_ERROR, "kasprintf failed for uevent buf!\n");
+		return;
+	}
+
+	rc = kobject_uevent_env(&mhi->dev->kobj, KOBJ_CHANGE, buf);
+	if (rc)
+		uci_log(UCI_DBG_ERROR,
+				"Sending uevent failed for chan %d\n", ch_id);
+
+	kfree(buf[0]);
+}
+EXPORT_SYMBOL(mhi_uci_chan_state_notify);
+
 void uci_ctrl_update(struct mhi_dev_client_cb_reason *reason)
 {
 	struct uci_ctrl *uci_ctrl_handle = NULL;
@@ -1197,6 +1272,8 @@ static int mhi_register_client(struct uci_client *mhi_client, int index)
 	mutex_init(&mhi_client->in_chan_lock);
 	mutex_init(&mhi_client->out_chan_lock);
 	spin_lock_init(&mhi_client->wr_req_lock);
+	/* Init the completion event for AT ctrl read */
+	init_completion(&mhi_client->at_ctrl_read_done);
 
 	uci_log(UCI_DBG_DBG, "Registering chan %d.\n", mhi_client->out_chan);
 	return 0;
@@ -1212,8 +1289,17 @@ static int mhi_uci_ctrl_set_tiocm(struct uci_client *client,
 	struct uci_client *ctrl_client =
 		&uci_ctxt.client_handles[CHAN_TO_CLIENT
 					(MHI_CLIENT_IP_CTRL_1_OUT)];
+	unsigned int info = 0;
 
 	uci_log(UCI_DBG_VERBOSE, "Rcvd ser_state = 0x%x\n", ser_state);
+
+	/* Check if the IP_CTRL channels were started by host */
+	mhi_ctrl_state_info(MHI_CLIENT_IP_CTRL_1_IN, &info);
+	if (info != MHI_STATE_CONNECTED) {
+		uci_log(UCI_DBG_VERBOSE,
+			"IP_CTRL channels not started by host yet\n");
+		return -EAGAIN;
+	}
 
 	cur_ser_state = client->tiocm & ~(TIOCM_DTR | TIOCM_RTS);
 	ser_state &= (TIOCM_CD | TIOCM_DSR | TIOCM_RI);
@@ -1272,47 +1358,74 @@ static void mhi_uci_at_ctrl_read(struct work_struct *work)
 	struct uci_client *tgt_client;
 	struct mhi_uci_ctrl_msg *ctrl_msg;
 	unsigned int chan;
+	unsigned long compl_ret;
 
-	ctrl_client->pkt_loc = NULL;
-	ctrl_client->pkt_size = 0;
+	while (!mhi_dev_channel_isempty(ctrl_client->in_handle)) {
 
-	ret_val = __mhi_uci_client_read(ctrl_client, &msg_size);
-	if (ret_val) {
-		uci_log(UCI_DBG_ERROR,
-			"Ctrl msg read failed, ret_val is %d!\n",
-			ret_val);
-		return;
+		ctrl_client->pkt_loc = NULL;
+		ctrl_client->pkt_size = 0;
+
+		ret_val = __mhi_uci_client_read(ctrl_client, &msg_size);
+		if (ret_val) {
+			uci_log(UCI_DBG_ERROR,
+				"Ctrl msg read failed, ret_val is %d\n",
+				ret_val);
+			return;
+		}
+		if (msg_size != sizeof(*ctrl_msg)) {
+			uci_log(UCI_DBG_ERROR, "Invalid ctrl msg size\n");
+			return;
+		}
+		if (!ctrl_client->pkt_loc) {
+			uci_log(UCI_DBG_ERROR, "ctrl msg pkt_loc null\n");
+			return;
+		}
+		ctrl_msg = ctrl_client->pkt_loc;
+		chan = ctrl_msg->dest_id;
+
+		if (chan >= MHI_MAX_SOFTWARE_CHANNELS) {
+			uci_log(UCI_DBG_ERROR,
+				"Invalid channel number in ctrl msg\n");
+			return;
+		}
+
+		uci_log(UCI_DBG_VERBOSE, "preamble: 0x%x\n",
+				ctrl_msg->preamble);
+		uci_log(UCI_DBG_VERBOSE, "msg_id: 0x%x\n", ctrl_msg->msg_id);
+		uci_log(UCI_DBG_VERBOSE, "dest_id: 0x%x\n", ctrl_msg->dest_id);
+		uci_log(UCI_DBG_VERBOSE, "size: 0x%x\n", ctrl_msg->size);
+		uci_log(UCI_DBG_VERBOSE, "msg: 0x%x\n", ctrl_msg->msg);
+
+		tgt_client = &uci_ctxt.client_handles[CHAN_TO_CLIENT(chan)];
+		tgt_client->tiocm &= (TIOCM_CD | TIOCM_DSR | TIOCM_RI);
+
+		if (ctrl_msg->msg & MHI_UCI_CTRL_MSG_DCD)
+			tgt_client->tiocm |= TIOCM_CD;
+		if (ctrl_msg->msg & MHI_UCI_CTRL_MSG_DSR)
+			tgt_client->tiocm |= TIOCM_DSR;
+		if (ctrl_msg->msg & MHI_UCI_CTRL_MSG_RI)
+			tgt_client->tiocm |= TIOCM_RI;
+
+		uci_log(UCI_DBG_VERBOSE, "Rcvd tiocm %d\n", tgt_client->tiocm);
+
+		/* Wait till client reads the new state */
+		reinit_completion(&tgt_client->at_ctrl_read_done);
+
+		tgt_client->at_ctrl_mask = POLLPRI;
+		wake_up(&tgt_client->read_wq);
+
+		uci_log(UCI_DBG_VERBOSE, "Waiting for at_ctrl_read_done");
+		compl_ret = wait_for_completion_interruptible_timeout(
+					&tgt_client->at_ctrl_read_done,
+					MHI_UCI_AT_CTRL_READ_TIMEOUT);
+		if (compl_ret == -ERESTARTSYS) {
+			uci_log(UCI_DBG_ERROR, "Exit signal caught\n");
+			return;
+		} else if (compl_ret == 0) {
+			uci_log(UCI_DBG_ERROR,
+			"Timed out waiting for client to read ctrl state\n");
+		}
 	}
-	if (msg_size != sizeof(*ctrl_msg)) {
-		uci_log(UCI_DBG_ERROR, "Invalid ctrl msg size!\n");
-		return;
-	}
-	if (!ctrl_client->pkt_loc) {
-		uci_log(UCI_DBG_ERROR, "ctrl msg pkt_loc null!\n");
-		return;
-	}
-	ctrl_msg = ctrl_client->pkt_loc;
-
-	chan = ctrl_msg->dest_id;
-	if (chan >= MHI_MAX_SOFTWARE_CHANNELS) {
-		uci_log(UCI_DBG_ERROR,
-			"Invalid channel number in ctrl msg!\n");
-		return;
-	}
-	tgt_client = &uci_ctxt.client_handles[CHAN_TO_CLIENT(chan)];
-	tgt_client->tiocm &= (TIOCM_CD | TIOCM_DSR | TIOCM_RI);
-
-	if (ctrl_msg->msg & MHI_UCI_CTRL_MSG_DCD)
-		tgt_client->tiocm |= TIOCM_CD;
-	if (ctrl_msg->msg & MHI_UCI_CTRL_MSG_DSR)
-		tgt_client->tiocm |= TIOCM_DSR;
-	if (ctrl_msg->msg & MHI_UCI_CTRL_MSG_RI)
-		tgt_client->tiocm |= TIOCM_RI;
-
-	uci_log(UCI_DBG_VERBOSE, "Rcvd tiocm %d\n", tgt_client->tiocm);
-
-	tgt_client->at_ctrl_mask = POLLPRI;
-	wake_up(&tgt_client->read_wq);
 }
 
 static long mhi_uci_client_ioctl(struct file *file, unsigned int cmd,
@@ -1363,6 +1476,8 @@ static long mhi_uci_client_ioctl(struct file *file, unsigned int cmd,
 			rc = -EFAULT;
 		}
 		uci_handle->at_ctrl_mask = 0;
+		uci_log(UCI_DBG_VERBOSE, "Completing at_ctrl_read_done");
+		complete(&uci_handle->at_ctrl_read_done);
 	} else if (cmd == MHI_UCI_TIOCM_SET) {
 		rc = get_user(tiocm, (unsigned int __user *)arg);
 		if (rc)
@@ -1521,6 +1636,26 @@ static void mhi_uci_at_ctrl_client_cb(struct mhi_dev_client_cb_data *cb_data)
 		uci_ctxt.at_ctrl_wq =
 			create_singlethread_workqueue("mhi_at_ctrl_wq");
 		INIT_WORK(&uci_ctxt.at_ctrl_work, mhi_uci_at_ctrl_read);
+	} else if (cb_data->ctrl_info == MHI_STATE_DISCONNECTED) {
+		if (uci_ctxt.at_ctrl_wq == NULL) {
+			uci_log(UCI_DBG_VERBOSE,
+				"Disconnect already processed for at ctrl channels\n");
+			return;
+		}
+		destroy_workqueue(uci_ctxt.at_ctrl_wq);
+		uci_ctxt.at_ctrl_wq = NULL;
+		if (!(client->f_flags & O_SYNC))
+			kfree(client->wreqs);
+		rc = mhi_dev_close_channel(client->out_handle);
+		if (rc)
+			uci_log(UCI_DBG_INFO,
+			"Failed to close channel %d ret %d\n",
+			client->out_chan, rc);
+		rc = mhi_dev_close_channel(client->in_handle);
+		if (rc)
+			uci_log(UCI_DBG_INFO,
+			"Failed to close channel %d ret %d\n",
+			client->in_chan, rc);
 	}
 }
 

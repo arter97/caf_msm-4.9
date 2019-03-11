@@ -163,7 +163,7 @@ static int fill_dynamic_stats(struct msm_vidc_inst *inst,
 	}
 
 	dprintk(VIDC_PROF,
-		"Input CR = %d Recon CR = %d Complexity Factor = %d\n",
+		"Input CR = %d Recon CR = %llu Complexity Factor = %llu\n",
 			vote_data->input_cr, vote_data->compression_ratio,
 			vote_data->complexity_factor);
 
@@ -197,13 +197,6 @@ int msm_comm_vote_bus(struct msm_vidc_core *core)
 		mutex_unlock(&core->lock);
 		rc = -ENOMEM;
 		return rc;
-	}
-	if (!vote_data) {
-		dprintk(VIDC_PROF,
-			"Failed to get vote_data for inst %pK\n",
-				inst);
-		mutex_unlock(&core->lock);
-		return -EINVAL;
 	}
 
 	list_for_each_entry(inst, &core->instances, list) {
@@ -272,6 +265,16 @@ int msm_comm_vote_bus(struct msm_vidc_core *core)
 				inst->clk_data.operating_rate >> 16 : 1;
 		else
 			vote_data[i].fps = inst->prop.fps;
+
+		if (inst->session_type == MSM_VIDC_ENCODER) {
+			vote_data[i].bitrate = inst->clk_data.bitrate;
+			/* scale bitrate if operating rate is larger than fps */
+			if (vote_data[i].fps > inst->prop.fps
+				&& inst->prop.fps) {
+				vote_data[i].bitrate = vote_data[i].bitrate /
+				inst->prop.fps * vote_data[i].fps;
+			}
+		}
 
 		vote_data[i].power_mode = 0;
 		if (!msm_vidc_clock_scaling || is_turbo ||
