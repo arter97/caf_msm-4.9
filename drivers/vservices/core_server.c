@@ -34,6 +34,9 @@
 #include "session.h"
 #include "compat.h"
 
+#include <microvisor/microvisor.h>
+#include <microvisor/resource_manager.h>
+
 #define VSERVICE_CORE_SERVICE_NAME	"core"
 
 struct core_server {
@@ -566,7 +569,21 @@ static ssize_t server_core_create_service_store(struct device *dev,
 
 	return ret;
 }
+static ssize_t server_core_boot_vm_service_store(struct device *dev,
+                struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct HypMsg Msg;
+	int ret;
 
+	Msg.MsgId = BOOT_MGR_START_CLIENT;
+	Msg.HypBootMgr.StartParams.EntryAddr = 0xA0080000;
+	Msg.HypBootMgr.StartParams.DtbAddr =   0xA3200000;
+	Msg.HypBootMgr.StartParams.Is64BitMode = 0x1;
+	ret = _okl4_sys_pipe_send(0x349,
+		(uint32_t) sizeof(struct HypMsg),
+		(uint8_t *)(&Msg));
+	return ret;
+}
 static ssize_t server_core_reset_service_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -635,11 +652,14 @@ static DEVICE_ATTR(reset_service, S_IWUSR,
 		NULL, server_core_reset_service_store);
 static DEVICE_ATTR(remove_service, S_IWUSR,
 		NULL, server_core_remove_service_store);
+static DEVICE_ATTR(boot_vm_service, S_IWUSR,
+		NULL, server_core_boot_vm_service_store);
 
 static struct attribute *server_core_dev_attrs[] = {
 	&dev_attr_create_service.attr,
 	&dev_attr_reset_service.attr,
 	&dev_attr_remove_service.attr,
+	&dev_attr_boot_vm_service.attr,
 	NULL,
 };
 

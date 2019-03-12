@@ -53,6 +53,20 @@
 /** OKL4 Kernel vCPU API supports SMP guest cells. */
 #define OKL4_VCPU_SMP_SUPPORT
 
+struct HypBootMgrStartParams {
+        uint64_t EntryAddr; /* Physical load address / entry point of Linux */
+        uint64_t DtbAddr; /* Physical address of DTB */
+        bool Is64BitMode; /* True to reset VM to AArch64 mode, false for AArch32 */
+};
+
+struct HypMsg {
+        uint32_t MsgId;
+        union {
+                bool success;
+                struct HypBootMgrStartParams StartParams;
+                /* Content depends on msg_id; see table below */
+        } HypBootMgr;
+};
 
 /** @} */
 #endif /* __AUTO__MICROVISOR_H__ */
