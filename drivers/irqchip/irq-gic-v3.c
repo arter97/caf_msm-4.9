@@ -229,6 +229,11 @@ void gic_v3_dist_save(void)
 	void __iomem *base = gic_data.dist_base;
 	int reg, i;
 
+	if (!base)
+		return;
+
+	bitmap_zero(irqs_restore, MAX_IRQ);
+
 	for (reg = SAVED_ICFGR; reg < NUM_SAVED_GICD_REGS; reg++) {
 		for_each_spi_irq_word(i, reg) {
 			saved_spi_regs_start[reg][i] =
@@ -420,6 +425,9 @@ static void _gic_v3_dist_clear_reg(u32 offset)
  */
 void gic_v3_dist_restore(void)
 {
+	if (!gic_data.dist_base)
+		return;
+
 	_gic_v3_dist_check_icfgr();
 	_gic_v3_dist_check_ipriorityr();
 	_gic_v3_dist_check_isenabler();
