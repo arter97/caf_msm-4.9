@@ -16,7 +16,7 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 	model = "SDM845 Virtual Platform";
-	compatible = "qcom,sdm845-vm";
+	compatible = "linux,dummy-virt";
 
 	interrupt-parent = <&intc>;
 
