@@ -16,9 +16,11 @@
 #include "sdm845-v2.dtsi"
 #include "sdm845-sde-display.dtsi"
 #include "sdm845-mtp.dtsi"
+#include "sdm845-v2-robotics.dtsi"
+#include "sdm845-v2-camera-sensor-mtp-robotics.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM sdm845 V2 Robotics MTP";
 	compatible = "qcom,sdm845-mtp", "qcom,sdm845", "qcom,mtp";
-	qcom,board-id = <8 0xa>;
+	qcom,board-id = <8 6>;
 };

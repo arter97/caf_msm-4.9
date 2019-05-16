@@ -637,6 +637,7 @@ static inline int get_dumpable(struct mm_struct *mm)
 #define MMF_UNSTABLE		22	/* mm is unstable for copy_from_user */
 #define MMF_HUGE_ZERO_PAGE	23      /* mm has ever used the global huge zero page */
 #define MMF_OOM_VICTIM		25      /* mm is the oom victim */
+#define MMF_OOM_REAP_QUEUED	26	/* mm was queued for oom_reaper */
 
 #define MMF_INIT_MASK		(MMF_DUMPABLE_MASK | MMF_DUMP_FILTER_MASK)
 
@@ -1803,6 +1804,7 @@ struct task_struct {
 	unsigned int policy;
 	int nr_cpus_allowed;
 	cpumask_t cpus_allowed;
+	cpumask_t cpus_requested;
 
 #ifdef CONFIG_PREEMPT_RCU
 	int rcu_read_lock_nesting;
