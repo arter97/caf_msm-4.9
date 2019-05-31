@@ -172,6 +172,9 @@
 
 #include "sdm429w-camera-sensor-spyro.dtsi"
 
+&i2c_5 {
+	status = "disabled";
+};
 
 &soc {
 	/delete-node/ qcom,spm@b1d2000;
