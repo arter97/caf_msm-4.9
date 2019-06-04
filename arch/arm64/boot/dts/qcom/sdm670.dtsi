@@ -588,8 +588,13 @@
 		};
 
 		cont_splash_memory: cont_splash_region@9c000000 {
-			reg = <0x0 0x9c000000 0x0 0x02400000>;
+			reg = <0x0 0x9c000000 0x0 0x2300000>;
 			label = "cont_splash_region";
+		};
+
+		dfps_data_memory: dfps_data_region@9e300000 {
+			reg = <0x0 0x9e300000 0x0 0x0100000>;
+			label = "dfps_data_region";
 		};
 
 		dump_mem: mem_dump_region {
@@ -1932,6 +1937,10 @@
 		qcom,pm-qos-cpu-groups = <0x3f 0xC0>;
 		qcom,pm-qos-cpu-group-latency-us = <70 70>;
 		qcom,pm-qos-default-cpu = <0>;
+
+		pinctrl-names = "dev-reset-assert", "dev-reset-deassert";
+		pinctrl-0 = <&ufs_dev_reset_assert>;
+		pinctrl-1 = <&ufs_dev_reset_deassert>;
 
 		resets = <&clock_gcc GCC_UFS_PHY_BCR>;
 		reset-names = "core_reset";

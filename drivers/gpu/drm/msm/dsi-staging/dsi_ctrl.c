@@ -498,7 +498,8 @@ static int dsi_ctrl_init_regmap(struct platform_device *pdev,
 static int dsi_ctrl_clocks_deinit(struct dsi_ctrl *ctrl)
 {
 	struct dsi_core_clk_info *core = &ctrl->clk_info.core_clks;
-	struct dsi_link_clk_info *link = &ctrl->clk_info.link_clks;
+	struct dsi_link_lp_clk_info *lp_link = &ctrl->clk_info.lp_link_clks;
+	struct dsi_link_hs_clk_info *hs_link = &ctrl->clk_info.hs_link_clks;
 	struct dsi_clk_link_set *rcg = &ctrl->clk_info.rcg_clks;
 
 	if (core->mdp_core_clk)
@@ -514,16 +515,17 @@ static int dsi_ctrl_clocks_deinit(struct dsi_ctrl *ctrl)
 
 	memset(core, 0x0, sizeof(*core));
 
-	if (link->byte_clk)
-		devm_clk_put(&ctrl->pdev->dev, link->byte_clk);
-	if (link->pixel_clk)
-		devm_clk_put(&ctrl->pdev->dev, link->pixel_clk);
-	if (link->esc_clk)
-		devm_clk_put(&ctrl->pdev->dev, link->esc_clk);
-	if (link->byte_intf_clk)
-		devm_clk_put(&ctrl->pdev->dev, link->byte_intf_clk);
+	if (hs_link->byte_clk)
+		devm_clk_put(&ctrl->pdev->dev, hs_link->byte_clk);
+	if (hs_link->pixel_clk)
+		devm_clk_put(&ctrl->pdev->dev, hs_link->pixel_clk);
+	if (lp_link->esc_clk)
+		devm_clk_put(&ctrl->pdev->dev, lp_link->esc_clk);
+	if (hs_link->byte_intf_clk)
+		devm_clk_put(&ctrl->pdev->dev, hs_link->byte_intf_clk);
 
-	memset(link, 0x0, sizeof(*link));
+	memset(hs_link, 0x0, sizeof(*hs_link));
+	memset(lp_link, 0x0, sizeof(*lp_link));
 
 	if (rcg->byte_clk)
 		devm_clk_put(&ctrl->pdev->dev, rcg->byte_clk);
@@ -540,7 +542,8 @@ static int dsi_ctrl_clocks_init(struct platform_device *pdev,
 {
 	int rc = 0;
 	struct dsi_core_clk_info *core = &ctrl->clk_info.core_clks;
-	struct dsi_link_clk_info *link = &ctrl->clk_info.link_clks;
+	struct dsi_link_lp_clk_info *lp_link = &ctrl->clk_info.lp_link_clks;
+	struct dsi_link_hs_clk_info *hs_link = &ctrl->clk_info.hs_link_clks;
 	struct dsi_clk_link_set *rcg = &ctrl->clk_info.rcg_clks;
 
 	core->mdp_core_clk = devm_clk_get(&pdev->dev, "mdp_core_clk");
@@ -573,30 +576,30 @@ static int dsi_ctrl_clocks_init(struct platform_device *pdev,
 		pr_debug("can't get mnoc clock, rc=%d\n", rc);
 	}
 
-	link->byte_clk = devm_clk_get(&pdev->dev, "byte_clk");
-	if (IS_ERR(link->byte_clk)) {
-		rc = PTR_ERR(link->byte_clk);
+	hs_link->byte_clk = devm_clk_get(&pdev->dev, "byte_clk");
+	if (IS_ERR(hs_link->byte_clk)) {
+		rc = PTR_ERR(hs_link->byte_clk);
 		pr_err("failed to get byte_clk, rc=%d\n", rc);
 		goto fail;
 	}
 
-	link->pixel_clk = devm_clk_get(&pdev->dev, "pixel_clk");
-	if (IS_ERR(link->pixel_clk)) {
-		rc = PTR_ERR(link->pixel_clk);
+	hs_link->pixel_clk = devm_clk_get(&pdev->dev, "pixel_clk");
+	if (IS_ERR(hs_link->pixel_clk)) {
+		rc = PTR_ERR(hs_link->pixel_clk);
 		pr_err("failed to get pixel_clk, rc=%d\n", rc);
 		goto fail;
 	}
 
-	link->esc_clk = devm_clk_get(&pdev->dev, "esc_clk");
-	if (IS_ERR(link->esc_clk)) {
-		rc = PTR_ERR(link->esc_clk);
+	lp_link->esc_clk = devm_clk_get(&pdev->dev, "esc_clk");
+	if (IS_ERR(lp_link->esc_clk)) {
+		rc = PTR_ERR(lp_link->esc_clk);
 		pr_err("failed to get esc_clk, rc=%d\n", rc);
 		goto fail;
 	}
 
-	link->byte_intf_clk = devm_clk_get(&pdev->dev, "byte_intf_clk");
-	if (IS_ERR(link->byte_intf_clk)) {
-		link->byte_intf_clk = NULL;
+	hs_link->byte_intf_clk = devm_clk_get(&pdev->dev, "byte_intf_clk");
+	if (IS_ERR(hs_link->byte_intf_clk)) {
+		hs_link->byte_intf_clk = NULL;
 		pr_debug("can't find byte intf clk, rc=%d\n", rc);
 	}
 
@@ -1227,9 +1230,10 @@ kickoff:
 			}
 		}
 
-		if (dsi_ctrl->hw.ops.mask_error_intr)
+		if (dsi_ctrl->hw.ops.mask_error_intr &&
+		    !dsi_ctrl->esd_check_underway)
 			dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
-					BIT(DSI_FIFO_OVERFLOW), false);
+						BIT(DSI_FIFO_OVERFLOW), false);
 		dsi_ctrl->hw.ops.reset_cmd_fifo(&dsi_ctrl->hw);
 
 		/*
@@ -2555,6 +2559,16 @@ void dsi_ctrl_isr_configure(struct dsi_ctrl *dsi_ctrl, bool enable)
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 
+void dsi_ctrl_set_continuous_clk(struct dsi_ctrl *dsi_ctrl, bool enable)
+{
+	if (!dsi_ctrl)
+		return;
+
+	mutex_lock(&dsi_ctrl->ctrl_lock);
+	dsi_ctrl->hw.ops.set_continuous_clk(&dsi_ctrl->hw, enable);
+	mutex_unlock(&dsi_ctrl->ctrl_lock);
+}
+
 int dsi_ctrl_soft_reset(struct dsi_ctrl *dsi_ctrl)
 {
 	if (!dsi_ctrl)
@@ -2677,7 +2691,12 @@ int dsi_ctrl_update_host_config(struct dsi_ctrl *ctrl,
 		goto error;
 	}
 
-	if (!(flags & (DSI_MODE_FLAG_SEAMLESS | DSI_MODE_FLAG_VRR))) {
+	if (!(flags & (DSI_MODE_FLAG_SEAMLESS | DSI_MODE_FLAG_VRR |
+		       DSI_MODE_FLAG_DYN_CLK))) {
+		/*
+		 * for dynamic clk swith case link frequence would
+		 * be updated dsi_display_dynamic_clk_switch().
+		 */
 		rc = dsi_ctrl_update_link_freqs(ctrl, config, clk_handle);
 		if (rc) {
 			pr_err("[%s] failed to update link frequencies, rc=%d\n",
@@ -2840,7 +2859,8 @@ int dsi_ctrl_cmd_tx_trigger(struct dsi_ctrl *dsi_ctrl, u32 flags)
 						dsi_ctrl->cell_index);
 			}
 		}
-		if (dsi_ctrl->hw.ops.mask_error_intr)
+		if (dsi_ctrl->hw.ops.mask_error_intr &&
+				!dsi_ctrl->esd_check_underway)
 			dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw,
 					BIT(DSI_FIFO_OVERFLOW), false);
 
@@ -3338,7 +3358,8 @@ u32 dsi_ctrl_collect_misr(struct dsi_ctrl *dsi_ctrl)
 	return misr;
 }
 
-void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl)
+void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl, u32 idx,
+		bool mask_enable)
 {
 	if (!dsi_ctrl || !dsi_ctrl->hw.ops.error_intr_ctrl
 			|| !dsi_ctrl->hw.ops.clear_error_status) {
@@ -3351,9 +3372,23 @@ void dsi_ctrl_mask_error_status_interrupts(struct dsi_ctrl *dsi_ctrl)
 	 * register
 	 */
 	mutex_lock(&dsi_ctrl->ctrl_lock);
-	dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, false);
-	dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
+	if (idx & BIT(DSI_ERR_INTR_ALL)) {
+		/*
+		 * The behavior of mask_enable is different in ctrl register
+		 * and mask register and hence mask_enable is manipulated for
+		 * selective error interrupt masking vs total error interrupt
+		 * masking.
+		 */
+
+		dsi_ctrl->hw.ops.error_intr_ctrl(&dsi_ctrl->hw, !mask_enable);
+		dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
 					DSI_ERROR_INTERRUPT_COUNT);
+	} else {
+		dsi_ctrl->hw.ops.mask_error_intr(&dsi_ctrl->hw, idx,
+								mask_enable);
+		dsi_ctrl->hw.ops.clear_error_status(&dsi_ctrl->hw,
+					DSI_ERROR_INTERRUPT_COUNT);
+	}
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
 }
 
@@ -3377,6 +3412,27 @@ void dsi_ctrl_irq_update(struct dsi_ctrl *dsi_ctrl, bool enable)
 					DSI_SINT_ERROR);
 
 	mutex_unlock(&dsi_ctrl->ctrl_lock);
+}
+
+/**
+ * dsi_ctrl_wait4dynamic_refresh_done() - Poll for dynamci refresh
+ *				done interrupt.
+ * @dsi_ctrl:              DSI controller handle.
+ */
+int dsi_ctrl_wait4dynamic_refresh_done(struct dsi_ctrl *ctrl)
+{
+	int rc = 0;
+
+	if (!ctrl)
+		return 0;
+
+	mutex_lock(&ctrl->ctrl_lock);
+
+	if (ctrl->hw.ops.wait4dynamic_refresh_done)
+		rc = ctrl->hw.ops.wait4dynamic_refresh_done(&ctrl->hw);
+
+	mutex_unlock(&ctrl->ctrl_lock);
+	return rc;
 }
 
 /**

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -35,6 +35,7 @@
 #include <cam_cpas_api.h>
 #include "cam_soc_util.h"
 #include "cam_debug_util.h"
+#include "cam_context.h"
 
 #define MAX_CSIPHY                  3
 #define MAX_DPHY_DATA_LN            4
@@ -57,6 +58,11 @@
 #define CSIPHY_SETTLE_CNT_LOWER_BYTE     2
 #define CSIPHY_SETTLE_CNT_HIGHER_BYTE    3
 #define CSIPHY_DNP_PARAMS                4
+
+#define CSIPHY_MAX_INSTANCES     2
+
+#define CAM_CSIPHY_MAX_DPHY_LANES    4
+#define CAM_CSIPHY_MAX_CPHY_LANES    3
 
 #define ENABLE_IRQ false
 
@@ -101,6 +107,12 @@ struct csiphy_reg_parms_t {
 	uint32_t csiphy_reset_array_size;
 	uint32_t csiphy_2ph_config_array_size;
 	uint32_t csiphy_3ph_config_array_size;
+	uint32_t csiphy_cpas_cp_bits_per_phy;
+	uint32_t csiphy_cpas_cp_is_interleaved;
+	uint32_t csiphy_cpas_cp_2ph_offset;
+	uint32_t csiphy_cpas_cp_3ph_offset;
+	uint32_t csiphy_clock_lane;
+	uint32_t csiphy_combo_clk_lane;
 };
 
 /**
@@ -111,9 +123,9 @@ struct csiphy_reg_parms_t {
  * @crm_cb: Callback API pointers
  */
 struct intf_params {
-	int32_t device_hdl[2];
-	int32_t session_hdl[2];
-	int32_t link_hdl[2];
+	int32_t device_hdl[CSIPHY_MAX_INSTANCES];
+	int32_t session_hdl[CSIPHY_MAX_INSTANCES];
+	int32_t link_hdl[CSIPHY_MAX_INSTANCES];
 	struct cam_req_mgr_kmd_ops ops;
 	struct cam_req_mgr_crm_cb *crm_cb;
 };
@@ -175,7 +187,7 @@ struct cam_csiphy_param {
 	uint8_t     csiphy_3phase;
 	uint8_t     combo_mode;
 	uint8_t     lane_cnt;
-	uint8_t     secure_mode;
+	uint8_t     secure_mode[CSIPHY_MAX_INSTANCES];
 	uint64_t    settle_time;
 	uint64_t    settle_time_combo_sensor;
 	uint64_t    data_rate;
@@ -183,6 +195,7 @@ struct cam_csiphy_param {
 
 /**
  * struct csiphy_device
+ * @device_name: Device name
  * @pdev: Platform device
  * @irq: Interrupt structure
  * @base: Base address
@@ -208,6 +221,7 @@ struct cam_csiphy_param {
  *   device is for combo mode
  */
 struct csiphy_device {
+	char device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
 	struct mutex mutex;
 	uint32_t hw_version;
 	enum cam_csiphy_state csiphy_state;
@@ -226,11 +240,11 @@ struct csiphy_device {
 	uint32_t clk_lane;
 	uint32_t acquire_count;
 	uint32_t start_dev_count;
-	char device_name[20];
 	uint32_t is_acquired_dev_combo_mode;
 	struct cam_hw_soc_info   soc_info;
 	uint32_t cpas_handle;
 	uint32_t config_count;
+	uint64_t csiphy_cpas_cp_reg_mask[CSIPHY_MAX_INSTANCES];
 };
 
 #endif /* _CAM_CSIPHY_DEV_H_ */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -42,6 +42,7 @@ int cam_context_shutdown(struct cam_context *ctx)
 	int rc = 0;
 	int32_t ctx_hdl = ctx->dev_hdl;
 
+	mutex_lock(&ctx->ctx_mutex);
 	if (ctx->state_machine[ctx->state].ioctl_ops.stop_dev) {
 		rc = ctx->state_machine[ctx->state].ioctl_ops.stop_dev(
 			ctx, NULL);
@@ -54,6 +55,7 @@ int cam_context_shutdown(struct cam_context *ctx)
 		if (rc < 0)
 			CAM_ERR(CAM_CORE, "Error while dev release %d", rc);
 	}
+	mutex_unlock(&ctx->ctx_mutex);
 
 	if (!rc)
 		rc = cam_destroy_device_hdl(ctx_hdl);
@@ -217,6 +219,27 @@ int cam_context_handle_crm_process_evt(struct cam_context *ctx,
 			ctx->dev_hdl, ctx->state);
 	}
 	mutex_unlock(&ctx->ctx_mutex);
+
+	return rc;
+}
+
+int cam_context_dump_pf_info(struct cam_context *ctx, unsigned long iova,
+	uint32_t buf_info)
+{
+	int rc = 0;
+
+	if (!ctx->state_machine) {
+		CAM_ERR(CAM_CORE, "Context is not ready");
+		return -EINVAL;
+	}
+
+	if (ctx->state_machine[ctx->state].pagefault_ops) {
+		rc = ctx->state_machine[ctx->state].pagefault_ops(ctx, iova,
+			buf_info);
+	} else {
+		CAM_WARN(CAM_CORE, "No dump ctx in dev %d, state %d",
+			ctx->dev_hdl, ctx->state);
+	}
 
 	return rc;
 }
@@ -431,7 +454,7 @@ int cam_context_init(struct cam_context *ctx,
 	mutex_init(&ctx->sync_mutex);
 	spin_lock_init(&ctx->lock);
 
-	ctx->dev_name = dev_name;
+	strlcpy(ctx->dev_name, dev_name, CAM_CTX_DEV_NAME_MAX_LENGTH);
 	ctx->dev_id = dev_id;
 	ctx->ctx_id = ctx_id;
 	ctx->ctx_crm_intf = NULL;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -3087,7 +3087,11 @@ static int msm_comm_session_init(int flipped_state,
 		return -EINVAL;
 	}
 
-	msm_comm_init_clocks_and_bus_data(inst);
+	rc = msm_comm_init_clocks_and_bus_data(inst);
+	if (rc) {
+		dprintk(VIDC_ERR, "Failed to initialize clocks and bus data\n");
+		goto exit;
+	}
 
 	dprintk(VIDC_DBG, "%s: inst %pK\n", __func__, inst);
 	rc = call_hfi_op(hdev, session_init, hdev->hfi_device_data,
@@ -5096,6 +5100,14 @@ int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 				"Invalid params, inst %pK\n", inst);
 		return -EINVAL;
 	}
+
+	if (inst->state < MSM_VIDC_OPEN_DONE) {
+		dprintk(VIDC_ERR,
+			"Invalid state to call flush, inst %pK, state %#x\n",
+			inst, inst->state);
+		return -EINVAL;
+	}
+
 	core = inst->core;
 	hdev = core->device;
 

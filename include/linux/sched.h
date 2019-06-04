@@ -1802,6 +1802,7 @@ struct task_struct {
 	unsigned int policy;
 	int nr_cpus_allowed;
 	cpumask_t cpus_allowed;
+	cpumask_t cpus_requested;
 
 #ifdef CONFIG_PREEMPT_RCU
 	int rcu_read_lock_nesting;
@@ -1828,7 +1829,7 @@ struct task_struct {
 
 	struct mm_struct *mm, *active_mm;
 	/* per-thread vma caching */
-	u32 vmacache_seqnum;
+	u64 vmacache_seqnum;
 	struct vm_area_struct *vmacache[VMACACHE_SIZE];
 #if defined(SPLIT_RSS_COUNTING)
 	struct task_rss_stat	rss_stat;

@@ -1182,11 +1182,6 @@ static unsigned ext4_max_namelen(struct inode *inode)
 		EXT4_NAME_LEN;
 }
 
-static inline bool ext4_is_encrypted(struct inode *inode)
-{
-	return ext4_encrypted_inode(inode);
-}
-
 static const struct fscrypt_operations ext4_cryptops = {
 	.key_prefix		= "ext4:",
 	.get_context		= ext4_get_context,
@@ -1194,7 +1189,6 @@ static const struct fscrypt_operations ext4_cryptops = {
 	.dummy_context		= ext4_dummy_context,
 	.empty_dir		= ext4_empty_dir,
 	.max_namelen		= ext4_max_namelen,
-	.is_encrypted       = ext4_is_encrypted,
 };
 #endif
 
@@ -3010,6 +3004,9 @@ static ext4_group_t ext4_has_uninit_itable(struct super_block *sb)
 	ext4_group_t group, ngroups = EXT4_SB(sb)->s_groups_count;
 	struct ext4_group_desc *gdp = NULL;
 
+	if (!ext4_has_group_desc_csum(sb))
+		return ngroups;
+
 	for (group = 0; group < ngroups; group++) {
 		gdp = ext4_get_group_desc(sb, group, NULL);
 		if (!gdp)
@@ -3691,6 +3688,11 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	} else {
 		sbi->s_inode_size = le16_to_cpu(es->s_inode_size);
 		sbi->s_first_ino = le32_to_cpu(es->s_first_ino);
+		if (sbi->s_first_ino < EXT4_GOOD_OLD_FIRST_INO) {
+			ext4_msg(sb, KERN_ERR, "invalid first ino: %u",
+				 sbi->s_first_ino);
+			goto failed_mount;
+		}
 		if ((sbi->s_inode_size < EXT4_GOOD_OLD_INODE_SIZE) ||
 		    (!is_power_of_2(sbi->s_inode_size)) ||
 		    (sbi->s_inode_size > blocksize)) {
