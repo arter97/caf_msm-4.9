@@ -40,6 +40,18 @@
 	};
 };
 
+&pm8953_0 {
+	status = "disabled";
+};
+
+&pm8953_1 {
+	status = "disabled";
+};
+
+&pmi632_2 {
+	status = "disabled";
+};
+
 &cdc_pdm_lines_act {
 	mux {
 		pins = "gpio68", "gpio73", "gpio74";
