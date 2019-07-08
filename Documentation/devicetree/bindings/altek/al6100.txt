@@ -1,0 +1,53 @@
+altek al6100 depth chip (spi/I2c)
+
+Required properties:
+ - compatible: Should be "altek_isp"(with spi)/
+   "altek_i2c_slave"(with i2c)/"altek_i2c_top"(with i2c)
+   for al6100 depth chip driver
+ - irq-gpios: a gpio for spi/I2c interrupt
+ - vcc1-gpios: If present, specifies a gpio for power on 
+   al6100 depth chip 
+ - wp-gpios: If present, specifies a gpio for control
+   eeprom write protected pin
+ - reset-gpios: If present, specifies a gpio for reset
+   al6100 depth chip
+
+Example:
+(spi)
+&spi_8 { /* BLSP2 QUP4 */
+        mini_isp@0 {
+                compatible = "altek_isp";
+                reg = <0>;
+                spi-max-frequency = <50000000>;
+                spi-cpol;
+                spi-cpha;
+                /*spi-cs-high;*/
+                vcc-supply = <&pm8953_s3>;
+                reset-gpios = <&tlmm 33 0x00>;
+                irq-gpios = <&tlmm 35 0x00>;
+                vcc1-gpios = <&tlmm 38 0x00>;
+                wp-gpios = <&tlmm 52 0x00>;
+                vcc2-gpios = <&tlmm 63 0x00>;
+                status = "ok";
+        };
+};
+
+(I2c)
+altek_i2c_slave@11 {
+	compatible = "altek_i2c_slave";
+	//reg = <0x4b>;//for Pure Bypass
+	reg = <0x11>;
+	status = "disabled"; //use SPI instead
+};
+
+altek_i2c_top@77 {
+	compatible = "altek_i2c_top";
+	reg = <0x77>;
+	//vcc-supply = <&pm8953_s3>;
+	//reset-gpios = <&tlmm 33 0x00>;
+	irq-gpios = <&tlmm 35 0x00>;
+	//vcc1-gpios = <&tlmm 38 0x00>;
+	wp-gpios = <&tlmm 52 0x00>;
+	//vcc2-gpios = <&tlmm 63 0x00>;
+	status = "disabled"; //use SPI instead
+};
