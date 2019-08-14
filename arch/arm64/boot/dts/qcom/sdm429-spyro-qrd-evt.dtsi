@@ -42,6 +42,24 @@
 };
 
 &soc {
+	/delete-node/ qcom,spm@b1d2000;
+	qcom,spm@b1d2000 {
+		compatible = "qcom,spm-v2";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0xb1d2000 0x1000>;
+		qcom,name = "system-cci";
+		qcom,saw2-ver-reg = <0xfd0>;
+		qcom,saw2-cfg = <0x14>;
+		qcom,saw2-spm-dly= <0x3C102800>;
+		qcom,saw2-spm-ctl = <0xe>;
+		qcom,cpu-vctl-list = <&CPU0 &CPU1 &CPU2 &CPU3>;
+		qcom,vctl-timeout-us = <500>;
+		qcom,vctl-port = <0x0>;
+		qcom,vctl-port-ub = <0x1>;
+		qcom,pfm-port = <0x2>;
+	};
+
 	gpio_keys: gpio_keys {
 		compatible = "gpio-keys";
 		label = "gpio-keys";
@@ -152,7 +170,7 @@
 		"/dev/block/platform/soc/7824900.sdhci/by-name/vendor";
 				type = "ext4";
 				mnt_flags = "ro,barrier=1,discard";
-				fsmgr_flags = "wait,avb";
+				fsmgr_flags = "wait";
 				status = "ok";
 			};
 			system {
@@ -161,11 +179,27 @@
 		"/dev/block/platform/soc/7824900.sdhci/by-name/system";
 				type = "ext4";
 				mnt_flags = "ro,barrier=1,discard";
-				fsmgr_flags = "wait,avb";
+				fsmgr_flags = "wait";
 				status = "ok";
 			};
 		};
 	};
+};
+
+&soc {
+	qcom,ion {
+		qcom,ion-heap@8 { /* CP_MM HEAP */
+			reg = <8>;
+			memory-region = <&secure_mem>;
+			qcom,ion-heap-type = "SECURE_DMA";
+		};
+	};
+};
+
+&secure_mem {
+	alignment = <0 0x400000>;
+	size = <0 0x400000>;
+	status = "okay";
 };
 
 &modem_mem {
@@ -173,11 +207,11 @@
 };
 
 &adsp_fw_mem {
-	reg = <0x0 0x8b800000 0x0 0x1400000>;
+	reg = <0x0 0x8b800000 0x0 0x1500000>;
 };
 
 &wcnss_fw_mem {
-	reg = <0x0 0x8cc00000 0x0 0x700000>;
+	reg = <0x0 0x8cd00000 0x0 0x700000>;
 };
 
 &i2c_4 {

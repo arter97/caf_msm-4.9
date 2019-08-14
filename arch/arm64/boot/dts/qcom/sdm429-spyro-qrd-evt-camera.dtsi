@@ -274,7 +274,7 @@
 			"sensor_cam_mclk";
 		qcom,cam-power-seq-cfg-val = <1 1 1 1 1 24000000>;
 		qcom,cam-power-seq-delay = <1 1 1 30 30 5>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_gcc clk_mclk2_clk_src>,
 			<&clock_gcc clk_gcc_camss_mclk2_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -339,12 +339,11 @@
 		qcom,mount-angle = <270>;
 		cam_vdig-supply = <&pm660_l3>;
 		cam_vio-supply = <&pm660_l14>;
-		cam_vaf-supply = <&pm660_l19>;
-		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana",
-							"cam_vaf";
-		qcom,cam-vreg-min-voltage = <1200000 1800000 2800000 2850000>;
-		qcom,cam-vreg-max-voltage = <1200000 1800000 2800000 3200000>;
-		qcom,cam-vreg-op-mode = <200000 0 80000 100000>;
+		cam_vana-supply = <&pm660_s5>;
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana";
+		qcom,cam-vreg-min-voltage = <1200000 1800000 1420000>;
+		qcom,cam-vreg-max-voltage = <1200000 1800000 1420000>;
+		qcom,cam-vreg-op-mode = <200000 80000 80000>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_sensor_mclk1_default
 				&cam_sensor_front_default>;
@@ -409,7 +408,7 @@
 		qcom,sensor-position = <1>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <0>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_gcc clk_mclk2_clk_src>,
 			<&clock_gcc clk_gcc_camss_mclk2_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
