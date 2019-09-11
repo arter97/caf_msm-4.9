@@ -2854,9 +2854,14 @@ void ipa3_q6_pre_shutdown_cleanup(void)
 
 	ipa3_q6_pipe_delay(true);
 	ipa3_q6_avoid_holb();
-	if (ipa3_ctx->ipa_config_is_mhi)
+	if (ipa3_ctx->ipa_config_is_mhi) {
 		ipa3_set_reset_client_cons_pipe_sus_holb(true,
 		IPA_CLIENT_MHI_CONS);
+		if (ipa3_ctx->ipa_config_is_auto)
+			ipa3_set_reset_client_cons_pipe_sus_holb(true,
+				IPA_CLIENT_MHI2_CONS);
+	}
+
 	if (ipa3_q6_clean_q6_tables()) {
 		IPAERR("Failed to clean Q6 tables\n");
 		BUG();
@@ -2874,9 +2879,13 @@ void ipa3_q6_pre_shutdown_cleanup(void)
 	if (ipa3_ctx->ipa_config_is_auto)
 		ipa3_set_reset_client_prod_pipe_delay(true,
 		IPA_CLIENT_USB2_PROD);
-	if (ipa3_ctx->ipa_config_is_mhi)
+	if (ipa3_ctx->ipa_config_is_mhi) {
 		ipa3_set_reset_client_prod_pipe_delay(true,
 		IPA_CLIENT_MHI_PROD);
+		if (ipa3_ctx->ipa_config_is_auto)
+			ipa3_set_reset_client_prod_pipe_delay(true,
+				IPA_CLIENT_MHI2_PROD);
+	}
 
 	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 	IPADBG_LOW("Exit with success\n");
@@ -6609,6 +6618,7 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 		/* map SMEM memory for IPA table accesses */
 		smem_addr = smem_alloc(SMEM_IPA_FILTER_TABLE, IPA_SMEM_SIZE,
 				SMEM_MODEM, 0);
+		q6_smem_size = IPA_SMEM_SIZE;
 	} else {
 		IPADBG("ipa q6 smem size = %d\n", q6_smem_size);
 		smem_addr = smem_alloc(SMEM_IPA_FILTER_TABLE, q6_smem_size,
@@ -6621,7 +6631,7 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 		phys_addr_t pa_p;
 		u32 size_p;
 
-		IPA_SMMU_ROUND_TO_PAGE(iova, pa, IPA_SMEM_SIZE,
+		IPA_SMMU_ROUND_TO_PAGE(iova, pa, q6_smem_size,
 			iova_p, pa_p, size_p);
 		IPADBG("mapping 0x%lx to 0x%pa size %d\n",
 			iova_p, &pa_p, size_p);
