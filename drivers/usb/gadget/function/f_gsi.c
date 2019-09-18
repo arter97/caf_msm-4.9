@@ -213,6 +213,8 @@ static int gsi_wakeup_host(struct f_gsi *gsi)
 		return -ENODEV;
 	}
 
+	gsi->rwake_inprogress = true;
+
 	/*
 	 * In Super-Speed mode, remote wakeup is not allowed for suspended
 	 * functions which have been disallowed by the host to issue Function
@@ -234,6 +236,9 @@ static int gsi_wakeup_host(struct f_gsi *gsi)
 		log_event_dbg("RW delayed due to LPM exit.");
 	else if (ret)
 		log_event_err("wakeup failed. ret=%d.", ret);
+
+	if (ret)
+		gsi->rwake_inprogress = false;
 
 	return ret;
 }
@@ -512,7 +517,8 @@ int ipa_usb_notify_cb(enum ipa_usb_notify_event event,
 		break;
 
 	case IPA_USB_REMOTE_WAKEUP:
-		gsi_wakeup_host(gsi);
+		if (!gsi->rwake_inprogress)
+			gsi_wakeup_host(gsi);
 		break;
 
 	case IPA_USB_SUSPEND_COMPLETED:
@@ -541,10 +547,22 @@ static int ipa_connect_channels(struct gsi_data_port *d_port)
 	struct ipa_req_chan_out_params ipa_out_channel_out_params;
 
 	log_event_dbg("%s: USB GSI IN OPS", __func__);
-	usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
+	ret = usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
 		GSI_EP_OP_PREPARE_TRBS);
-	usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
+	if (ret) {
+		log_event_err("%s: GSI_EP_OP_PREPARE_TRBS failed: %d\n",
+				__func__, ret);
+		return ret;
+	}
+
+	ret = usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
 			GSI_EP_OP_STARTXFER);
+	if (ret) {
+		log_event_err("%s: GSI_EP_OP_STARTXFER failed: %d\n",
+				__func__, ret);
+		goto free_trb_ep_in;
+	}
+
 	d_port->in_xfer_rsc_index = usb_gsi_ep_op(d_port->in_ep, NULL,
 			GSI_EP_OP_GET_XFER_IDX);
 
@@ -585,10 +603,22 @@ static int ipa_connect_channels(struct gsi_data_port *d_port)
 
 	if (d_port->out_ep) {
 		log_event_dbg("%s: USB GSI OUT OPS", __func__);
-		usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
+		ret = usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
 			GSI_EP_OP_PREPARE_TRBS);
-		usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
+		if (ret) {
+			log_event_err("%s: GSI_EP_OP_PREPARE_TRBS failed: %d\n",
+					__func__, ret);
+			goto end_xfer_ep_in;
+		}
+
+		ret = usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
 				GSI_EP_OP_STARTXFER);
+		if (ret) {
+			log_event_err("%s: GSI_EP_OP_STARTXFER failed: %d\n",
+					__func__, ret);
+			goto free_trb_ep_out;
+		}
+
 		d_port->out_xfer_rsc_index =
 			usb_gsi_ep_op(d_port->out_ep,
 				NULL, GSI_EP_OP_GET_XFER_IDX);
@@ -664,7 +694,7 @@ static int ipa_connect_channels(struct gsi_data_port *d_port)
 					conn_params);
 	if (ret) {
 		log_event_err("%s: IPA connect failed %d", __func__, ret);
-		return ret;
+		goto end_xfer_ep_out;
 	}
 	log_event_dbg("%s: xdci_connect done", __func__);
 
@@ -692,6 +722,23 @@ static int ipa_connect_channels(struct gsi_data_port *d_port)
 		d_port->out_request.db_reg_phs_addr_msb =
 			ipa_out_channel_out_params.db_reg_phs_addr_msb;
 	}
+
+	return ret;
+
+end_xfer_ep_out:
+	if (d_port->out_ep)
+		usb_gsi_ep_op(d_port->out_ep, NULL,
+			GSI_EP_OP_ENDXFER);
+free_trb_ep_out:
+	if (d_port->out_ep)
+		usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
+			GSI_EP_OP_FREE_TRBS);
+end_xfer_ep_in:
+	usb_gsi_ep_op(d_port->in_ep, NULL,
+		GSI_EP_OP_ENDXFER);
+free_trb_ep_in:
+	usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
+		GSI_EP_OP_FREE_TRBS);
 	return ret;
 }
 
@@ -701,35 +748,36 @@ static void ipa_data_path_enable(struct gsi_data_port *d_port)
 	bool block_db = false;
 
 	log_event_dbg("IN: db_reg_phs_addr_lsb = %x",
-			gsi->d_port.in_request.db_reg_phs_addr_lsb);
-	usb_gsi_ep_op(gsi->d_port.in_ep,
-			&gsi->d_port.in_request,
+			d_port->in_request.db_reg_phs_addr_lsb);
+	usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
 			GSI_EP_OP_STORE_DBL_INFO);
 
-	if (gsi->d_port.out_ep) {
+	if (d_port->out_ep) {
 		log_event_dbg("OUT: db_reg_phs_addr_lsb = %x",
-				gsi->d_port.out_request.db_reg_phs_addr_lsb);
-		usb_gsi_ep_op(gsi->d_port.out_ep,
-				&gsi->d_port.out_request,
+				d_port->out_request.db_reg_phs_addr_lsb);
+		usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
 				GSI_EP_OP_STORE_DBL_INFO);
 	}
 
 	usb_gsi_ep_op(gsi->d_port.in_ep, &gsi->d_port.in_request,
 				GSI_EP_OP_ENABLE_GSI);
 
-	usb_gsi_ep_op(gsi->d_port.in_ep, &gsi->d_port.in_request,
+	usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
 				GSI_EP_OP_ENABLE_GSI);
 
 	/* Unblock doorbell to GSI */
 	usb_gsi_ep_op(d_port->in_ep, (void *)&block_db,
 				GSI_EP_OP_SET_CLR_BLOCK_DBL);
 
-	usb_gsi_ep_op(gsi->d_port.in_ep, &gsi->d_port.in_request,
-						GSI_EP_OP_RING_DB);
+	usb_gsi_ep_op(d_port->in_ep, &d_port->in_request,
+				GSI_EP_OP_RING_DB);
 
-	if (gsi->d_port.out_ep)
-		usb_gsi_ep_op(gsi->d_port.out_ep, &gsi->d_port.out_request,
-						GSI_EP_OP_RING_DB);
+	if (d_port->out_ep) {
+		usb_gsi_ep_op(d_port->out_ep, (void *)&block_db,
+				GSI_EP_OP_SET_CLR_BLOCK_DBL);
+		usb_gsi_ep_op(d_port->out_ep, &d_port->out_request,
+				GSI_EP_OP_RING_DB);
+	}
 }
 
 static void ipa_disconnect_handler(struct gsi_data_port *d_port)
@@ -750,9 +798,12 @@ static void ipa_disconnect_handler(struct gsi_data_port *d_port)
 				&gsi->d_port.in_request, GSI_EP_OP_DISABLE);
 	}
 
-	if (gsi->d_port.out_ep)
+	if (gsi->d_port.out_ep) {
+		usb_gsi_ep_op(d_port->out_ep, (void *)&block_db,
+				GSI_EP_OP_SET_CLR_BLOCK_DBL);
 		usb_gsi_ep_op(gsi->d_port.out_ep,
 				&gsi->d_port.out_request, GSI_EP_OP_DISABLE);
+	}
 
 	gsi->d_port.net_ready_trigger = false;
 }
@@ -803,7 +854,11 @@ static int ipa_suspend_work_handler(struct gsi_data_port *d_port)
 		ret = -EFAULT;
 		block_db = false;
 		usb_gsi_ep_op(d_port->in_ep, (void *)&block_db,
-			GSI_EP_OP_SET_CLR_BLOCK_DBL);
+				GSI_EP_OP_SET_CLR_BLOCK_DBL);
+		if (d_port->out_ep)
+			usb_gsi_ep_op(d_port->out_ep, (void *)&block_db,
+				GSI_EP_OP_SET_CLR_BLOCK_DBL);
+
 		goto done;
 	}
 
@@ -821,7 +876,10 @@ static int ipa_suspend_work_handler(struct gsi_data_port *d_port)
 	if (ret == -EFAULT) {
 		block_db = false;
 		usb_gsi_ep_op(d_port->in_ep, (void *)&block_db,
-					GSI_EP_OP_SET_CLR_BLOCK_DBL);
+				GSI_EP_OP_SET_CLR_BLOCK_DBL);
+		if (d_port->out_ep)
+			usb_gsi_ep_op(d_port->out_ep, (void *)&block_db,
+				GSI_EP_OP_SET_CLR_BLOCK_DBL);
 		gsi_wakeup_host(gsi);
 	} else if (ret == -EINPROGRESS) {
 		d_port->sm_state = STATE_SUSPEND_IN_PROGRESS;
@@ -852,6 +910,9 @@ static void ipa_resume_work_handler(struct gsi_data_port *d_port)
 
 	block_db = false;
 	usb_gsi_ep_op(d_port->in_ep, (void *)&block_db,
+			GSI_EP_OP_SET_CLR_BLOCK_DBL);
+	if (d_port->out_ep)
+		usb_gsi_ep_op(d_port->out_ep, (void *)&block_db,
 			GSI_EP_OP_SET_CLR_BLOCK_DBL);
 }
 
@@ -898,12 +959,26 @@ static void ipa_work_handler(struct work_struct *w)
 			if (ret) {
 				log_event_err("%s: gsi_alloc_trb_failed\n",
 								__func__);
+				usb_gadget_autopm_put_async(d_port->gadget);
 				break;
 			}
-			ipa_connect_channels(d_port);
+
 			d_port->sm_state = STATE_CONNECT_IN_PROGRESS;
 			log_event_dbg("%s: ST_INIT_EVT_CONN_IN_PROG",
 					__func__);
+			if (peek_event(d_port) != EVT_DISCONNECTED) {
+				ret = ipa_connect_channels(d_port);
+				if (ret) {
+					log_event_err("%s: ipa_connect_channels failed\n",
+								__func__);
+					gsi_free_trb_buffer(gsi);
+					usb_gadget_autopm_put_async(
+								d_port->gadget);
+					d_port->sm_state = STATE_INITIALIZED;
+					break;
+				}
+			}
+
 		} else if (event == EVT_HOST_READY) {
 			/*
 			 * When in a composition such as RNDIS + ADB,
@@ -923,10 +998,19 @@ static void ipa_work_handler(struct work_struct *w)
 			if (ret) {
 				log_event_err("%s: gsi_alloc_trb_failed\n",
 								__func__);
+				usb_gadget_autopm_put_async(d_port->gadget);
 				break;
 			}
 
-			ipa_connect_channels(d_port);
+			ret = ipa_connect_channels(d_port);
+			if (ret) {
+				log_event_err("%s: ipa_connect_channels failed\n",
+							__func__);
+				gsi_free_trb_buffer(gsi);
+				usb_gadget_autopm_put_async(d_port->gadget);
+				break;
+			}
+
 			ipa_data_path_enable(d_port);
 			d_port->sm_state = STATE_CONNECTED;
 			log_event_dbg("%s: ST_INIT_EVT_HOST_READY", __func__);
@@ -939,8 +1023,9 @@ static void ipa_work_handler(struct work_struct *w)
 			log_event_dbg("%s: ST_CON_IN_PROG_EVT_HOST_READY",
 					 __func__);
 		} else if (event == EVT_CONNECTED) {
-			if (peek_event(d_port) == EVT_SUSPEND) {
-				log_event_dbg("%s: ST_CON_IN_PROG_EVT_SUSPEND",
+			if (peek_event(d_port) == EVT_SUSPEND ||
+				peek_event(d_port) == EVT_DISCONNECTED) {
+				log_event_dbg("%s: NO_OP CONN_SUS CONN_DIS",
 					 __func__);
 				break;
 			}
@@ -993,8 +1078,10 @@ static void ipa_work_handler(struct work_struct *w)
 				log_event_dbg("%s: ST_CON_HOST_NRDY\n",
 								__func__);
 				block_db = true;
-				/* stop USB ringing doorbell to GSI(OUT_EP) */
+				/* stop USB ringing doorbell to GSI(both EPs) */
 				usb_gsi_ep_op(d_port->in_ep, (void *)&block_db,
+						GSI_EP_OP_SET_CLR_BLOCK_DBL);
+				usb_gsi_ep_op(d_port->out_ep, (void *)&block_db,
 						GSI_EP_OP_SET_CLR_BLOCK_DBL);
 				gsi_rndis_ipa_reset_trigger(d_port);
 				usb_gsi_ep_op(d_port->in_ep, NULL,
@@ -1035,16 +1122,6 @@ static void ipa_work_handler(struct work_struct *w)
 		} else if (event == EVT_CONNECTED) {
 			d_port->sm_state = STATE_CONNECTED;
 			log_event_dbg("%s: ST_CON_EVT_CON", __func__);
-		}
-		break;
-	case STATE_DISCONNECTED:
-		if (event == EVT_CONNECT_IN_PROGRESS) {
-			ipa_connect_channels(d_port);
-			d_port->sm_state = STATE_CONNECT_IN_PROGRESS;
-			log_event_dbg("%s: ST_DIS_EVT_CON_IN_PROG", __func__);
-		} else if (event == EVT_UNINITIALIZED) {
-			d_port->sm_state = STATE_UNINITIALIZED;
-			log_event_dbg("%s: ST_DIS_EVT_UNINIT", __func__);
 		}
 		break;
 	case STATE_SUSPEND_IN_PROGRESS:
@@ -1137,8 +1214,9 @@ static void gsi_ctrl_clear_cpkt_queues(struct f_gsi *gsi, bool skip_req_q)
 {
 	struct gsi_ctrl_pkt *cpkt = NULL;
 	struct list_head *act, *tmp;
+	unsigned long flags;
 
-	spin_lock(&gsi->c_port.lock);
+	spin_lock_irqsave(&gsi->c_port.lock, flags);
 	if (skip_req_q)
 		goto clean_resp_q;
 
@@ -1153,7 +1231,7 @@ clean_resp_q:
 		list_del(&cpkt->list);
 		gsi_ctrl_pkt_free(cpkt);
 	}
-	spin_unlock(&gsi->c_port.lock);
+	spin_unlock_irqrestore(&gsi->c_port.lock, flags);
 }
 
 static int gsi_ctrl_send_cpkt_tomodem(struct f_gsi *gsi, void *buf, size_t len)
@@ -1402,7 +1480,7 @@ static long gsi_ctrl_dev_ioctl(struct file *fp, unsigned int cmd,
 						ctrl_device);
 	struct f_gsi *gsi;
 	struct gsi_ctrl_pkt *cpkt;
-	struct ep_info info = { {0} };
+	struct ep_info info = { {0}, {0} };
 	int val, ret = 0;
 	unsigned long flags;
 
@@ -1769,10 +1847,15 @@ static int gsi_ctrl_send_notification(struct f_gsi *gsi)
 	__le32 *data;
 	struct usb_cdc_notification *event;
 	struct usb_request *req = gsi->c_port.notify_req;
-	struct usb_composite_dev *cdev = gsi->function.config->cdev;
+	struct usb_composite_dev *cdev;
 	struct gsi_ctrl_pkt *cpkt;
 	unsigned long flags;
 	bool del_free_cpkt = false;
+
+	if (!gsi->function.config)
+		return -ENODEV;
+
+	cdev = gsi->function.config->cdev;
 
 	if (!atomic_read(&gsi->connected)) {
 		log_event_dbg("%s: cable disconnect", __func__);
@@ -2575,6 +2658,9 @@ static void gsi_suspend(struct usb_function *f)
 	block_db = true;
 	usb_gsi_ep_op(gsi->d_port.in_ep, (void *)&block_db,
 			GSI_EP_OP_SET_CLR_BLOCK_DBL);
+	if (gsi->d_port.out_ep)
+		usb_gsi_ep_op(gsi->d_port.out_ep, (void *)&block_db,
+			GSI_EP_OP_SET_CLR_BLOCK_DBL);
 	post_event(&gsi->d_port, EVT_SUSPEND);
 	queue_work(gsi->d_port.ipa_usb_wq, &gsi->d_port.usb_ipa_w);
 	log_event_dbg("gsi suspended");
@@ -2621,6 +2707,8 @@ static void gsi_resume(struct usb_function *f)
 			!usb_gsi_remote_wakeup_allowed(f) &&
 			gsi->host_supports_flow_control)
 		rndis_flow_control(gsi->params, false);
+
+	gsi->rwake_inprogress = false;
 
 	post_event(&gsi->d_port, EVT_RESUMED);
 	queue_work(gsi->d_port.ipa_usb_wq, &gsi->d_port.usb_ipa_w);

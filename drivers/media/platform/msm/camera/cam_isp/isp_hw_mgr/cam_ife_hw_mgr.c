@@ -32,6 +32,7 @@
 #include "cam_common_util.h"
 
 #define CAM_IFE_HW_ENTRIES_MAX  20
+#define CAM_IFE_BUF_DONE_DELAY_TH 33000
 
 #define TZ_SVC_SMMU_PROGRAM 0x15
 #define TZ_SAFE_SYSCALL_ID  0x3
@@ -43,7 +44,7 @@
 	(CAM_ISP_PACKET_META_GENERIC_BLOB_COMMON + 1)
 
 #define CAM_ISP_GENERIC_BLOB_TYPE_MAX               \
-	(CAM_ISP_GENERIC_BLOB_TYPE_BW_CONFIG + 1)
+	(CAM_ISP_GENERIC_BLOB_TYPE_FPS_CONFIG + 1)
 
 static uint32_t blob_type_hw_cmd_map[CAM_ISP_GENERIC_BLOB_TYPE_MAX] = {
 	CAM_ISP_HW_CMD_GET_HFR_UPDATE,
@@ -2496,6 +2497,18 @@ static int cam_isp_blob_hfr_update(
 	return rc;
 }
 
+static int cam_isp_blob_fps_update(
+	uint32_t                               blob_type,
+	struct cam_isp_generic_blob_info      *blob_info,
+	struct cam_isp_fps_config             *fps_config,
+	struct cam_hw_prepare_update_args     *prepare)
+{
+	int                                    rc = 0;
+
+	CAM_DBG(CAM_ISP, "fps = %u", fps_config->fps);
+	g_ife_hw_mgr.debug_cfg.ife_timestamps_th = fps_config->fps;
+	return rc;
+}
 static int cam_isp_blob_clock_update(
 	uint32_t                               blob_type,
 	struct cam_isp_generic_blob_info      *blob_info,
@@ -2580,8 +2593,8 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 	struct cam_hw_prepare_update_args *prepare = NULL;
 
 	if (!blob_data || (blob_size == 0) || !blob_info) {
-		CAM_ERR(CAM_ISP, "Invalid info blob %pK %d prepare %pK",
-			blob_data, blob_size, prepare);
+		CAM_ERR(CAM_ISP, "Invalid args data %pK size %d info %pK",
+			blob_data, blob_size, blob_info);
 		return -EINVAL;
 	}
 
@@ -2600,8 +2613,29 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 
 	switch (blob_type) {
 	case CAM_ISP_GENERIC_BLOB_TYPE_HFR_CONFIG: {
-		struct cam_isp_resource_hfr_config    *hfr_config =
-			(struct cam_isp_resource_hfr_config *)blob_data;
+		struct cam_isp_resource_hfr_config    *hfr_config;
+
+		if (blob_size < sizeof(struct cam_isp_resource_hfr_config)) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u", blob_size);
+			return -EINVAL;
+		}
+
+		hfr_config = (struct cam_isp_resource_hfr_config *)blob_data;
+
+		if (hfr_config->num_ports > CAM_ISP_IFE_OUT_RES_MAX) {
+			CAM_ERR(CAM_ISP, "Invalid num_ports %u in hfr config",
+				hfr_config->num_ports);
+			return -EINVAL;
+		}
+
+		if (blob_size < (sizeof(uint32_t) * 2 + hfr_config->num_ports *
+			sizeof(struct cam_isp_port_hfr_config))) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u expected %lu",
+				blob_size, (unsigned long)(sizeof(uint32_t)
+				* 2 + sizeof(struct cam_isp_port_hfr_config) *
+				hfr_config->num_ports));
+			return -EINVAL;
+		}
 
 		rc = cam_isp_blob_hfr_update(blob_type, blob_info,
 			hfr_config, prepare);
@@ -2610,8 +2644,29 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 	}
 		break;
 	case CAM_ISP_GENERIC_BLOB_TYPE_CLOCK_CONFIG: {
-		struct cam_isp_clock_config    *clock_config =
-			(struct cam_isp_clock_config *)blob_data;
+		struct cam_isp_clock_config    *clock_config;
+
+		if (blob_size < sizeof(struct cam_isp_clock_config)) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u", blob_size);
+			return -EINVAL;
+		}
+
+		clock_config = (struct cam_isp_clock_config *)blob_data;
+
+		if (clock_config->num_rdi > CAM_IFE_RDI_NUM_MAX) {
+			CAM_ERR(CAM_ISP, "Invalid num_rdi %u in clock config",
+				clock_config->num_rdi);
+			return -EINVAL;
+		}
+
+		if (blob_size < (sizeof(uint32_t) * 2 + sizeof(uint64_t) *
+			(clock_config->num_rdi + 2))) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u expected %lu",
+				blob_size, (unsigned long)(sizeof(uint32_t)
+				* 2 + sizeof(uint64_t) *
+				(clock_config->num_rdi + 2)));
+			return -EINVAL;
+		}
 
 		rc = cam_isp_blob_clock_update(blob_type, blob_info,
 			clock_config, prepare);
@@ -2620,9 +2675,30 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 	}
 		break;
 	case CAM_ISP_GENERIC_BLOB_TYPE_BW_CONFIG: {
-		struct cam_isp_bw_config    *bw_config =
-			(struct cam_isp_bw_config *)blob_data;
+		struct cam_isp_bw_config    *bw_config;
 		struct cam_isp_prepare_hw_update_data   *prepare_hw_data;
+
+		if (blob_size < sizeof(struct cam_isp_bw_config)) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u", blob_size);
+			return -EINVAL;
+		}
+
+		bw_config = (struct cam_isp_bw_config *)blob_data;
+
+		if (bw_config->num_rdi > CAM_IFE_RDI_NUM_MAX) {
+			CAM_ERR(CAM_ISP, "Invalid num_rdi %u in bw config",
+				bw_config->num_rdi);
+			return -EINVAL;
+		}
+
+		if (blob_size < (sizeof(uint32_t) * 2 + (bw_config->num_rdi + 2)
+			* sizeof(struct cam_isp_bw_vote))) {
+			CAM_ERR(CAM_ISP, "Invalid blob size %u expected %lu",
+				blob_size, (unsigned long)(sizeof(uint32_t)
+				* 2 + (bw_config->num_rdi + 2)
+				* sizeof(struct cam_isp_bw_vote)));
+			return -EINVAL;
+		}
 
 		if (!prepare || !prepare->priv ||
 			(bw_config->usage_type >= CAM_IFE_HW_NUM_MAX)) {
@@ -2638,6 +2714,15 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 			bw_config, sizeof(prepare_hw_data->bw_config[0]));
 		prepare_hw_data->bw_config_valid[bw_config->usage_type] = true;
 
+	}
+		break;
+	case CAM_ISP_GENERIC_BLOB_TYPE_FPS_CONFIG: {
+		struct cam_isp_fps_config    *fsp_config =
+			(struct cam_isp_fps_config *)blob_data;
+		rc = cam_isp_blob_fps_update(blob_type, blob_info,
+			fsp_config, prepare);
+		if (rc)
+			CAM_ERR(CAM_ISP, "FPS Update Failed");
 	}
 		break;
 	default:
@@ -2961,6 +3046,10 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			hw_mgr->mgr_common.img_iommu_hdl_secure,
 			hw_cmd_args->u.pf_args.buf_info,
 			hw_cmd_args->u.pf_args.mem_found);
+		break;
+	case CAM_HW_MGR_CMD_GET_TIMESTAMP_TH:
+		hw_cmd_args->u.irq_timestamps_th =
+			g_ife_hw_mgr.debug_cfg.ife_timestamps_th;
 		break;
 	default:
 		CAM_ERR(CAM_ISP, "Invalid cmd");
@@ -3469,6 +3558,8 @@ static int cam_ife_hw_mgr_handle_reg_update(
 				break;
 
 			if (!rup_status) {
+				rup_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 				ife_hwr_irq_rup_cb(
 					ife_hwr_mgr_ctx->common.cb_priv,
 					CAM_ISP_HW_EVENT_REG_UPDATE,
@@ -3497,6 +3588,8 @@ static int cam_ife_hw_mgr_handle_reg_update(
 			if (atomic_read(&ife_hwr_mgr_ctx->overflow_pending))
 				break;
 			if (!rup_status) {
+				rup_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 				/* Send the Reg update hw event */
 				ife_hwr_irq_rup_cb(
 					ife_hwr_mgr_ctx->common.cb_priv,
@@ -3839,6 +3932,8 @@ static int cam_ife_hw_mgr_handle_sof(
 						ife_hw_mgr_ctx,
 						&sof_done_event_data.timestamp,
 						&sof_done_event_data.boot_time);
+					sof_done_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 
 					ife_hw_irq_sof_cb(
 						ife_hw_mgr_ctx->common.cb_priv,
@@ -3861,6 +3956,8 @@ static int cam_ife_hw_mgr_handle_sof(
 					ife_hw_mgr_ctx,
 					&sof_done_event_data.timestamp,
 					&sof_done_event_data.boot_time);
+				sof_done_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 
 				ife_hw_irq_sof_cb(
 					ife_hw_mgr_ctx->common.cb_priv,
@@ -3944,11 +4041,14 @@ static int cam_ife_hw_mgr_handle_eof_for_camif_hw_res(
 				if (atomic_read(
 					&ife_hwr_mgr_ctx->overflow_pending))
 					break;
-				if (!eof_status)
+				if (!eof_status) {
+					eof_done_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 					ife_hwr_irq_eof_cb(
 						ife_hwr_mgr_ctx->common.cb_priv,
 						CAM_ISP_HW_EVENT_EOF,
 						&eof_done_event_data);
+					}
 			}
 
 			break;
@@ -3991,11 +4091,14 @@ static int cam_ife_hw_mgr_handle_eof_for_camif_hw_res(
 			if (atomic_read(&ife_hwr_mgr_ctx->overflow_pending))
 				break;
 
-			if (!rc)
+			if (!rc) {
+				eof_done_event_data.irq_mono_boot_time =
+					evt_payload->ts.time_usecs;
 				ife_hwr_irq_eof_cb(
 					ife_hwr_mgr_ctx->common.cb_priv,
 					CAM_ISP_HW_EVENT_EOF,
 					&eof_done_event_data);
+			}
 
 			break;
 
@@ -4095,6 +4198,8 @@ static int cam_ife_hw_mgr_handle_buf_done_for_hw_res(
 
 			if (atomic_read(&ife_hwr_mgr_ctx->overflow_pending))
 				break;
+			buf_done_event_data.irq_mono_boot_time =
+					evt_payload->ts.time_usecs;
 			/* Report for Successful buf_done event if any */
 			if (buf_done_event_data.num_handles > 0 &&
 				ife_hwr_irq_wm_done_cb) {
@@ -4534,6 +4639,8 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 	if (iommu_hdl)
 		*iommu_hdl = g_ife_hw_mgr.mgr_common.img_iommu_hdl;
 
+	g_ife_hw_mgr.debug_cfg.ife_timestamps_th =
+		CAM_IFE_BUF_DONE_DELAY_TH;
 	cam_ife_hw_mgr_debug_register();
 	CAM_DBG(CAM_ISP, "Exit");
 
