@@ -210,6 +210,7 @@ static void cam_cci_init_cci_params(struct cci_device *new_cci_dev)
 				&new_cci_dev->cci_master_info[i].lock_q[j]);
 		}
 	}
+	mutex_init(&new_cci_dev->init_mutex);
 	new_cci_dev->cci_state = CCI_STATE_DISABLED;
 	spin_lock_init(&new_cci_dev->lock_status);
 }
