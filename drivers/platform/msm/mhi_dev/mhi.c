@@ -1974,6 +1974,7 @@ free_ereqs:
 	ch->ereqs = NULL;
 free_client:
 	kfree(*handle_client);
+	*handle_client = NULL;
 exit:
 	mutex_unlock(&ch->ch_lock);
 	return rc;
@@ -1984,6 +1985,11 @@ int mhi_dev_channel_isempty(struct mhi_dev_client *handle)
 {
 	struct mhi_dev_channel *ch;
 	int rc;
+
+	if (!handle) {
+		mhi_log(MHI_MSG_ERROR, "Invalid channel access\n");
+		return -EINVAL;
+	}
 
 	ch = handle->channel;
 	if (!ch)
@@ -1999,6 +2005,11 @@ int mhi_dev_close_channel(struct mhi_dev_client *handle)
 {
 	struct mhi_dev_channel *ch;
 	int rc = 0;
+
+	if (!handle) {
+		mhi_log(MHI_MSG_ERROR, "Invalid channel access\n");
+		return -EINVAL;
+	}
 
 	ch = handle->channel;
 
