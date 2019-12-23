@@ -26,6 +26,9 @@
 
 #define MAX_PLANE	4
 
+#define RGB_24BPP_TMDS_CHAR_RATE_RATIO		1
+#define YUV420_24BPP_TMDS_CHAR_RATE_RATIO	2
+
 /**
  * Device Private DRM Mode Flags
  * drm_mode->private_flags
