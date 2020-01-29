@@ -11,6 +11,20 @@
  * GNU General Public License for more details.
  */
 
+&soc {
+	qcom,ion {
+		compatible = "qcom,msm-ion";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+			qcom,ion-heap@10 { /* SECURE DISPLAY HEAP */
+				reg = <10>;
+				memory-region = <&secure_display_memory>;
+				qcom,ion-heap-type = "SECURE_DMA";
+			};
+	};
+};
+
 &external_image_mem {
 	reg = <0x0 0x87900000 0x0 0x700000>;
 };
@@ -28,6 +42,7 @@
 		linux,reserve-contiguous-region;
 		reg = <0 0 0 0x400000>;
 		label = "secure_display_mem";
+		status = "disabled";
 	};
 };
 

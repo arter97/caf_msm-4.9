@@ -54,6 +54,7 @@
 	};
 
 	apps_iommu: qcom,iommu@1e00000 {
+		status = "okay";
 		compatible = "qcom,qsmmu-v500";
 		reg = <0x1e00000 0x40000>,
 			<0x1ef2000 0x20>;
