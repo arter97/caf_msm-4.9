@@ -211,6 +211,8 @@ struct mdp3_hw_resource {
 	struct mutex reg_bus_lock;
 	int bklt_level;
 	int bklt_update;
+	bool secure_update_bl;
+	bool secure_reg_on;
 	bool twm_en;
 	u32 max_bw;
 
