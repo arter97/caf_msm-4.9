@@ -1204,7 +1204,6 @@ void _enable_gpuhtw_llc(struct kgsl_mmu *mmu, struct kgsl_iommu_pt *iommu_pt)
 		"System cache not enabled for GPU pagetable walks: %d\n", ret);
 }
 
-#if 0
 static int program_smmu_aperture(unsigned int cb, unsigned int aperture_reg)
 {
 	struct scm_desc desc = {0};
@@ -1217,7 +1216,6 @@ static int program_smmu_aperture(unsigned int cb, unsigned int aperture_reg)
 
 	return scm_call2(SCM_SIP_FNID(SCM_SVC_MP, CP_SMMU_APERTURE_ID), &desc);
 }
-#endif
 
 static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 {
@@ -1259,7 +1257,6 @@ static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 		goto done;
 	}
 
-#if 0
 	if (!MMU_FEATURE(mmu, KGSL_MMU_GLOBAL_PAGETABLE) &&
 		scm_is_call_available(SCM_SVC_MP, CP_SMMU_APERTURE_ID)) {
 		ret = program_smmu_aperture(cb_num, CP_APERTURE_REG);
@@ -1269,7 +1266,6 @@ static int _init_global_pt(struct kgsl_mmu *mmu, struct kgsl_pagetable *pt)
 			return ret;
 		}
 	}
-#endif
 
 	ctx->cb_num = cb_num;
 	ctx->regbase = iommu->regbase + KGSL_IOMMU_CB0_OFFSET

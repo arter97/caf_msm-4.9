@@ -491,7 +491,6 @@ static int __scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
 	register u32 r5 asm("r5") = w5;
 	register u32 r6 asm("r6") = 0;
 
-	pr_err("Him1: Inside __scm_call_armv8_32 else CONFIG_ARM64 starting with passed argument w0 as 0x%x\n", w0);
 	do {
 		asm volatile(
 			__asmeq("%0", R0_STR)
@@ -526,7 +525,6 @@ static int __scm_call_armv8_32(u32 w0, u32 w1, u32 w2, u32 w3, u32 w4, u32 w5,
 	if (ret3)
 		*ret3 = r3;
 
-	pr_err("Him1: Inside __scm_call_armv8_32 else CONFIG_ARM64 with passed argument w0 as 0x%x\n", w0);
 	return r0;
 }
 
