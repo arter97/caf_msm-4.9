@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -243,6 +243,7 @@
 #include "msm8909-vidc.dtsi"
 #include "msm8909-mdss.dtsi"
 #include "msm8909-mdss-pll.dtsi"
+#include "msm8909-camera.dtsi"
 
 &soc {
 	#address-cells = <1>;
@@ -2013,3 +2014,4 @@
 	status = "okay";
 };
 #include "msm8909-thermal.dtsi"
+#include "msm8909-pinctrl.dtsi"
