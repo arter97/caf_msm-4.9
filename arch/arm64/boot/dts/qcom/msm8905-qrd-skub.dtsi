@@ -572,3 +572,7 @@
 &pm8909_conga_analog {
 	status = "disabled";
 };
+
+&actuator0 {
+	status = "disabled";
+};
