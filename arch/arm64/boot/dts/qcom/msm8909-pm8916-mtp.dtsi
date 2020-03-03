@@ -78,6 +78,12 @@
 	};
 };
 
+&dsi_hx8394d_720_vid {
+	qcom,cont-splash-enabled;
+	qcom,mdss-dsi-pwm-gpio = <&pm8916_mpps 4 0>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};
+
 &spmi_bus {
 	pm8916@0 {
 		qcom,leds@a300 {
@@ -184,4 +190,12 @@
 			status = "disabled";
 		};
 	};
+};
+
+&vendor_fstab {
+	status = "disabled";
+};
+
+&system_fstab {
+	status = "disabled";
 };

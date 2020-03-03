@@ -11,6 +11,7 @@
  */
 
 #include "dsi-panel-390p-auo-cmd.dtsi"
+#include "dsi-panel-hx8394d-720p-video.dtsi"
 
 &soc {
 	dsi_panel_pwr_supply: dsi_panel_pwr_supply {
