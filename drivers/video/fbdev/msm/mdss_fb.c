@@ -1724,8 +1724,6 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	} else if (mdss_fb_is_power_on(mfd) && mfd->panel_info->panel_dead) {
 		mfd->unset_bl_level = mfd->bl_level;
 	} else if (!mfd->allow_secure_bl_update && bkl_lvl) {
-		mfd->unset_bl_level = 0;
-	} else {
 		mfd->unset_bl_level = U32_MAX;
 	}
 
