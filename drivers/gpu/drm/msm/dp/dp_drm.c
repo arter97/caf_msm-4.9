@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,7 +32,7 @@ enum dp_connector_hdr_state {
 };
 
 static int get_sink_dc_support(struct dp_display *dp,
-		struct drm_display_mode *mode)
+			struct drm_display_mode *mode)
 {
 	int dc_format = 0;
 	struct drm_connector *connector = dp->connector;
@@ -41,28 +41,28 @@ static int get_sink_dc_support(struct dp_display *dp,
 			(connector->display_info.edid_hdmi_dc_modes
 			& DRM_EDID_YCBCR420_DC_30))
 		if (dp->get_dc_support(dp, mode->clock,
-				MSM_MODE_FLAG_COLOR_FORMAT_YCBCR420, true))
+			MSM_MODE_FLAG_COLOR_FORMAT_YCBCR420, true))
 			dc_format |= MSM_MODE_FLAG_YUV420_DC_ENABLE;
 
 	if ((mode->flags & DRM_MODE_FLAG_SUPPORTS_RGB) &&
 			(connector->display_info.edid_hdmi_dc_modes
-			 & DRM_EDID_HDMI_DC_30))
+			& DRM_EDID_HDMI_DC_30))
 		if (dp->get_dc_support(dp, mode->clock,
-				MSM_MODE_FLAG_COLOR_FORMAT_RGB444, true))
+			MSM_MODE_FLAG_COLOR_FORMAT_RGB444, true))
 			dc_format |= MSM_MODE_FLAG_RGB444_DC_ENABLE;
 
 	if ((mode->flags & DRM_MODE_FLAG_SUPPORTS_YUV422) &&
 			(connector->display_info.edid_hdmi_dc_modes
-			 & DRM_EDID_HDMI_DC_30))
+			& DRM_EDID_HDMI_DC_30))
 		if (dp->get_dc_support(dp, mode->clock,
-				MSM_MODE_FLAG_COLOR_FORMAT_YCBCR422, false))
+			MSM_MODE_FLAG_COLOR_FORMAT_YCBCR422, false))
 			dc_format |= MSM_MODE_FLAG_YUV422_DC_ENABLE;
 
 	return dc_format;
 }
 
 static u32 choose_best_format(struct dp_display *dp,
-		struct drm_display_mode *mode)
+	struct drm_display_mode *mode)
 {
 	/*
 	 * choose priority:
@@ -77,13 +77,13 @@ static u32 choose_best_format(struct dp_display *dp,
 	dc_format = get_sink_dc_support(dp, mode);
 	if (dc_format & MSM_MODE_FLAG_RGB444_DC_ENABLE)
 		return (MSM_MODE_FLAG_COLOR_FORMAT_RGB444
-				| MSM_MODE_FLAG_RGB444_DC_ENABLE);
+			| MSM_MODE_FLAG_RGB444_DC_ENABLE);
 	else if (dc_format & MSM_MODE_FLAG_YUV422_DC_ENABLE)
 		return (MSM_MODE_FLAG_COLOR_FORMAT_YCBCR422
-				| MSM_MODE_FLAG_YUV422_DC_ENABLE);
+			| MSM_MODE_FLAG_YUV422_DC_ENABLE);
 	else if (dc_format & MSM_MODE_FLAG_YUV420_DC_ENABLE)
 		return (MSM_MODE_FLAG_COLOR_FORMAT_YCBCR420
-				| MSM_MODE_FLAG_YUV420_DC_ENABLE);
+			| MSM_MODE_FLAG_YUV420_DC_ENABLE);
 	else if (mode->flags & DRM_MODE_FLAG_SUPPORTS_RGB)
 		return MSM_MODE_FLAG_COLOR_FORMAT_RGB444;
 	else if (mode->flags & DRM_MODE_FLAG_SUPPORTS_YUV420)
@@ -95,7 +95,7 @@ static u32 choose_best_format(struct dp_display *dp,
 }
 
 static void convert_to_dp_mode(const struct drm_display_mode *drm_mode,
-			struct dp_display_mode *dp_mode, struct dp_display *dp)
+		struct dp_display_mode *dp_mode, struct dp_display *dp)
 {
 	memset(dp_mode, 0, sizeof(*dp_mode));
 
