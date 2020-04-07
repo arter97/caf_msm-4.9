@@ -399,6 +399,7 @@ dtbo-$(CONFIG_ARCH_SDM429) += sdm429-mtp-overlay.dtbo \
 	sdm429-spyro-qrd-dvt-overlay.dtbo \
 	sda429-spyro-qrd-dvt-overlay.dtbo \
 	sdm429-spyro-qrd-wdp-overlay.dtbo \
+	sdm429-spyro-qrd-newport-overlay.dtbo \
 	sdm429-bg-wtp-overlay.dtbo \
 	sdm429-bg-wdp-overlay.dtbo \
 	sda429-bg-wdp-overlay.dtbo \
@@ -526,6 +527,7 @@ sdm429-spyro-qrd-evt-overlay.dtbo-base := sdm429-spyro.dtb
 sdm429-spyro-qrd-dvt-overlay.dtbo-base := sdm429-spyro-dvt.dtb
 sda429-spyro-qrd-dvt-overlay.dtbo-base := sda429-spyro-dvt.dtb
 sdm429-spyro-qrd-wdp-overlay.dtbo-base := sdm429-spyro-wdp.dtb
+sdm429-spyro-qrd-newport-overlay.dtbo-base := sdm429-spyro-newport.dtb
 sdm429-bg-wtp-overlay.dtbo-base := sdm429-bg-wtp.dtb
 sda429-bg-wtp-overlay.dtbo-base := sda429-bg-wtp.dtb
 sdm429-bg-wdp-overlay.dtbo-base := sdm429-bg-wdp.dtb
