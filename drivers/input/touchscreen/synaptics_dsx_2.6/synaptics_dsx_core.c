@@ -1472,6 +1472,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #endif
 
 		if (rmi4_data->stylus_enable) {
+		    if(rmi4_data->stylus_dev) {
 			stylus_presence = 0;
 			input_report_key(rmi4_data->stylus_dev,
 					BTN_TOUCH, 0);
@@ -1482,6 +1483,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 						BTN_TOOL_RUBBER, 0);
 			}
 			input_sync(rmi4_data->stylus_dev);
+		    }
 		}
 	}
 
@@ -3615,6 +3617,10 @@ static int synaptics_rmi4_free_fingers(struct synaptics_rmi4_data *rmi4_data)
 				MT_TOOL_FINGER, 0);
 	}
 #endif
+        if (rmi4_data->input_dev == NULL)
+               pr_err("%s: HIM: Input Device is NULL", __func__);
+        else
+               pr_err("%s: HIM: rmi4_data->input_dev = %d", __func__, (int)rmi4_data->input_dev);
 	input_report_key(rmi4_data->input_dev,
 			BTN_TOUCH, 0);
 	input_report_key(rmi4_data->input_dev,
@@ -3625,6 +3631,10 @@ static int synaptics_rmi4_free_fingers(struct synaptics_rmi4_data *rmi4_data)
 	input_sync(rmi4_data->input_dev);
 
 	if (rmi4_data->stylus_enable) {
+               pr_err("%s: HIM: Stylus is Enable", __func__);
+       }
+       if (rmi4_data->stylus_enable) {
+	    if (rmi4_data->stylus_dev != NULL) {
 		input_report_key(rmi4_data->stylus_dev,
 				BTN_TOUCH, 0);
 		input_report_key(rmi4_data->stylus_dev,
@@ -3634,6 +3644,7 @@ static int synaptics_rmi4_free_fingers(struct synaptics_rmi4_data *rmi4_data)
 					BTN_TOOL_RUBBER, 0);
 		}
 		input_sync(rmi4_data->stylus_dev);
+	    }
 	}
 
 	mutex_unlock(&(rmi4_data->rmi4_report_mutex));

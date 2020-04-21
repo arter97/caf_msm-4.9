@@ -21,9 +21,7 @@
 / {
 	model = "Qualcomm Technologies, Inc. MSM8909-PM8916 1GB MTP";
 	compatible = "qcom,msm8909-mtp", "qcom,msm8909", "qcom,mtp";
-	qcom,msm-id = <245 0x20000>, <245 0x0>;
 	qcom,board-id= <0x8 0x2>;
-	qcom,pmic-id = <0x1000B 0x0 0x0 0x0>;
 };
 
 &pm8916_chg {
@@ -32,4 +30,11 @@
 
 &usb_otg {
 	extcon = <&pm8916_chg>;
+};
+
+
+&blsp1_uart1 {
+        status = "ok";
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart_console_active>;
 };

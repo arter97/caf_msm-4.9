@@ -141,15 +141,16 @@
 			compatible = "android,firmware";
 			fstab {
 				compatible = "android,fstab";
-				vendor_fstab: vendor {
+				vendor {
 					compatible = "android,vendor";
 					dev =
 			"/dev/block/platform/soc/7824900.sdhci/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,verify";
+					fsmgr_flags = "wait";
 					status = "ok";
 				};
+/*
 				system_fstab: system {
 					compatible = "android,system";
 					dev =
@@ -159,6 +160,7 @@
 					fsmgr_flags = "wait,verify";
 					status = "ok";
 				};
+*/
 			};
 		};
 	};
@@ -169,19 +171,19 @@
 		ranges;
 
 		external_image_mem: external_image__region@0 {
-			reg = <0x0 0x87a00000 0x0 0x0600000>;
+			reg = <0x0 0x87900000 0x0 0x0700000>;
 			compatible = "removed-dma-pool";
 			no-map;
 		};
 
 		modem_adsp_mem: modem_adsp_region@0 {
-			reg = <0x0 0x88000000 0x0 0x05500000>;
+			reg = <0x0 0x88000000 0x0 0x05200000>;
 			compatible = "removed-dma-pool";
 			no-map;
 		};
 
 		peripheral_mem: pheripheral_region@0 {
-			reg = <0x0 0x8d500000 0x0 0x0700000>;
+			reg = <0x0 0x8d200000 0x0 0x0700000>;
 			compatible = "removed-dma-pool";
 			no-map;
 		};

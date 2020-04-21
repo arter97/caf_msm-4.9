@@ -312,9 +312,9 @@
 	};
 };
 
-&vendor_fstab {
+/*&vendor_fstab {
 	fsmgr_flags = "wait";
-};
+};*/
 
 &mdss_dsi0{
 	qcom,dsi-pref-prim-pan = <&dsi_auo_390p_cmd>;

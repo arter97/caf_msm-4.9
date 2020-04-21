@@ -2136,7 +2136,6 @@ static int qpnp_pwm_probe(struct platform_device *pdev)
 {
 	struct qpnp_pwm_chip	*pwm_chip;
 	int			rc;
-
 	pwm_chip = kzalloc(sizeof(*pwm_chip), GFP_KERNEL);
 	if (pwm_chip == NULL)
 		return -ENOMEM;
@@ -2164,7 +2163,7 @@ static int qpnp_pwm_probe(struct platform_device *pdev)
 	pwm_chip->chip.base = -1;
 	pwm_chip->chip.npwm = 1;
 
-	rc = pwmchip_add(&pwm_chip->chip);
+	rc = pwmchip_add_with_polarity(&pwm_chip->chip, PWM_POLARITY_NORMAL);
 	if (rc < 0) {
 		pr_err("pwmchip_add() failed: %d\n", rc);
 		goto failed_insert;

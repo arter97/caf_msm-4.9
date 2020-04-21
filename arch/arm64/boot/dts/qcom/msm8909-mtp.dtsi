@@ -71,25 +71,40 @@
 
 	i2c@78b9000 { /* BLSP1 QUP5 */
 		synaptics@20 {
-			compatible = "synaptics,dsx";
+                        /*status = "disabled";*/
+			compatible = "synaptics,dsx-i2c";
 			reg = <0x20>;
 			interrupt-parent = <&msm_gpio>;
 			interrupts = <13 0x2008>;
+
+                        synaptics,irq-on-state = <0>;
+                        synaptics,irq-flags = <0x2008>;
+                        /*synaptics,resume-in-workqueue;
+                        synaptics,x-flip;
+                        synaptics,y-flip;*/
+
+
 			avdd-supply = <&pm8909_l17>;
 			vdd-supply = <&pm8909_l6>;
 			/* pins used by touchscreen */
-			pinctrl-names = "pmx_ts_active",
+                        pinctrl-names = "pmx_ts_active",
 				"pmx_ts_suspend","pmx_ts_release";
 			pinctrl-0 = <&ts_int_active &ts_reset_active>;
 			pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
 			pinctrl-2 = <&ts_release>;
 			synaptics,irq-gpio = <&msm_gpio 13 0x2008>;
 			synaptics,reset-gpio = <&msm_gpio 12 0x0>;
-			synaptics,disable-gpios;
-			synaptics,display-coords = <0 0 719 1279>;
-			synaptics,panel-coords = <0 0 719 1405>;
+
+                        synaptics,reset-on-state = <0>;
+                        synaptics,reset-active-ms = <20>;
+                        synaptics,cap-button-codes = <139 158 172>;
+                        /delete-property/ synaptics,disable-gpios;
+                        /delete-property/ synaptics,display-coords;
+                        /delete-property/ synaptics,panel-coords;
+
 		};
 	};
+
 
 	i2c@78b6000 { /* BLSP1 QUP2 */
 		nq@28 {
@@ -109,6 +124,16 @@
 			clock-names = "ref_clk";
 		};
 	};
+
+        gen-vkeys {
+                compatible = "qcom,gen-vkeys";
+                label = "synaptics_dsx_i2c";
+                qcom,disp-maxx = <719>;
+                qcom,disp-maxy = <1279>;
+                qcom,panel-maxx = <719>;
+                qcom,panel-maxy = <1405>;
+                qcom,key-codes = <158 139 172 217>;
+        };
 
 	gpio_keys {
 		compatible = "gpio-keys";
@@ -189,14 +214,10 @@
 			"pri_i2s_act",
 			"us_eu_gpio_act",
 			"pri_i2s_us_eu_gpio_act";
-		pinctrl-0 = <&cdc_pdm_lines_sus &cross_conn_det_sus
-							&vdd_spkdrv_sus>;
-		pinctrl-1 = <&cdc_pdm_lines_act &cross_conn_det_sus
-							&vdd_spkdrv_act>;
-		pinctrl-2 = <&cdc_pdm_lines_sus &cross_conn_det_act
-							&vdd_spkdrv_sus>;
-		pinctrl-3 = <&cdc_pdm_lines_act &cross_conn_det_act
-							&vdd_spkdrv_act>;
+                pinctrl-0 = <&cdc_pdm_lines_sus &cross_conn_det_sus>;
+                pinctrl-1 = <&cdc_pdm_lines_act &cross_conn_det_sus>;
+                pinctrl-2 = <&cdc_pdm_lines_sus &cross_conn_det_act>;
+                pinctrl-3 = <&cdc_pdm_lines_act &cross_conn_det_act>;
 		qcom,cdc-us-euro-gpios = <&msm_gpio 97 0>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
@@ -324,6 +345,23 @@
 
 &mdss_mdp {
 	qcom,mdss-pref-prim-intf = "dsi";
+};
+
+&dsi_hx8394d_720_vid {
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
+	qcom,mdss-dsi-bl-pmic-pwm-frequency = <100>;
+	qcom,mdss-dsi-bl-pmic-bank-select = <0>;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_hx8394d_720_vid>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+
+	qcom,platform-reset-gpio = <&msm_gpio 25 0>;
+	qcom,platform-bklight-en-gpio = <&msm_gpio 37 0>;
 };
 
 &msm_gpio {

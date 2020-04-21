@@ -305,9 +305,11 @@
 		#size-cells = <1>;
 
 		pm8916_pwm: qcom,pwms@bc00 {
-			compatible = "qcom,pwm-lpg";
+			compatible = "qcom,qpnp-pwm";
 			reg = <0xbc00 0x100>;
-			reg-names = "lpg-base";
+			reg-names = "qpnp-lpg-channel-base";
+			qcom,channel-id = <0>;
+			qcom,supported-sizes = <6>, <9>;
 			#pwm-cells = <2>;
 		};
 
