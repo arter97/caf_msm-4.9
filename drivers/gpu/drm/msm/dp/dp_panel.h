@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,6 +47,7 @@ struct dp_panel_info {
 	u32 pixel_clk_khz;
 	u32 bpp;
 	u32 out_format;
+	enum hdmi_picture_aspect par;
 };
 
 struct dp_display_mode {

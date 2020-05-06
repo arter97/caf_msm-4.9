@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -189,13 +189,18 @@ static void dp_ctrl_config_ctrl(struct dp_ctrl_private *ctrl)
 static void dp_ctrl_misc_ctrl(struct dp_ctrl_private *ctrl)
 {
 	u32 out_format = ctrl->panel->pinfo.out_format;
+	u32 yres = ctrl->panel->pinfo.v_active;
 	u32 cc, tb;
 
 	tb = ctrl->link->get_test_bits_depth(ctrl->link,
 		ctrl->panel->pinfo.bpp);
 	cc = ctrl->link->get_colorimetry_config(ctrl->link);
-	if (out_format == MSM_MODE_FLAG_COLOR_FORMAT_YCBCR422)
-		cc |= (0x01 << 1); /* Set YUV422 */
+	if (out_format == MSM_MODE_FLAG_COLOR_FORMAT_YCBCR422) {
+		cc |= (0x01 << 1); /* Set 4:2:2 Pixel Encoding */
+		cc |= BIT(3); /* Set YCbCr Colorimetry */
+		if (yres >= 720)
+			cc |= BIT(4); /* Set BT709 */
+	}
 
 	ctrl->catalog->config_misc(ctrl->catalog, cc, tb);
 }
@@ -269,7 +274,8 @@ static void dp_ctrl_calc_tu_parameters(struct dp_ctrl_private *ctrl,
 {
 	u32 const multiplier = 1000000;
 	u64 pclk, lclk;
-	u8 bpp, ln_cnt;
+	u32 bpp;
+	u8 ln_cnt;
 	int run_idx = 0;
 	u32 lwidth, h_blank;
 	u32 fifo_empty = 0;

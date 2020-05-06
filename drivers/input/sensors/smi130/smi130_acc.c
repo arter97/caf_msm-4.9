@@ -6967,6 +6967,7 @@ static void store_acc_boot_sample(struct smi130_acc_data *client_data,
 {
 	if (false == client_data->acc_buffer_smi130_samples)
 		return;
+	mutex_lock(&client_data->acc_sensor_buff);
 	if (ts.tv_sec <  client_data->max_buffer_time) {
 		if (client_data->acc_bufsample_cnt < SMI_ACC_MAXSAMPLE) {
 			client_data->smi130_acc_samplist[client_data->
@@ -6989,6 +6990,7 @@ static void store_acc_boot_sample(struct smi130_acc_data *client_data,
 			smi130_acc_set_mode(client_data->smi130_acc_client,
 					SMI_ACC2X2_MODE_SUSPEND, 1);
 	}
+	mutex_unlock(&client_data->acc_sensor_buff);
 }
 #else
 static void store_acc_boot_sample(struct smi130_acc_data *client_data,
@@ -7145,9 +7147,7 @@ static irqreturn_t smi130_acc_irq_work_func(int irq, void *handle)
 		smi130_acc->value = acc;
 		mutex_unlock(&smi130_acc->value_mutex);
 	}
-	mutex_lock(&smi130_acc->acc_sensor_buff);
 	store_acc_boot_sample(smi130_acc, acc.x, acc.y, acc.z, ts);
-	mutex_unlock(&smi130_acc->acc_sensor_buff);
 
 	smi130_set_cpu_idle_state(false);
 	return IRQ_HANDLED;
