@@ -19,7 +19,7 @@
 	/delete-property/ qcom,split-a2dp;
 	asoc-wsa-codec-names;
 	asoc-wsa-codec-prefixes;
-	ext-smart-pa = "aw8896";
+	ext-smart-pa = "tfa98xx";
 	qcom,audio-routing =
 		"CDC_CONN", "MCLK",
 		"QUAT_MI2S_RX", "DIGITAL_REGULATOR",
