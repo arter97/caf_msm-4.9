@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1878,7 +1878,8 @@ static int diag_dci_process_apps_pkt(struct diag_pkt_header_t *pkt_header,
 							DIAG_MAX_REQ_SIZE;
 			write_len += sizeof(uint32_t);
 		} else if (ss_cmd_code == DIAG_DIAG_STM) {
-			write_len = diag_process_stm_cmd(req_buf, payload_ptr);
+			write_len = diag_process_stm_cmd(req_buf, req_len,
+				payload_ptr);
 		}
 	} else if (subsys_id == DIAG_SS_PARAMS) {
 		if (ss_cmd_code == DIAG_DIAG_POLL) {
@@ -3132,6 +3133,7 @@ fail_alloc:
 		kfree(new_entry);
 		new_entry = NULL;
 	}
+	put_task_struct(current);
 	mutex_unlock(&driver->dci_mutex);
 	return DIAG_DCI_NO_REG;
 }
