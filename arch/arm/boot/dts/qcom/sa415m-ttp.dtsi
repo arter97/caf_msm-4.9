@@ -33,6 +33,10 @@
 	};
 };
 
+&cnss_pcie {
+	status = "disabled";
+};
+
 &soc {
 	pps {
 		compatible = "pps-gpio";
