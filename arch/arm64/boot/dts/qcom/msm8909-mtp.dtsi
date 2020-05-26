@@ -76,18 +76,10 @@
 			reg = <0x20>;
 			interrupt-parent = <&msm_gpio>;
 			interrupts = <13 0x2008>;
-
-                        synaptics,irq-on-state = <0>;
-                        synaptics,irq-flags = <0x2008>;
-                        /*synaptics,resume-in-workqueue;
-                        synaptics,x-flip;
-                        synaptics,y-flip;*/
-
-
 			avdd-supply = <&pm8909_l17>;
 			vdd-supply = <&pm8909_l6>;
 			/* pins used by touchscreen */
-                        pinctrl-names = "pmx_ts_active",
+			pinctrl-names = "pmx_ts_active",
 				"pmx_ts_suspend","pmx_ts_release";
 			pinctrl-0 = <&ts_int_active &ts_reset_active>;
 			pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
@@ -105,7 +97,6 @@
 			/delete-property/ synaptics,panel-coords;
 		};
 	};
-
 
 	i2c@78b6000 { /* BLSP1 QUP2 */
 		nq@28 {
@@ -215,10 +206,14 @@
 			"pri_i2s_act",
 			"us_eu_gpio_act",
 			"pri_i2s_us_eu_gpio_act";
-                pinctrl-0 = <&cdc_pdm_lines_sus &cross_conn_det_sus>;
-                pinctrl-1 = <&cdc_pdm_lines_act &cross_conn_det_sus>;
-                pinctrl-2 = <&cdc_pdm_lines_sus &cross_conn_det_act>;
-                pinctrl-3 = <&cdc_pdm_lines_act &cross_conn_det_act>;
+		pinctrl-0 = <&cdc_pdm_lines_sus &cross_conn_det_sus
+							&vdd_spkdrv_sus>;
+		pinctrl-1 = <&cdc_pdm_lines_act &cross_conn_det_sus
+							&vdd_spkdrv_act>;
+		pinctrl-2 = <&cdc_pdm_lines_sus &cross_conn_det_act
+							&vdd_spkdrv_sus>;
+		pinctrl-3 = <&cdc_pdm_lines_act &cross_conn_det_act
+							&vdd_spkdrv_act>;
 		qcom,cdc-us-euro-gpios = <&msm_gpio 97 0>;
 		asoc-platform = <&pcm0>, <&pcm1>, <&pcm2>, <&voip>, <&voice>,
 				<&loopback>, <&compress>, <&hostless>,
