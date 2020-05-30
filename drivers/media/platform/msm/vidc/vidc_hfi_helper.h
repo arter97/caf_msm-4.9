@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -655,7 +655,6 @@ struct hfi_bit_depth {
 };
 
 struct hfi_picture_type {
-	u32 is_sync_frame;
 	u32 picture_type;
 };
 
@@ -975,7 +974,7 @@ struct hfi_cmd_session_set_property_packet {
 	u32 packet_type;
 	u32 session_id;
 	u32 num_properties;
-	u32 rg_property_data[0];
+	u32 rg_property_data[1];
 };
 
 struct hfi_cmd_session_set_buffers_packet {
