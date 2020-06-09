@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, 2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1353,10 +1353,12 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mdp5_data->ctl;
 	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
 
+	mutex_lock(&mdp5_data->ov_lock);
 	if (mdss_mdp_ctl_is_power_on(ctl)) {
 		if (!mdp5_data->mdata->batfet)
 			mdss_mdp_batfet_ctrl(mdp5_data->mdata, true);
 		mdss_mdp_release_splash_pipe(mfd);
+		mutex_unlock(&mdp5_data->ov_lock);
 		return 0;
 	} else if (mfd->panel_info->cont_splash_enabled) {
 		if (mdp5_data->allow_kickoff) {
@@ -1368,12 +1370,14 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 			if (rc) {
 				pr_debug("empty kickoff on fb%d during cont splash\n",
 					mfd->index);
+				mutex_unlock(&mdp5_data->ov_lock);
 				return -EPERM;
 			}
 		}
 	} else if (mdata->handoff_pending) {
 		pr_warn("fb%d: commit while splash handoff pending\n",
 				mfd->index);
+		mutex_unlock(&mdp5_data->ov_lock);
 		return -EPERM;
 	}
 
@@ -1446,6 +1450,7 @@ ctl_error:
 	mdp5_data->ctl = NULL;
 end:
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
+	mutex_unlock(&mdp5_data->ov_lock);
 	return rc;
 }
 
@@ -2872,17 +2877,16 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		mutex_lock(ctl->shared_lock);
 	}
 
-	mutex_lock(&mdp5_data->ov_lock);
 	ctl->bw_pending = 0;
 	ret = mdss_mdp_overlay_start(mfd);
 	if (ret) {
 		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);
-		mutex_unlock(&mdp5_data->ov_lock);
 		if (ctl->shared_lock)
 			mutex_unlock(ctl->shared_lock);
 		return ret;
 	}
 
+	mutex_lock(&mdp5_data->ov_lock);
 	ret = mdss_iommu_ctrl(1);
 	if (IS_ERR_VALUE((unsigned long)ret)) {
 		pr_err("iommu attach failed rc=%d\n", ret);
@@ -3436,7 +3440,9 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 		goto pipe_release;
 	}
 
+	mutex_unlock(&mdp5_data->ov_lock);
 	ret = mdss_mdp_overlay_start(mfd);
+	mutex_lock(&mdp5_data->ov_lock);
 	if (ret) {
 		pr_err("unable to start overlay %d (%d)\n", mfd->index, ret);
 		goto clk_disable;
