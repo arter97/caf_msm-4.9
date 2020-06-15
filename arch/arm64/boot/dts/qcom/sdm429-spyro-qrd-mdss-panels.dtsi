@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,6 +13,7 @@
 
 #include "dsi-panel-edo-rm67162-qvga-cmd.dtsi"
 #include "dsi-panel-truly-rm69090-qvga-cmd.dtsi"
+#include "dsi-panel-truly-rm69090-qvga-cmd-v2.dtsi"
 
 &soc {
 	dsi_pm660_panel_pwr_supply: dsi_pm660_panel_pwr_supply {
@@ -91,6 +92,17 @@
 };
 
 &dsi_truly_rm69090_qvga_cmd {
+	/delete-property/ qcom,mdss-dsi-panel-timings;
+	qcom,mdss-dsi-panel-timings-phy-12nm = [04 04 01 08 00 03 01 0D];
+	qcom,panel-supply-entries = <&dsi_pm660_panel_pwr_supply>;
+	qcom,partial-update-enabled;
+	qcom,partial-update-addr-offset = <0x10 0>;
+	qcom,panel-roi-alignment = <2 2 4 2 20 2>;
+	qcom,esd-check-enabled;
+	qcom,mdss-dsi-panel-status-check-mode = "te_signal_check";
+};
+
+&dsi_truly_rm69090_qvga_cmd_v2 {
 	/delete-property/ qcom,mdss-dsi-panel-timings;
 	qcom,mdss-dsi-panel-timings-phy-12nm = [04 04 01 08 00 03 01 0D];
 	qcom,panel-supply-entries = <&dsi_pm660_panel_pwr_supply>;
