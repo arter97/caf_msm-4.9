@@ -104,6 +104,7 @@ Optional properties:
 - qcom,mdss-fb-map-sec:			pHandle that specifies the framebuffer to which the
 					secondary interface is mapped.
 - qcom,platform-enable-gpio:		Specifies the panel lcd/display enable gpio.
+- qcom,platform-buf-enable-gpio:		Specifies the panel buffer enable gpio.
 - qcom,platform-reset-gpio:		Specifies the panel reset gpio.
 - qcom,platform-te-gpio:		Specifies the gpio used for TE.
 - qcom,platform-bklight-en-gpio:	Specifies the gpio used to enable display back-light
@@ -252,6 +253,7 @@ Example:
 			pinctrl-names = "mdss_default", "mdss_sleep";
 			pinctrl-0 = <&mdss_dsi_active>;
 			pinctrl-1 = <&mdss_dsi_suspend>;
+			qcom,platform-buf-enable-gpio = <&msmgpio 20 1>;
 			qcom,platform-reset-gpio = <&msmgpio 25 1>;
 			qcom,platform-te-gpio = <&msmgpio 24 0>;
 			qcom,platform-enable-gpio = <&msmgpio 58 1>;
