@@ -37,6 +37,21 @@
 	reg = <0x86400000 0x9300000>;
 };
 
+&tlmm {
+	wakeup_gpio_default: wakeup_gpio_default {
+		mux {
+			pins = "gpio87";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio87";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+	};
+};
+
 &i2c_3 {
 	tlv320aic3x_codec: tlv320aic3x@18 {
 		compatible = "ti,tlv320aic3x";
@@ -153,6 +168,10 @@
 		qcom,status-in-gpio = <&tlmm 95 0x00>;
 		qcom,status-out-gpio = <&tlmm 36 0x00>;
 		qcom,status-out2-gpio = <&tlmm 88 0x00>;
+		qcom,wakeup-gpio-in = <&tlmm 87 0x00>;
+		qcom,wakeup-gpio-out = <&tlmm 22 0x00>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&wakeup_gpio_default>;
 		status = "okay";
 	};
 
