@@ -127,37 +127,47 @@ static int setup_ipc(struct gpio_cntrl *mdm)
 	node = mdm->dev->of_node;
 	for (i = 0; i < ARRAY_SIZE(gpio_map); i++) {
 		val = of_get_named_gpio(node, gpio_map[i], 0);
-		if (val >= 0)
-			mdm->gpios[i] = val;
+		mdm->gpios[i] = (val >= 0) ? val : -1;
 	}
 
-	ret = gpio_request(mdm->gpios[AP2MDM_STATUS], "AP2MDM_STATUS");
-	if (ret) {
-		dev_err(mdm->dev, "Failed to configure AP2MDM_STATUS gpio\n");
-		return ret;
-	}
-	gpio_direction_input(mdm->gpios[AP2MDM_STATUS]);
+	if (mdm->gpios[AP2MDM_STATUS] >= 0) {
+		ret = gpio_request(mdm->gpios[AP2MDM_STATUS], "AP2MDM_STATUS");
+		if (ret) {
+			dev_err(mdm->dev,
+				"Failed to configure AP2MDM_STATUS gpio\n");
+			return ret;
+		}
+		gpio_direction_input(mdm->gpios[AP2MDM_STATUS]);
 
-	ret = gpio_request(mdm->gpios[MDM2AP_STATUS], "MDM2AP_STATUS");
-	if (ret) {
-		dev_err(mdm->dev, "Failed to configure MDM2AP_STATUS gpio\n");
-		return ret;
-	}
-	gpio_direction_output(mdm->gpios[MDM2AP_STATUS], 1);
+		irq = gpio_to_irq(mdm->gpios[AP2MDM_STATUS]);
+		if (irq < 0) {
+			dev_err(mdm->dev, "bad AP2MDM_STATUS IRQ resource\n");
+			return irq;
+		}
+		mdm->status_irq = irq;
+	} else
+		dev_info(mdm->dev, "AP2MDM_STATUS not used\n");
 
-	ret = gpio_request(mdm->gpios[MDM2AP_STATUS2], "MDM2AP_STATUS2");
-	if (ret) {
-		dev_err(mdm->dev, "Failed to configure MDM2AP_STATUS2 gpio\n");
-		return ret;
-	}
-	gpio_direction_output(mdm->gpios[MDM2AP_STATUS2], 0);
+	if (mdm->gpios[MDM2AP_STATUS] >= 0) {
+		ret = gpio_request(mdm->gpios[MDM2AP_STATUS], "MDM2AP_STATUS");
+		if (ret) {
+			dev_err(mdm->dev, "Failed to configure MDM2AP_STATUS gpio\n");
+			return ret;
+		}
+		gpio_direction_output(mdm->gpios[MDM2AP_STATUS], 1);
+	} else
+		dev_info(mdm->dev, "MDM2AP_STATUS not used\n");
 
-	irq = gpio_to_irq(mdm->gpios[AP2MDM_STATUS]);
-	if (irq < 0) {
-		dev_err(mdm->dev, "bad AP2MDM_STATUS IRQ resource\n");
-		return irq;
-	}
-	mdm->status_irq = irq;
+	if (mdm->gpios[MDM2AP_STATUS2] >= 0) {
+		ret = gpio_request(mdm->gpios[MDM2AP_STATUS2],
+						"MDM2AP_STATUS2");
+		if (ret) {
+			dev_err(mdm->dev, "Failed to configure MDM2AP_STATUS2 gpio\n");
+			return ret;
+		}
+		gpio_direction_output(mdm->gpios[MDM2AP_STATUS2], 0);
+	} else
+		dev_info(mdm->dev, "MDM2AP_STATUS2 not used\n");
 
 	return 0;
 }
@@ -192,8 +202,11 @@ static int sdx_ext_ipc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	mdm->panic_blk.notifier_call = sdx_ext_ipc_panic;
-	atomic_notifier_chain_register(&panic_notifier_list, &mdm->panic_blk);
+	if (mdm->gpios[MDM2AP_STATUS] >= 0) {
+		mdm->panic_blk.notifier_call = sdx_ext_ipc_panic;
+		atomic_notifier_chain_register(&panic_notifier_list,
+						&mdm->panic_blk);
+	}
 
 	mutex_init(&mdm->policy_lock);
 	if (of_property_read_bool(pdev->dev.of_node, "qcom,default-policy-nop"))
@@ -209,21 +222,27 @@ static int sdx_ext_ipc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mdm);
 
-	ret = devm_request_irq(mdm->dev, mdm->status_irq, ap_status_change,
+	if (mdm->gpios[AP2MDM_STATUS] >= 0) {
+		ret = devm_request_irq(mdm->dev, mdm->status_irq,
+				ap_status_change,
 				IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-							"ap status", mdm);
-	if (ret < 0) {
-		dev_err(mdm->dev, "%s: AP2MDM_STATUS IRQ#%d request failed,\n",
-					__func__, mdm->status_irq);
-		goto irq_fail;
+				"ap status", mdm);
+		if (ret < 0) {
+			dev_err(mdm->dev,
+				 "%s: AP2MDM_STATUS IRQ#%d request failed,\n",
+				__func__, mdm->status_irq);
+			goto irq_fail;
+		}
+		irq_set_irq_wake(mdm->status_irq, 1);
 	}
-	irq_set_irq_wake(mdm->status_irq, 1);
 	return 0;
 
 irq_fail:
 	device_remove_file(mdm->dev, &dev_attr_policy);
 sys_fail:
-	atomic_notifier_chain_unregister(&panic_notifier_list, &mdm->panic_blk);
+	if (mdm->gpios[MDM2AP_STATUS] >= 0)
+		atomic_notifier_chain_unregister(&panic_notifier_list,
+						&mdm->panic_blk);
 	remove_ipc(mdm);
 	devm_kfree(&pdev->dev, mdm);
 	return ret;
@@ -234,8 +253,11 @@ static int sdx_ext_ipc_remove(struct platform_device *pdev)
 	struct gpio_cntrl *mdm;
 
 	mdm = dev_get_drvdata(&pdev->dev);
-	disable_irq_wake(mdm->status_irq);
-	atomic_notifier_chain_unregister(&panic_notifier_list, &mdm->panic_blk);
+	if (mdm->gpios[AP2MDM_STATUS] >= 0)
+		disable_irq_wake(mdm->status_irq);
+	if (mdm->gpios[MDM2AP_STATUS] >= 0)
+		atomic_notifier_chain_unregister(&panic_notifier_list,
+						&mdm->panic_blk);
 	remove_ipc(mdm);
 	device_remove_file(mdm->dev, &dev_attr_policy);
 	return 0;
