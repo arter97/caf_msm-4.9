@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -435,6 +435,7 @@ struct mdss_dsi_ctrl_pdata {
 	int panel_mode;
 	int irq_cnt;
 	int disp_te_gpio;
+	int buf_en_gpio;
 	int rst_gpio;
 	int disp_en_gpio;
 	int bklt_en_gpio;

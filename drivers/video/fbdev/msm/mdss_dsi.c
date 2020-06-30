@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -4216,6 +4216,12 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 		"qcom,ext-vdd-gpio", 0);
 	if (!gpio_is_valid(ctrl_pdata->vdd_ext_gpio))
 		pr_info("%s: ext vdd gpio not specified\n", __func__);
+
+	ctrl_pdata->buf_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+			 "qcom,platform-buf-enable-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->buf_en_gpio))
+		pr_info("%s:%d, buf_en gpio not specified\n",
+						__func__, __LINE__);
 
 	ctrl_pdata->rst_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			 "qcom,platform-reset-gpio", 0);

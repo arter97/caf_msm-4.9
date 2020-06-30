@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -312,6 +312,17 @@ static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			goto disp_en_gpio_err;
 		}
 	}
+
+	if (gpio_is_valid(ctrl_pdata->buf_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->buf_en_gpio,
+						"buf_enable");
+		if (rc) {
+			pr_err("request buf_en gpio failed, rc=%d\n",
+				       rc);
+			goto buf_en_gpio_err;
+		}
+	}
+
 	rc = gpio_request(ctrl_pdata->rst_gpio, "disp_rst_n");
 	if (rc) {
 		pr_err("request reset gpio failed, rc=%d\n",
@@ -355,6 +366,9 @@ vdd_en_gpio_err:
 bklt_en_gpio_err:
 	gpio_free(ctrl_pdata->rst_gpio);
 rst_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->buf_en_gpio))
+		gpio_free(ctrl_pdata->buf_en_gpio);
+buf_en_gpio_err:
 	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 		gpio_free(ctrl_pdata->disp_en_gpio);
 disp_en_gpio_err:
@@ -419,6 +433,10 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			   __func__, __LINE__);
 	}
 
+	if (!gpio_is_valid(ctrl_pdata->buf_en_gpio))
+		pr_debug("%s:%d, buf_en line not configured\n",
+			   __func__, __LINE__);
+
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_debug("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);
@@ -434,6 +452,16 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			return rc;
 		}
 		if (!pinfo->cont_splash_enabled) {
+			if (gpio_is_valid(ctrl_pdata->buf_en_gpio)) {
+				rc = gpio_direction_output(ctrl_pdata->buf_en_gpio, 1);
+				if (rc) {
+					pr_err("%s: unable to set dir for buf_en gpio\n",
+						__func__);
+					goto exit;
+				}
+				gpio_set_value((ctrl_pdata->buf_en_gpio), 1);
+			}
+
 			if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 				rc = gpio_direction_output(
 					ctrl_pdata->disp_en_gpio, 1);
@@ -521,6 +549,11 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		gpio_free(ctrl_pdata->rst_gpio);
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
+
+		if (gpio_is_valid(ctrl_pdata->buf_en_gpio)) {
+			gpio_set_value((ctrl_pdata->buf_en_gpio), 0);
+			gpio_free(ctrl_pdata->buf_en_gpio);
+		}
 	}
 
 exit:
