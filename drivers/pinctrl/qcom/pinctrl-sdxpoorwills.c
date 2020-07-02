@@ -1169,7 +1169,7 @@ static struct msm_gpio_mux_input sdxpoorwills_mux_in[] = {
 	{44, 83},
 	{45, 84, 1},
 	{46, 86},
-	{47, 87},
+	{47, 87, 1},
 	{48, 88},
 	{49, 89},
 	{50, 90},
