@@ -4775,6 +4775,7 @@ static irqreturn_t handle_msi_irq(int irq, void *data)
 			writel_relaxed(BIT(j), ctrl_status);
 			/* ensure that interrupt is cleared (acked) */
 			wmb();
+
 			generic_handle_irq(
 			   irq_find_mapping(dev->irq_domain, (j + (32*i)))
 			   );
@@ -4951,13 +4952,79 @@ static void msm_pcie_msi_nop(struct irq_data *d)
 {
 }
 
+static void msm_mask_msi_irq(struct irq_data *data)
+{
+	struct msi_desc *desc = irq_data_get_msi_desc(data);
+	struct pci_dev *pdev;
+	struct msm_pcie_dev_t *pcie_dev;
+	void __iomem *intr_en_addr;
+	uint32_t offset = 0;
+	uint32_t index = 0;
+
+	if (!desc)
+		goto end;
+
+	pdev = msi_desc_to_pci_dev(desc);
+	if (!pdev)
+		goto end;
+
+	pcie_dev = PCIE_BUS_PRIV_DATA(pdev->bus);
+	if (!pcie_dev)
+		goto end;
+
+	offset = data->irq - desc->irq;
+	index = offset / MSM_PCIE_MAX_MSI;
+
+	intr_en_addr = pcie_dev->dm_core +
+			PCIE20_MSI_CTRL_INTR_EN + (index * 12);
+
+	offset %= MSM_PCIE_MAX_MSI;
+	msm_pcie_write_mask(intr_en_addr, BIT(offset), 0);
+
+end:
+	pci_msi_mask_irq(data);
+}
+
+static void msm_unmask_msi_irq(struct irq_data *data)
+{
+	struct msi_desc *desc = irq_data_get_msi_desc(data);
+	struct pci_dev *pdev;
+	struct msm_pcie_dev_t *pcie_dev;
+	void __iomem *intr_en_addr;
+	uint32_t offset = 0;
+	uint32_t index = 0;
+	unsigned long val = 0;
+
+	pci_msi_unmask_irq(data);
+
+	if (!desc)
+		return;
+
+	pdev = msi_desc_to_pci_dev(desc);
+	if (!pdev)
+		return;
+
+	pcie_dev = PCIE_BUS_PRIV_DATA(pdev->bus);
+	if (!pcie_dev)
+		return;
+
+	offset = data->irq - desc->irq;
+	index = offset / MSM_PCIE_MAX_MSI;
+
+	intr_en_addr = pcie_dev->dm_core +
+			PCIE20_MSI_CTRL_INTR_EN + (index * 12);
+
+	offset %= MSM_PCIE_MAX_MSI;
+	msm_pcie_write_mask(intr_en_addr, 0, BIT(offset));
+}
+
 static struct irq_chip pcie_msi_chip = {
 	.name = "msm-pcie-msi",
 	.irq_ack = msm_pcie_msi_nop,
-	.irq_enable = unmask_msi_irq,
-	.irq_disable = mask_msi_irq,
-	.irq_mask = mask_msi_irq,
-	.irq_unmask = unmask_msi_irq,
+	.irq_enable = msm_unmask_msi_irq,
+	.irq_disable = msm_mask_msi_irq,
+	.irq_mask = msm_mask_msi_irq,
+	.irq_unmask = msm_unmask_msi_irq,
 };
 
 static int msm_pcie_create_irq(struct msm_pcie_dev_t *dev)
