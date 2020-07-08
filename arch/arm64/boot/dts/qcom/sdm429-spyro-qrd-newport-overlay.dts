@@ -79,3 +79,29 @@
 		};
 	};
 };
+
+
+&gpio_key_active {
+        mux {
+                pins = "gpio74", "gpio128", "gpio35", "gpio126";
+        };
+
+        config {
+                pins = "gpio74", "gpio128", "gpio35", "gpio126";
+        };
+};
+
+&gpio_key_suspend {
+        mux {
+                pins = "gpio74", "gpio128", "gpio35", "gpio126";
+        };
+
+        config {
+                pins = "gpio74", "gpio128", "gpio35", "gpio126";
+        };
+};
+
+
+&function_1 {
+        gpios = <&tlmm 74 0x1>;
+};
