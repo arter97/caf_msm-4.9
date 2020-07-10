@@ -105,3 +105,7 @@
 &function_1 {
         gpios = <&tlmm 74 0x1>;
 };
+
+&function_2 {
+        linux,code = <158>;
+};
