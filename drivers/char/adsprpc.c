@@ -69,7 +69,7 @@
 #define RPC_TIMEOUT	(5 * HZ)
 #define BALIGN		128
 #define NUM_CHANNELS	4	/* adsp, mdsp, slpi, cdsp*/
-#define NUM_SESSIONS	9	/*8 compute, 1 cpz*/
+#define NUM_SESSIONS	10	/*8 compute, 2 secure sessions*/
 #define M_FDLIST	(16)
 #define M_CRCLIST	(64)
 #define SESSION_ID_INDEX (30)
@@ -106,6 +106,7 @@
 #define FASTRPC_STATIC_HANDLE_MAX (20)
 #define FASTRPC_LATENCY_CTRL_ENB  (1)
 
+#define MAX_SIZE_LIMIT (0x78000000)
 #define INIT_FILELEN_MAX (2*1024*1024)
 #define INIT_MEMLEN_MAX  (8*1024*1024)
 
@@ -566,11 +567,19 @@ static int fastrpc_mmap_find(struct fastrpc_file *fl, int fd,
 static int dma_alloc_memory(dma_addr_t *region_phys, void **vaddr, size_t size,
 			unsigned long dma_attrs)
 {
+	int err = 0;
 	struct fastrpc_apps *me = &gfa;
 
 	if (me->dev == NULL) {
 		pr_err("device adsprpc-mem is not initialized\n");
 		return -ENODEV;
+	}
+	VERIFY(err, size > 0 && size < MAX_SIZE_LIMIT);
+	if (err) {
+		err = -EFAULT;
+		pr_err("adsprpc: %s: invalid allocation size 0x%zx\n",
+			__func__, size);
+		return err;
 	}
 	*vaddr = dma_alloc_attrs(me->dev, size, region_phys, GFP_KERNEL,
 								dma_attrs);
@@ -632,14 +641,14 @@ static void fastrpc_mmap_free(struct fastrpc_mmap *map, uint32_t flags)
 	fl = map->fl;
 	if (fl && !(map->flags == ADSP_MMAP_HEAP_ADDR ||
 				map->flags == ADSP_MMAP_REMOTE_HEAP_ADDR)) {
-		cid = fl->cid;
-		VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
-		if (err) {
-		     err = -ECHRNG;
-		     pr_err("adsprpc: ERROR:%s, Invalid channel id: %d, err:%d\n",
-		       __func__, cid, err);
-		     return;
-	    }
+	cid = fl->cid;
+	VERIFY(err, cid >= ADSP_DOMAIN_ID && cid < NUM_CHANNELS);
+	if (err) {
+		err = -ECHRNG;
+		pr_err("adsprpc: ERROR:%s, Invalid channel id: %d, err:%d",
+			__func__, cid, err);
+		return;
+		}
 	}
 	if (map->flags == ADSP_MMAP_HEAP_ADDR ||
 				map->flags == ADSP_MMAP_REMOTE_HEAP_ADDR) {
