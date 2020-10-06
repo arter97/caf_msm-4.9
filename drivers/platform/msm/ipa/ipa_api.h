@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -441,6 +441,9 @@ struct ipa_api_controller {
 		bool (*teth_port_state)(void), enum ipa_client_type client);
 
 	void (*ipa_deregister_client_callback)(enum ipa_client_type client);
+
+	int (*ipa_get_default_aggr_time_limit)(enum ipa_client_type client,
+		u32 *default_aggr_time_limit);
 };
 
 #ifdef CONFIG_IPA

@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -59,7 +59,6 @@
 		(BAM_DMA_MAX_PKT_NUMBER * (sizeof(struct sps_iovec)))
 #define TX_TIMEOUT (5 * HZ)
 #define MIN_TX_ERROR_SLEEP_PERIOD 500
-#define DEFAULT_AGGR_TIME_LIMIT 1
 #define DEFAULT_AGGR_PKT_LIMIT 0
 
 #define IPA_RNDIS_IPC_LOG_PAGES 50
@@ -358,7 +357,7 @@ static struct ipa_ep_cfg ipa_to_usb_ep_cfg = {
 		.aggr_en = IPA_ENABLE_AGGR,
 		.aggr = IPA_GENERIC,
 		.aggr_byte_limit = 4,
-		.aggr_time_limit = DEFAULT_AGGR_TIME_LIMIT,
+		.aggr_time_limit = IPA_RNDIS_DEFAULT_AGGR_TIME_LIMIT,
 		.aggr_pkt_limit = DEFAULT_AGGR_PKT_LIMIT
 	},
 	.deaggr = {
@@ -2208,6 +2207,7 @@ static int rndis_ipa_ep_registers_cfg(
 	int result;
 	struct ipa_ep_cfg *usb_to_ipa_ep_cfg;
 	int add = 0;
+	u32 default_aggr_time_limit = IPA_RNDIS_DEFAULT_AGGR_TIME_LIMIT;
 
 	if (deaggr_enable) {
 		usb_to_ipa_ep_cfg = &usb_to_ipa_ep_cfg_deaggr_en;
@@ -2248,7 +2248,9 @@ static int rndis_ipa_ep_registers_cfg(
 		ipa_to_usb_ep_cfg.aggr.aggr_pkt_limit = 1;
 	} else {
 		ipa_to_usb_ep_cfg.aggr.aggr_time_limit =
-			DEFAULT_AGGR_TIME_LIMIT;
+			!ipa_get_default_aggr_time_limit(IPA_TO_USB_CLIENT,
+			&default_aggr_time_limit) ? default_aggr_time_limit :
+			IPA_RNDIS_DEFAULT_AGGR_TIME_LIMIT;
 		ipa_to_usb_ep_cfg.aggr.aggr_pkt_limit =
 			DEFAULT_AGGR_PKT_LIMIT;
 	}

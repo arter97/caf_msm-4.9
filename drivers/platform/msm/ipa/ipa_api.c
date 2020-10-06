@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2932,6 +2932,26 @@ const char *ipa_get_version_string(enum ipa_hw_type ver)
 	return str;
 }
 EXPORT_SYMBOL(ipa_get_version_string);
+
+/**
+ * ipa_get_default_aggr_time_limit() - provide default aggregation
+ * timeout for a supported client.
+ * @client: client type - currently USB is supported.
+ *
+ * Return value: 0 on Success, Negative on failure.
+ */
+int ipa_get_default_aggr_time_limit(enum ipa_client_type client,
+	u32 *default_aggr_time_limit)
+{
+	int ret;
+
+	IPA_API_DISPATCH_RETURN(ipa_get_default_aggr_time_limit,
+		client, default_aggr_time_limit);
+
+	return ret;
+}
+EXPORT_SYMBOL(ipa_get_default_aggr_time_limit);
+
 
 static const struct of_device_id ipa_plat_drv_match[] = {
 	{ .compatible = "qcom,ipa", },

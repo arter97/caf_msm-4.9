@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -73,6 +73,9 @@
 #define IPA_IPC_LOG_PAGES 50
 
 #define IPA_MAX_NUM_REQ_CACHE 10
+
+/* Default aggregation timeout for WAN/LAN pipes. */
+#define IPA_GENERIC_AGGR_TIME_LIMIT 1 /* 1 msec */
 
 #define IPADBG(fmt, args...) \
 	do { \
@@ -1626,6 +1629,9 @@ struct ipa3_context {
 	bool fw_loaded;
 	int (*client_lock_unlock[IPA_MAX_CLNT])(bool is_lock);
 	bool (*get_teth_port_state[IPA_MAX_CLNT])(void);
+	u32 wan_aggr_time_limit;
+	u32 lan_aggr_time_limit;
+	u32 rndis_aggr_time_limit;
 };
 
 struct ipa3_plat_drv_res {
@@ -1663,6 +1669,9 @@ struct ipa3_plat_drv_res {
 	bool use_ipa_pm;
 	struct ipa_pm_init_params pm_init;
 	bool wdi_over_pcie;
+	u32 wan_aggr_time_limit;
+	u32 lan_aggr_time_limit;
+	u32 rndis_aggr_time_limit;
 };
 
 /**
@@ -2291,6 +2300,8 @@ int ipa3_remove_interrupt_handler(enum ipa_irq_type interrupt);
 int ipa3_get_ep_mapping(enum ipa_client_type client);
 
 enum gsi_prefetch_mode ipa_get_ep_prefetch_mode(enum ipa_client_type client);
+int ipa3_get_default_aggr_time_limit(enum ipa_client_type client,
+	u32 *default_aggr_time_limit);
 
 bool ipa3_is_ready(void);
 

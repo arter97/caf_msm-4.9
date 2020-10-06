@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,7 +32,6 @@
 /* 8K less 1 nominal MTU (1500 bytes) rounded to units of KB */
 #define IPA_MTU 1500
 #define IPA_GENERIC_AGGR_BYTE_LIMIT 6
-#define IPA_GENERIC_AGGR_TIME_LIMIT 1
 #define IPA_GENERIC_AGGR_PKT_LIMIT 0
 
 #define IPA_GSB_AGGR_BYTE_LIMIT 14
@@ -2870,8 +2869,6 @@ static int ipa3_assign_policy(struct ipa_sys_connect_params *in,
 			sys->free_skb = ipa3_free_skb_rx;
 			in->ipa_ep_cfg.aggr.aggr_en = IPA_ENABLE_AGGR;
 			in->ipa_ep_cfg.aggr.aggr = IPA_GENERIC;
-			in->ipa_ep_cfg.aggr.aggr_time_limit =
-				IPA_GENERIC_AGGR_TIME_LIMIT;
 			if (in->client == IPA_CLIENT_APPS_LAN_CONS) {
 				sys->pyld_hdlr = ipa3_lan_rx_pyld_hdlr;
 				sys->repl_hdlr =
@@ -2880,6 +2877,8 @@ static int ipa3_assign_policy(struct ipa_sys_connect_params *in,
 					ipa3_recycle_rx_wrapper;
 				sys->rx_pool_sz =
 					ipa3_ctx->lan_rx_ring_size;
+				in->ipa_ep_cfg.aggr.aggr_time_limit =
+					ipa3_ctx->lan_aggr_time_limit;
 				in->ipa_ep_cfg.aggr.aggr_byte_limit =
 				IPA_GENERIC_AGGR_BYTE_LIMIT;
 				in->ipa_ep_cfg.aggr.aggr_pkt_limit =
@@ -2901,6 +2900,8 @@ static int ipa3_assign_policy(struct ipa_sys_connect_params *in,
 					 ipa3_replenish_rx_cache_recycle;
 				in->ipa_ep_cfg.aggr.aggr_sw_eof_active
 					= true;
+				in->ipa_ep_cfg.aggr.aggr_time_limit =
+					ipa3_ctx->wan_aggr_time_limit;
 				if (ipa3_ctx->
 				ipa_client_apps_wan_cons_agg_gro) {
 					IPAERR("get close-by %u\n",

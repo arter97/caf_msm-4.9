@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1486,6 +1486,9 @@ void ipa_set_client(int index, enum ipacm_client_enum client, bool uplink);
 
 enum ipacm_client_enum ipa_get_client(int pipe_idx);
 
+int ipa_get_default_aggr_time_limit(enum ipa_client_type client,
+	u32 *default_aggr_time_limit);
+
 bool ipa_get_client_uplink(int pipe_idx);
 
 /*
@@ -2228,6 +2231,12 @@ static inline void ipa_set_client(int index, enum ipacm_client_enum client,
 }
 
 static inline enum ipacm_client_enum ipa_get_client(int pipe_idx)
+{
+	return -EPERM;
+}
+
+static inline int ipa_get_default_aggr_time_limit(enum ipa_client_type client,
+	u32 *default_aggr_time_limit)
 {
 	return -EPERM;
 }
