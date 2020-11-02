@@ -965,6 +965,15 @@ config MSM_BAM_DMUX
 
 source "drivers/soc/qcom/wcnss/Kconfig"
 
+config SUBSYS_BACKUP
+	bool "Subsystem Backup-Restore driver"
+	help
+	  This driver implements the QMI client for interaction with the
+	  remote subsystem. Upon a backup/restore notification, this driver
+	  allocates a shared buffer and locks exclusively for the subsystem
+	  to use. Upon completion of backup/restore, the shared buffer is
+	  freed.
+
 config BIG_CLUSTER_MIN_FREQ_ADJUST
 	bool "Adjust BIG cluster min frequency based on power collapse state"
 	default n
