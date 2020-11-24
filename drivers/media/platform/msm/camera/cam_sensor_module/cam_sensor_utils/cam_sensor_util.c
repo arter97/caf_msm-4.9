@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -158,35 +158,46 @@ int32_t cam_sensor_handle_random_write(
 	struct list_head **list)
 {
 	struct i2c_settings_list  *i2c_list;
-	int32_t rc = 0, cnt;
+	int32_t rc = 0, cnt, remain_cnt, write_cnt;
+	int32_t cnt_offset = 0;
 
-	i2c_list = cam_sensor_get_i2c_ptr(i2c_reg_settings,
-		cam_cmd_i2c_random_wr->header.count);
-	if (i2c_list == NULL ||
-		i2c_list->i2c_settings.reg_setting == NULL) {
-		CAM_ERR(CAM_SENSOR, "Failed in allocating i2c_list");
-		return -ENOMEM;
-	}
-
+	remain_cnt = cam_cmd_i2c_random_wr->header.count;
 	*cmd_length_in_bytes = (sizeof(struct i2c_rdwr_header) +
 		sizeof(struct i2c_random_wr_payload) *
 		(cam_cmd_i2c_random_wr->header.count));
-	i2c_list->op_code = CAM_SENSOR_I2C_WRITE_RANDOM;
-	i2c_list->i2c_settings.addr_type =
-		cam_cmd_i2c_random_wr->header.addr_type;
-	i2c_list->i2c_settings.data_type =
-		cam_cmd_i2c_random_wr->header.data_type;
 
-	for (cnt = 0; cnt < (cam_cmd_i2c_random_wr->header.count);
-		cnt++) {
-		i2c_list->i2c_settings.reg_setting[cnt].reg_addr =
-			cam_cmd_i2c_random_wr->random_wr_payload[cnt].reg_addr;
-		i2c_list->i2c_settings.reg_setting[cnt].reg_data =
-			cam_cmd_i2c_random_wr->random_wr_payload[cnt].reg_data;
-		i2c_list->i2c_settings.reg_setting[cnt].data_mask = 0;
+	while (remain_cnt > 0) {
+		CAM_ERR(CAM_SENSOR, "remain_cnt: %d", remain_cnt);
+		write_cnt = (remain_cnt > MAX_ONE_TIME_COUNT) ?
+				MAX_ONE_TIME_COUNT : remain_cnt;
+		i2c_list = cam_sensor_get_i2c_ptr(i2c_reg_settings,
+				write_cnt);
+		if (i2c_list == NULL ||
+			i2c_list->i2c_settings.reg_setting == NULL) {
+			CAM_ERR(CAM_SENSOR, "Failed in allocating i2c_list");
+			return -ENOMEM;
+		}
+
+		i2c_list->op_code = CAM_SENSOR_I2C_WRITE_RANDOM;
+		i2c_list->i2c_settings.addr_type =
+			cam_cmd_i2c_random_wr->header.addr_type;
+		i2c_list->i2c_settings.data_type =
+			cam_cmd_i2c_random_wr->header.data_type;
+
+		for (cnt = 0; cnt < write_cnt; cnt++) {
+			i2c_list->i2c_settings.reg_setting[cnt].reg_addr =
+				cam_cmd_i2c_random_wr->
+				random_wr_payload[cnt + cnt_offset].reg_addr;
+			i2c_list->i2c_settings.reg_setting[cnt].reg_data =
+				cam_cmd_i2c_random_wr->
+				random_wr_payload[cnt + cnt_offset].reg_data;
+			i2c_list->i2c_settings.reg_setting[cnt].data_mask = 0;
+		}
+		*offset    += cnt;
+		cnt_offset += cnt;
+		remain_cnt -= MAX_ONE_TIME_COUNT;
+		*list = &(i2c_list->list);
 	}
-	*offset = cnt;
-	*list = &(i2c_list->list);
 
 	return rc;
 }

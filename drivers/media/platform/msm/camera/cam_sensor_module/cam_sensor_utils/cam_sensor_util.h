@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,6 +27,7 @@
 #include "cam_sensor_io.h"
 
 #define INVALID_VREG 100
+#define MAX_ONE_TIME_COUNT	100
 
 int cam_get_dt_power_setting_data(struct device_node *of_node,
 	struct cam_hw_soc_info *soc_info,
