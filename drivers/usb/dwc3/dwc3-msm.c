@@ -306,6 +306,7 @@ static int dwc3_restart_usb_host_mode(struct notifier_block *nb,
 					unsigned long event, void *ptr);
 static int dwc3_notify_pd_status(struct notifier_block *nb,
 				unsigned long event, void *ptr);
+static bool shutdown_when_disconnected;
 
 /**
  *
@@ -3587,6 +3588,9 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		}
 	}
 
+	shutdown_when_disconnected = of_property_read_bool(node,
+					"qcom,shutdown-enable");
+
 	/* Assumes dwc3 is the first DT child of dwc3-msm */
 	dwc3_node = of_get_next_available_child(node, NULL);
 	if (!dwc3_node) {
@@ -4401,7 +4405,10 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 #ifdef CONFIG_VXR200_XR_MISC
 			vxr7200_usb_event(false);
 #endif
-
+			if (shutdown_when_disconnected) {
+				pr_err("ARGlass: USB discontd, powering off\n");
+				orderly_poweroff(true);
+			}
 		}
 		break;
 
