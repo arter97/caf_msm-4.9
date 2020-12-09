@@ -964,6 +964,12 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd,
 			map->size = buf_page_size(len);
 		}
 
+		VERIFY(err, map->size >= len && map->size < MAX_SIZE_LIMIT);
+		if (err) {
+			err = -EFAULT;
+			goto bail;
+		}
+
 		vmid = fl->apps->channel[fl->cid].vmid;
 		if (!sess->smmu.enabled && !vmid) {
 			if (fl->apps->channel[cid].memshareenabled == 2) {
@@ -1015,9 +1021,11 @@ static int fastrpc_buf_alloc(struct fastrpc_file *fl, size_t size,
 	struct fastrpc_buf *buf = NULL, *fr = NULL;
 	struct hlist_node *n;
 
-	VERIFY(err, size > 0);
-	if (err)
+	VERIFY(err, size > 0 && size < MAX_SIZE_LIMIT);
+	if (err) {
+		err = -EFAULT;
 		goto bail;
+	}
 
 	if (!remote) {
 		/* find the smallest buffer that fits in the cache */
@@ -1636,9 +1644,10 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx)
 	PERF_END);
 	for (i = bufs; i < bufs + handles; ++i) {
 		struct fastrpc_mmap *map = ctx->maps[i];
-
-		pages[i].addr = map->phys;
-		pages[i].size = map->size;
+		if (map) {
+			pages[i].addr = map->phys;
+			pages[i].size = map->size;
+		}
 	}
 	if (!me->legacy) {
 		fdlist = (uint64_t *)&pages[bufs + handles];
@@ -1719,7 +1728,8 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx)
 	}
 	PERF_END);
 	for (i = bufs; rpra && lrpra && i < bufs + handles; i++) {
-		rpra[i].dma.fd = lrpra[i].dma.fd = ctx->fds[i];
+		if (ctx->fds)
+			rpra[i].dma.fd = lrpra[i].dma.fd = ctx->fds[i];
 		rpra[i].dma.len = lrpra[i].dma.len = (uint32_t)lpra[i].buf.len;
 		rpra[i].dma.offset = lrpra[i].dma.offset =
 			 (uint32_t)(uintptr_t)lpra[i].buf.pv;
@@ -4093,7 +4103,7 @@ static int fastrpc_cb_probe(struct device *dev)
 		start = 0x60000000;
 	VERIFY(err, !IS_ERR_OR_NULL(sess->smmu.mapping =
 				arm_iommu_create_mapping(&platform_bus_type,
-						start, 0x78000000)));
+						start, MAX_SIZE_LIMIT)));
 	if (err)
 		goto bail;
 

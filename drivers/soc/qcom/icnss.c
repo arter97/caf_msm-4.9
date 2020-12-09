@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -4714,6 +4714,9 @@ static int icnss_probe(struct platform_device *pdev)
 		icnss_pr_err("Driver is already initialized\n");
 		return -EEXIST;
 	}
+
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,icnss-disable"))
+		return -ENODEV;
 
 	icnss_pr_dbg("Platform driver probe\n");
 
