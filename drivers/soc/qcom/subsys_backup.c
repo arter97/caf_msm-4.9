@@ -1494,7 +1494,7 @@ static int backup_buffer_flush(struct file *filp, fl_owner_t id)
 	int ret;
 	struct subsys_backup *backup_dev = filp->private_data;
 
-	if (backup_dev->state == BACKUP_END &&
+	if (backup_dev->state == IDLE &&
 		backup_dev->img_buf.hyp_assigned_to_hlos)
 		return 0;
 
