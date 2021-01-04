@@ -111,6 +111,7 @@
 #define FASTRPC_STATIC_HANDLE_MAX (20)
 #define FASTRPC_LATENCY_CTRL_ENB  (1)
 
+#define MAX_SIZE_LIMIT (0x78000000)
 #define INIT_FILELEN_MAX (2*1024*1024)
 #define INIT_MEMLEN_MAX  (8*1024*1024)
 
@@ -659,11 +660,19 @@ static int fastrpc_mmap_find(struct fastrpc_file *fl, int fd,
 static int dma_alloc_memory(dma_addr_t *region_phys, void **vaddr, size_t size,
 			unsigned long dma_attrs)
 {
+	int err = 0;
 	struct fastrpc_apps *me = &gfa;
 
 	if (me->dev == NULL) {
 		pr_err("device adsprpc-mem is not initialized\n");
 		return -ENODEV;
+	}
+	VERIFY(err, size > 0 && size < MAX_SIZE_LIMIT);
+	if (err) {
+		err = -EFAULT;
+		pr_err("adsprpc: %s: invalid allocation size 0x%zx\n",
+			__func__, size);
+		return err;
 	}
 	*vaddr = dma_alloc_attrs(me->dev, size, region_phys, GFP_KERNEL,
 								dma_attrs);
@@ -2713,8 +2722,13 @@ static int fastrpc_internal_munmap(struct fastrpc_file *fl,
 	mutex_unlock(&fl->fl_map_mutex);
 	if (err)
 		goto bail;
+	VERIFY(err, map != NULL);
+	if (err) {
+		err = -EINVAL;
+		goto bail;
+	}
 	VERIFY(err, !fastrpc_munmap_on_dsp(fl, map->raddr,
-				map->phys, map->size, map->flags));
+			map->phys, map->size, map->flags));
 	if (err)
 		goto bail;
 	mutex_lock(&fl->fl_map_mutex);
