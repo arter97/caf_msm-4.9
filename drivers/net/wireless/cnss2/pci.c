@@ -1945,6 +1945,12 @@ int cnss_pm_request_resume(struct cnss_pci_data *pci_priv)
 	return pm_request_resume(&pci_dev->dev);
 }
 
+int cnss_pci_force_wake_request_sync(struct device *dev, int timeout_us)
+{
+	return 0;
+}
+EXPORT_SYMBOL(cnss_pci_force_wake_request_sync);
+
 int cnss_pci_force_wake_request(struct device *dev)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
