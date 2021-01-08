@@ -665,7 +665,7 @@ static ssize_t remote_status_show(struct device *dev,
 	struct subsys_backup *backup_dev = dev_get_drvdata(dev);
 
 	return snprintf(buf, PAGE_SIZE, "%s\n",
-			backup_type_to_str(backup_dev->remote_status));
+			status_to_str(backup_dev->remote_status));
 }
 static DEVICE_ATTR_RO(remote_status);
 
