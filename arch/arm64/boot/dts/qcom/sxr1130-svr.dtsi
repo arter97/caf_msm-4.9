@@ -278,6 +278,9 @@
 		qcom,lpi-gpios;
 	};
 
+	qcom,ion-heap@22 { /* MDSP HEAP */
+		status = "disabled";
+	};
 };
 
 
@@ -532,7 +535,7 @@
 	qcom,sxr1130-sxr-dp-sink;
 };
 
-/*Adding delays so that display power settles down*/
+/*Adding delays so that display power settles down properly*/
 &mdss_dsi_phy0 {
 	qcom,phy-supply-entries {
 		qcom,phy-supply-entry@0 {
@@ -548,5 +551,15 @@
 			qcom,supply-pre-on-sleep = <40>;
 			qcom,supply-post-on-sleep = <40>;
 		};
+	};
+};
+
+&mdsp_mem {
+	status = "disabled";
+};
+
+/ {
+	qcom,msm-mdsprpc-mem {
+		status = "disabled";
 	};
 };
