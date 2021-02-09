@@ -800,6 +800,14 @@ static void subsys_qmi_resp_cb(struct qmi_handle *handle, unsigned int msg_id,
 	backup_dev = (struct subsys_backup *)resp_cb_data;
 }
 
+static void subsys_backup_set_idle_state(struct subsys_backup *backup_dev)
+{
+	backup_dev->last_notif_sent = -1;
+	backup_dev->backup_type = -1;
+	backup_dev->remote_status = -1;
+	backup_dev->state = IDLE;
+}
+
 static int subsys_qmi_send_request(struct subsys_backup *backup_dev,
 			int req_msg_id, size_t req_len, struct elem_info
 			*req_ei, void *req_data, int resp_msg_id,
@@ -1415,6 +1423,7 @@ static int subsys_backup_service_event_notify(struct notifier_block *nb,
 
 	case QMI_SERVER_EXIT:
 		backup_dev->qmi.connected = false;
+		subsys_backup_set_idle_state(backup_dev);
 		hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
 		free_buffers(backup_dev);
 		break;
