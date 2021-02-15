@@ -1147,7 +1147,7 @@ static void backup_notif_handler(struct subsys_backup *backup_dev,
 	struct qmi_backup_ind_type *ind;
 
 	if (atomic_read(&backup_dev->open_count) == 0) {
-		dev_err(backup_dev->dev, "%s: No active users\n", __func__);
+		dev_warn(backup_dev->dev, "%s: No active users\n", __func__);
 		return;
 	}
 
@@ -1187,7 +1187,7 @@ static void restore_notif_handler(struct subsys_backup *backup_dev,
 	struct qmi_restore_ind_type *ind;
 
 	if (atomic_read(&backup_dev->open_count) == 0) {
-		dev_err(backup_dev->dev, "%s: No active users\n", __func__);
+		dev_warn(backup_dev->dev, "%s: No active users\n", __func__);
 		return;
 	}
 
@@ -1433,7 +1433,7 @@ static int backup_buffer_open(struct inode *inodep, struct file *filep)
 
 	if (atomic_inc_return(&backup_dev->open_count) != 1) {
 		dev_err(backup_dev->dev,
-				"Multiple instances of open  not allowed\n");
+				"Multiple instances of open not allowed\n");
 		atomic_dec(&backup_dev->open_count);
 		return -EBUSY;
 	}
@@ -1448,7 +1448,7 @@ static ssize_t backup_buffer_read(struct file *filp, char __user *buf,
 	size_t ret;
 
 	if (backup_dev->state != BACKUP_END) {
-		dev_err(backup_dev->dev, "%s: Backup not complete: %d\n",
+		dev_warn(backup_dev->dev, "%s: Backup not complete: %d\n",
 				__func__);
 		return 0;
 	} else if (!backup_dev->img_buf.hyp_assigned_to_hlos) {
@@ -1477,7 +1477,8 @@ static ssize_t backup_buffer_write(struct file *filp, const char __user *buf,
 	struct subsys_backup *backup_dev = filp->private_data;
 
 	if (backup_dev->state != RESTORE_START) {
-		dev_err(backup_dev->dev, "%s: Restore not started\n", __func__);
+		dev_warn(backup_dev->dev, "%s: Restore not started\n",
+				__func__);
 		return 0;
 	} else if (!backup_dev->img_buf.hyp_assigned_to_hlos) {
 		dev_err(backup_dev->dev, "%s: Not hyp_assinged to HLOS\n",
@@ -1499,7 +1500,7 @@ static int backup_buffer_flush(struct file *filp, fl_owner_t id)
 		return 0;
 
 	if (backup_dev->state != RESTORE_START || !backup_dev->img_buf.vaddr) {
-		dev_err(backup_dev->dev, "%s: Invalid operation\n", __func__);
+		dev_warn(backup_dev->dev, "%s: Invalid operation\n", __func__);
 		return -EBUSY;
 	}
 
