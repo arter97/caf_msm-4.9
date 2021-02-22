@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -149,7 +149,7 @@ bail:
 	kfree(buf);
 
 	if (!debug->dp_debug.sim_mode)
-		debug->panel->set_edid(debug->panel, edid);
+		debug->panel->set_edid(debug->panel, edid, debug->edid_size);
 
 	mutex_unlock(&debug->lock);
 	return rc;
