@@ -15,15 +15,6 @@
 #include "ipa_i.h"
 #include <linux/msm_ipa.h>
 
-#define WLAN_IPA_CONNECT_EVENT (meta->msg_type == WLAN_STA_CONNECT || \
-	meta->msg_type == WLAN_AP_CONNECT || \
-	meta->msg_type == WLAN_CLIENT_CONNECT_EX || \
-	meta->msg_type == WLAN_CLIENT_CONNECT)
-
-#define WLAN_IPA_DISCONNECT_EVENT (meta->msg_type == WLAN_STA_DISCONNECT || \
-	meta->msg_type == WLAN_AP_DISCONNECT || \
-	meta->msg_type == WLAN_CLIENT_DISCONNECT)
-
 struct ipa3_intf {
 	char name[IPA_RESOURCE_NAME_MAX];
 	struct list_head link;
@@ -415,7 +406,7 @@ static int wlan_msg_process(struct ipa_msg_meta *meta, void *buff)
 
 	if (!buff)
 		return -EINVAL;
-	if (WLAN_IPA_CONNECT_EVENT) {
+	if (WLAN_IPA_CONNECT_EVENT(meta->msg_type)) {
 		/* debug print */
 		event_ex_cur_con = buff;
 		for (cnt = 0; cnt < event_ex_cur_con->num_of_attribs; cnt++) {
@@ -455,7 +446,7 @@ static int wlan_msg_process(struct ipa_msg_meta *meta, void *buff)
 	}
 
 	/* remove the cache */
-	if (WLAN_IPA_DISCONNECT_EVENT) {
+	if (WLAN_IPA_DISCONNECT_EVENT(meta->msg_type)) {
 		/* debug print */
 		event_ex_cur_discon = buff;
 		IPADBG("Mac %02x:%02x:%02x:%02x:%02x:%02x,msg %d\n",
