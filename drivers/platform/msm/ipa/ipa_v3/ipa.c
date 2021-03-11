@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -5404,6 +5404,9 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->use_64_bit_dma_mask = resource_p->use_64_bit_dma_mask;
 	ipa3_ctx->wan_rx_ring_size = resource_p->wan_rx_ring_size;
 	ipa3_ctx->lan_rx_ring_size = resource_p->lan_rx_ring_size;
+	ipa3_ctx->wan_aggr_time_limit = resource_p->wan_aggr_time_limit;
+	ipa3_ctx->lan_aggr_time_limit = resource_p->lan_aggr_time_limit;
+	ipa3_ctx->rndis_aggr_time_limit = resource_p->rndis_aggr_time_limit;
 	ipa3_ctx->skip_uc_pipe_reset = resource_p->skip_uc_pipe_reset;
 	ipa3_ctx->tethered_flow_control = resource_p->tethered_flow_control;
 	ipa3_ctx->ee = resource_p->ee;
@@ -5985,7 +5988,9 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	ipa_drv_res->ipa_tz_unlock_reg = NULL;
 	ipa_drv_res->mhi_evid_limits[0] = IPA_MHI_GSI_EVENT_RING_ID_START;
 	ipa_drv_res->mhi_evid_limits[1] = IPA_MHI_GSI_EVENT_RING_ID_END;
-
+	ipa_drv_res->wan_aggr_time_limit = IPA_GENERIC_AGGR_TIME_LIMIT;
+	ipa_drv_res->lan_aggr_time_limit = IPA_GENERIC_AGGR_TIME_LIMIT;
+	ipa_drv_res->rndis_aggr_time_limit = IPA_RNDIS_DEFAULT_AGGR_TIME_LIMIT;
 	/* Get IPA HW Version */
 	result = of_property_read_u32(pdev->dev.of_node, "qcom,ipa-hw-ver",
 					&ipa_drv_res->ipa_hw_type);
@@ -6029,6 +6034,37 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	else
 		IPADBG(": found ipa_drv_res->lan-rx-ring-size = %u",
 			ipa_drv_res->lan_rx_ring_size);
+
+	/* Get IPA WAN / LAN / RNDIS Aggregation timeout value in ms */
+	result = of_property_read_u32(pdev->dev.of_node,
+			"qcom,wan-aggr-time-limit",
+			&ipa_drv_res->wan_aggr_time_limit);
+	if (result)
+		IPADBG("using default for wan-aggr-time-limit = %u\n",
+				ipa_drv_res->wan_aggr_time_limit);
+	else
+		IPADBG(": found ipa_drv_res->wan_aggr_time_limit = %u",
+				ipa_drv_res->wan_aggr_time_limit);
+
+	result = of_property_read_u32(pdev->dev.of_node,
+			"qcom,lan-aggr-time-limit",
+			&ipa_drv_res->lan_aggr_time_limit);
+	if (result)
+		IPADBG("using default for lan-aggr-time-limit = %u\n",
+				ipa_drv_res->lan_aggr_time_limit);
+	else
+		IPADBG(": found ipa_drv_res->lan_aggr_time_limit = %u",
+				ipa_drv_res->lan_aggr_time_limit);
+
+	result = of_property_read_u32(pdev->dev.of_node,
+			"qcom,rndis-aggr-time-limit",
+			&ipa_drv_res->rndis_aggr_time_limit);
+	if (result)
+		IPADBG("using default for rndis-aggr-time-limit = %u\n",
+				ipa_drv_res->rndis_aggr_time_limit);
+	else
+		IPADBG(": found ipa_drv_res->rndis_aggr_time_limit = %u",
+				ipa_drv_res->rndis_aggr_time_limit);
 
 	ipa_drv_res->use_ipa_teth_bridge =
 			of_property_read_bool(pdev->dev.of_node,

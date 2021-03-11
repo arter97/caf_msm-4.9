@@ -972,6 +972,9 @@
 		qcom,msm-bus,name = "ipa";
 		qcom,msm-bus,num-cases = <5>;
 		qcom,msm-bus,num-paths = <5>;
+		qcom,wan-aggr-time-limit = <2>;
+		qcom,lan-aggr-time-limit = <2>;
+		qcom,rndis-aggr-time-limit = <2>;
 		qcom,msm-bus,vectors-KBps =
 		/* No vote */
 		<MSM_BUS_MASTER_IPA MSM_BUS_SLAVE_SNOC_MEM_NOC_GC 0 0>,
