@@ -1170,7 +1170,7 @@ static void backup_notif_handler(struct subsys_backup *backup_dev,
 
 	backup_dev->qmi.decoded_msg = devm_kzalloc(backup_dev->dev,
 					sizeof(*backup_ind), GFP_KERNEL);
-	if (!backup_dev) {
+	if (!backup_dev->qmi.decoded_msg) {
 		dev_err(backup_dev->dev, "%s: Failed to allocate memory\n",
 				__func__);
 		return;
@@ -1209,7 +1209,7 @@ static void restore_notif_handler(struct subsys_backup *backup_dev,
 
 	backup_dev->qmi.decoded_msg = devm_kzalloc(backup_dev->dev,
 					sizeof(*restore_ind), GFP_KERNEL);
-	if (!backup_dev) {
+	if (!backup_dev->qmi.decoded_msg) {
 		dev_err(backup_dev->dev, "%s: Failed to allocate memory\n",
 				__func__);
 		return;
