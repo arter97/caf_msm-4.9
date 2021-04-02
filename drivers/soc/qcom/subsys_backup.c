@@ -800,6 +800,14 @@ static void subsys_qmi_resp_cb(struct qmi_handle *handle, unsigned int msg_id,
 	backup_dev = (struct subsys_backup *)resp_cb_data;
 }
 
+static void subsys_backup_set_idle_state(struct subsys_backup *backup_dev)
+{
+	backup_dev->last_notif_sent = -1;
+	backup_dev->backup_type = -1;
+	backup_dev->remote_status = -1;
+	backup_dev->state = IDLE;
+}
+
 static int subsys_qmi_send_request(struct subsys_backup *backup_dev,
 			int req_msg_id, size_t req_len, struct elem_info
 			*req_ei, void *req_data, int resp_msg_id,
@@ -1096,7 +1104,12 @@ static void request_handler_worker(struct work_struct *work)
 				__func__, ret);
 		else
 			free_buffers(backup_dev);
-		backup_dev->state = IDLE;
+		/*
+		 * Allow userspace to read the uevent variables before
+		 * resetting it
+		 */
+		usleep_range(100000, 1000000);
+		subsys_backup_set_idle_state(backup_dev);
 		break;
 
 	default:
@@ -1147,7 +1160,7 @@ static void backup_notif_handler(struct subsys_backup *backup_dev,
 	struct qmi_backup_ind_type *ind;
 
 	if (atomic_read(&backup_dev->open_count) == 0) {
-		dev_err(backup_dev->dev, "%s: No active users\n", __func__);
+		dev_warn(backup_dev->dev, "%s: No active users\n", __func__);
 		return;
 	}
 
@@ -1169,7 +1182,7 @@ static void backup_notif_handler(struct subsys_backup *backup_dev,
 	}
 
 	backup_dev->qmi.decoded_msg = devm_kzalloc(backup_dev->dev,
-					sizeof(*backup_ind), GFP_KERNEL);
+			sizeof(struct qmi_backup_ind_type), GFP_KERNEL);
 	if (!backup_dev->qmi.decoded_msg) {
 		dev_err(backup_dev->dev, "%s: Failed to allocate memory\n",
 				__func__);
@@ -1177,7 +1190,7 @@ static void backup_notif_handler(struct subsys_backup *backup_dev,
 	}
 
 	memcpy((void *)backup_dev->qmi.decoded_msg, backup_ind,
-			sizeof(*backup_ind));
+			sizeof(struct qmi_backup_ind_type));
 	queue_work(system_wq, &backup_dev->request_handler_work);
 }
 
@@ -1187,7 +1200,7 @@ static void restore_notif_handler(struct subsys_backup *backup_dev,
 	struct qmi_restore_ind_type *ind;
 
 	if (atomic_read(&backup_dev->open_count) == 0) {
-		dev_err(backup_dev->dev, "%s: No active users\n", __func__);
+		dev_warn(backup_dev->dev, "%s: No active users\n", __func__);
 		return;
 	}
 
@@ -1208,7 +1221,7 @@ static void restore_notif_handler(struct subsys_backup *backup_dev,
 	}
 
 	backup_dev->qmi.decoded_msg = devm_kzalloc(backup_dev->dev,
-					sizeof(*restore_ind), GFP_KERNEL);
+			sizeof(struct qmi_restore_ind_type), GFP_KERNEL);
 	if (!backup_dev->qmi.decoded_msg) {
 		dev_err(backup_dev->dev, "%s: Failed to allocate memory\n",
 				__func__);
@@ -1216,7 +1229,7 @@ static void restore_notif_handler(struct subsys_backup *backup_dev,
 	}
 
 	memcpy((void *)backup_dev->qmi.decoded_msg, restore_ind,
-		sizeof(*restore_ind));
+		sizeof(struct qmi_restore_ind_type));
 	queue_work(system_wq, &backup_dev->request_handler_work);
 }
 
@@ -1415,6 +1428,7 @@ static int subsys_backup_service_event_notify(struct notifier_block *nb,
 
 	case QMI_SERVER_EXIT:
 		backup_dev->qmi.connected = false;
+		subsys_backup_set_idle_state(backup_dev);
 		hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
 		free_buffers(backup_dev);
 		break;
@@ -1433,7 +1447,7 @@ static int backup_buffer_open(struct inode *inodep, struct file *filep)
 
 	if (atomic_inc_return(&backup_dev->open_count) != 1) {
 		dev_err(backup_dev->dev,
-				"Multiple instances of open  not allowed\n");
+				"Multiple instances of open not allowed\n");
 		atomic_dec(&backup_dev->open_count);
 		return -EBUSY;
 	}
@@ -1448,7 +1462,7 @@ static ssize_t backup_buffer_read(struct file *filp, char __user *buf,
 	size_t ret;
 
 	if (backup_dev->state != BACKUP_END) {
-		dev_err(backup_dev->dev, "%s: Backup not complete: %d\n",
+		dev_warn(backup_dev->dev, "%s: Backup not complete: %d\n",
 				__func__);
 		return 0;
 	} else if (!backup_dev->img_buf.hyp_assigned_to_hlos) {
@@ -1463,7 +1477,7 @@ static ssize_t backup_buffer_read(struct file *filp, char __user *buf,
 	if (ret < 0) {
 		dev_err(backup_dev->dev, "%s: Failed: %d\n", __func__, ret);
 	} else if (ret < size) {
-		backup_dev->state = IDLE;
+		subsys_backup_set_idle_state(backup_dev);
 		free_buffers(backup_dev);
 	}
 
@@ -1477,7 +1491,8 @@ static ssize_t backup_buffer_write(struct file *filp, const char __user *buf,
 	struct subsys_backup *backup_dev = filp->private_data;
 
 	if (backup_dev->state != RESTORE_START) {
-		dev_err(backup_dev->dev, "%s: Restore not started\n", __func__);
+		dev_warn(backup_dev->dev, "%s: Restore not started\n",
+				__func__);
 		return 0;
 	} else if (!backup_dev->img_buf.hyp_assigned_to_hlos) {
 		dev_err(backup_dev->dev, "%s: Not hyp_assinged to HLOS\n",
@@ -1499,7 +1514,7 @@ static int backup_buffer_flush(struct file *filp, fl_owner_t id)
 		return 0;
 
 	if (backup_dev->state != RESTORE_START || !backup_dev->img_buf.vaddr) {
-		dev_err(backup_dev->dev, "%s: Invalid operation\n", __func__);
+		dev_warn(backup_dev->dev, "%s: Invalid operation\n", __func__);
 		return -EBUSY;
 	}
 
