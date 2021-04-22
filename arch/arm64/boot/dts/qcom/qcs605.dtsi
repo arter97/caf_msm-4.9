@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,10 @@
 / {
 	model = "Qualcomm Technologies, Inc. QCS605";
 	qcom,msm-id = <347 0x0>;
+};
+
+&removed_region {
+	reg = <0 0x85fc0000 0 0x1540000>;
 };
 
 &pil_modem_mem {
@@ -52,6 +56,10 @@
 
 &pil_gpu_mem {
 	reg = <0 0x90f15000 0 0x4000>;
+};
+
+&qseecom_mem {
+	reg = <0 0x9e800000 0 0x1000000>;
 };
 
 &adsp_mem {
