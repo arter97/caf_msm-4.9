@@ -83,7 +83,7 @@ static void qcom_mhi_ipc_router_dl_callback(struct mhi_device *mhi_dev,
 	}
 	D("%s: Allocated rr_packet\n", __func__);
 
-	skb = alloc_skb(mhi_res->bytes_xferd, GFP_KERNEL);
+	skb = alloc_skb(mhi_res->bytes_xferd, GFP_ATOMIC);
 	if (!skb) {
 		IPC_RTR_ERR("%s: Couldn't alloc skb\n",
 				__func__);

@@ -201,11 +201,11 @@ static int msm_ipc_add_default_rule(void)
 	struct security_rule *rule;
 	int key;
 
-	rule = kzalloc(sizeof(*rule), GFP_KERNEL);
+	rule = kzalloc(sizeof(*rule), GFP_ATOMIC);
 	if (!rule)
 		return -ENOMEM;
 
-	rule->group_id = kzalloc(sizeof(*rule->group_id), GFP_KERNEL);
+	rule->group_id = kzalloc(sizeof(*rule->group_id), GFP_ATOMIC);
 	if (!rule->group_id) {
 		kfree(rule);
 		return -ENOMEM;

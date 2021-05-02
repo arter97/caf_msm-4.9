@@ -586,7 +586,7 @@ struct rr_packet *clone_pkt(struct rr_packet *pkt)
 	struct sk_buff *temp_skb, *cloned_skb;
 	struct sk_buff_head *pkt_fragment_q;
 
-	cloned_pkt = kzalloc(sizeof(*cloned_pkt), GFP_KERNEL);
+	cloned_pkt = kzalloc(sizeof(*cloned_pkt), GFP_ATOMIC);
 	if (!cloned_pkt) {
 		IPC_RTR_ERR("%s: failure\n", __func__);
 		return NULL;
@@ -594,7 +594,7 @@ struct rr_packet *clone_pkt(struct rr_packet *pkt)
 	memcpy(&cloned_pkt->hdr, &pkt->hdr, sizeof(struct rr_header_v1));
 	if (pkt->opt_hdr.len > 0) {
 		cloned_pkt->opt_hdr.data = kmalloc(pkt->opt_hdr.len,
-							GFP_KERNEL);
+							GFP_ATOMIC);
 		if (!cloned_pkt->opt_hdr.data) {
 			IPC_RTR_ERR("%s: Memory allocation Failed\n", __func__);
 		} else {
@@ -604,7 +604,7 @@ struct rr_packet *clone_pkt(struct rr_packet *pkt)
 		}
 	}
 
-	pkt_fragment_q = kmalloc(sizeof(*pkt_fragment_q), GFP_KERNEL);
+	pkt_fragment_q = kmalloc(sizeof(*pkt_fragment_q), GFP_ATOMIC);
 	if (!pkt_fragment_q) {
 		IPC_RTR_ERR("%s: pkt_frag_q alloc failure\n", __func__);
 		kfree(cloned_pkt);
@@ -614,7 +614,7 @@ struct rr_packet *clone_pkt(struct rr_packet *pkt)
 	kref_init(&cloned_pkt->ref);
 
 	skb_queue_walk(pkt->pkt_fragment_q, temp_skb) {
-		cloned_skb = skb_clone(temp_skb, GFP_KERNEL);
+		cloned_skb = skb_clone(temp_skb, GFP_ATOMIC);
 		if (!cloned_skb)
 			goto fail_clone;
 		skb_queue_tail(pkt_fragment_q, cloned_skb);
@@ -647,7 +647,7 @@ struct rr_packet *create_pkt(struct sk_buff_head *data)
 	struct rr_packet *pkt;
 	struct sk_buff *temp_skb;
 
-	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
+	pkt = kzalloc(sizeof(*pkt), GFP_ATOMIC);
 	if (!pkt) {
 		IPC_RTR_ERR("%s: failure\n", __func__);
 		return NULL;
@@ -659,7 +659,7 @@ struct rr_packet *create_pkt(struct sk_buff_head *data)
 			pkt->length += temp_skb->len;
 	} else {
 		pkt->pkt_fragment_q = kmalloc(sizeof(*pkt->pkt_fragment_q),
-					      GFP_KERNEL);
+					      GFP_ATOMIC);
 		if (!pkt->pkt_fragment_q) {
 			IPC_RTR_ERR("%s: Couldn't alloc pkt_fragment_q\n",
 				    __func__);
