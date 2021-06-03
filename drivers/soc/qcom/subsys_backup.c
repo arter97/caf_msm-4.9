@@ -1367,14 +1367,6 @@ static void subsys_backup_new_server(struct work_struct *work)
 	backup_dev->last_notif_sent = -1;
 	backup_dev->backup_type = -1;
 
-	backup_dev->qmi.qmi_svc_handle = devm_kzalloc(backup_dev->dev,
-					sizeof(struct qmi_handle), GFP_KERNEL);
-	if (!backup_dev->qmi.qmi_svc_handle) {
-		dev_err(backup_dev->dev, "%s: Failed to allocate QMI handle\n",
-				__func__);
-		return;
-	}
-
 	backup_dev->qmi.qmi_svc_handle =
 			qmi_handle_create(subsys_backup_client_notify,
 						backup_dev);
@@ -1438,6 +1430,10 @@ static int subsys_backup_service_event_notify(struct notifier_block *nb,
 		subsys_backup_set_idle_state(backup_dev);
 		hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
 		free_buffers(backup_dev);
+		if (backup_dev->qmi.qmi_svc_handle &&
+			qmi_handle_destroy(backup_dev->qmi.qmi_svc_handle))
+			dev_err(backup_dev->dev,
+				"Failed to destroy QMI handle\n");
 		break;
 
 	default:
