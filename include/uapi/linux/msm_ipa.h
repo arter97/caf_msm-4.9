@@ -232,7 +232,7 @@ enum ipa_client_type {
 	/* RESERVERD PROD			= 14, */
 	IPA_CLIENT_WLAN3_CONS			= 15,
 
-	/* RESERVERD PROD			= 16, */
+	IPA_CLIENT_WLAN4_PROD			= 16,
 	IPA_CLIENT_WLAN4_CONS			= 17,
 
 	IPA_CLIENT_USB_PROD			= 18,

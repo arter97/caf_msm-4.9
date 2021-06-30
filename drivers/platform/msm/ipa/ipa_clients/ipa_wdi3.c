@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include "../ipa_common_i.h"
 #include "../ipa_v3/ipa_pm.h"
+#include "../ipa_v3/ipa_i.h"
 
 #define OFFLOAD_DRV_NAME "ipa_wdi"
 #define IPA_WDI_DBG(fmt, args...) \
@@ -106,6 +107,9 @@ int ipa_wdi_init(struct ipa_wdi_init_in_params *in,
 	}
 
 	out->is_uC_ready = uc_ready_params.is_uC_ready;
+
+	if (ipa3_ctx->ipa_wdi2_over_gsi)
+		out->is_over_gsi = true;
 
 	smmu_in.smmu_client = IPA_SMMU_WLAN_CLIENT;
 	if (ipa_get_smmu_params(&smmu_in, &smmu_out))
@@ -243,14 +247,20 @@ int ipa_wdi_reg_intf(struct ipa_wdi_reg_intf_in_params *in)
 
 	memset(tx_prop, 0, sizeof(tx_prop));
 	tx_prop[0].ip = IPA_IP_v4;
-	tx_prop[0].dst_pipe = IPA_CLIENT_WLAN1_CONS;
+	if (ipa_wdi_ctx->wdi_version == IPA_WDI_2)
+		tx_prop[0].dst_pipe = IPA_CLIENT_WLAN4_CONS;
+	else
+		tx_prop[0].dst_pipe = IPA_CLIENT_WLAN1_CONS;
 	tx_prop[0].alt_dst_pipe = in->alt_dst_pipe;
 	tx_prop[0].hdr_l2_type = in->hdr_info[0].hdr_type;
 	strlcpy(tx_prop[0].hdr_name, hdr->hdr[IPA_IP_v4].name,
 		sizeof(tx_prop[0].hdr_name));
 
 	tx_prop[1].ip = IPA_IP_v6;
-	tx_prop[1].dst_pipe = IPA_CLIENT_WLAN1_CONS;
+	if (ipa_wdi_ctx->wdi_version == IPA_WDI_2)
+		tx_prop[1].dst_pipe = IPA_CLIENT_WLAN4_CONS;
+	else
+		tx_prop[1].dst_pipe = IPA_CLIENT_WLAN1_CONS;
 	tx_prop[1].alt_dst_pipe = in->alt_dst_pipe;
 	tx_prop[1].hdr_l2_type = in->hdr_info[1].hdr_type;
 	strlcpy(tx_prop[1].hdr_name, hdr->hdr[IPA_IP_v6].name,
@@ -262,7 +272,10 @@ int ipa_wdi_reg_intf(struct ipa_wdi_reg_intf_in_params *in)
 
 	memset(rx_prop, 0, sizeof(rx_prop));
 	rx_prop[0].ip = IPA_IP_v4;
-	rx_prop[0].src_pipe = IPA_CLIENT_WLAN1_PROD;
+	if (ipa_wdi_ctx->wdi_version == IPA_WDI_2)
+		rx_prop[0].src_pipe = IPA_CLIENT_WLAN4_PROD;
+	else
+		rx_prop[0].src_pipe = IPA_CLIENT_WLAN1_PROD;
 	rx_prop[0].hdr_l2_type = in->hdr_info[0].hdr_type;
 	if (in->is_meta_data_valid) {
 		rx_prop[0].attrib.attrib_mask |= IPA_FLT_META_DATA;
@@ -271,7 +284,10 @@ int ipa_wdi_reg_intf(struct ipa_wdi_reg_intf_in_params *in)
 	}
 
 	rx_prop[1].ip = IPA_IP_v6;
-	rx_prop[1].src_pipe = IPA_CLIENT_WLAN1_PROD;
+	if (ipa_wdi_ctx->wdi_version == IPA_WDI_2)
+		rx_prop[1].src_pipe = IPA_CLIENT_WLAN4_PROD;
+	else
+		rx_prop[1].src_pipe = IPA_CLIENT_WLAN1_PROD;
 	rx_prop[1].hdr_l2_type = in->hdr_info[1].hdr_type;
 	if (in->is_meta_data_valid) {
 		rx_prop[1].attrib.attrib_mask |= IPA_FLT_META_DATA;
@@ -519,6 +535,10 @@ int ipa_wdi_conn_pipes(struct ipa_wdi_conn_in_params *in,
 				in->u_rx.rx.event_ring_doorbell_pa;
 			in_rx.u.ul.rdy_comp_ring_size =
 				in->u_rx.rx.event_ring_size;
+			in_rx.u.ul.is_txr_rn_db_pcie_addr =
+				in->u_rx.rx.is_txr_rn_db_pcie_addr;
+			in_rx.u.ul.is_evt_rn_db_pcie_addr =
+				in->u_rx.rx.is_evt_rn_db_pcie_addr;
 			if (ipa_connect_wdi_pipe(&in_rx, &out_rx)) {
 				IPA_WDI_ERR("fail to setup rx pipe\n");
 				ret = -EFAULT;
@@ -544,6 +564,10 @@ int ipa_wdi_conn_pipes(struct ipa_wdi_conn_in_params *in,
 				in->u_tx.tx.event_ring_size;
 			in_tx.u.dl.num_tx_buffers =
 				in->u_tx.tx.num_pkt_buffers;
+			in_tx.u.dl.is_txr_rn_db_pcie_addr =
+				in->u_tx.tx.is_txr_rn_db_pcie_addr;
+			in_tx.u.dl.is_evt_rn_db_pcie_addr =
+				in->u_tx.tx.is_evt_rn_db_pcie_addr;
 			if (ipa_connect_wdi_pipe(&in_tx, &out_tx)) {
 				IPA_WDI_ERR("fail to setup tx pipe\n");
 				ret = -EFAULT;
@@ -571,6 +595,10 @@ int ipa_wdi_conn_pipes(struct ipa_wdi_conn_in_params *in,
 				in->u_rx.rx_smmu.event_ring_doorbell_pa;
 			in_rx.u.ul_smmu.rdy_comp_ring_size =
 				in->u_rx.rx_smmu.event_ring_size;
+			in_rx.u.ul_smmu.is_txr_rn_db_pcie_addr =
+				in->u_rx.rx_smmu.is_txr_rn_db_pcie_addr;
+			in_rx.u.ul_smmu.is_evt_rn_db_pcie_addr =
+				in->u_rx.rx_smmu.is_evt_rn_db_pcie_addr;
 			if (ipa_connect_wdi_pipe(&in_rx, &out_rx)) {
 				IPA_WDI_ERR("fail to setup rx pipe\n");
 				ret = -EFAULT;
@@ -596,6 +624,10 @@ int ipa_wdi_conn_pipes(struct ipa_wdi_conn_in_params *in,
 				in->u_tx.tx_smmu.event_ring_size;
 			in_tx.u.dl_smmu.num_tx_buffers =
 				in->u_tx.tx_smmu.num_pkt_buffers;
+			in_tx.u.dl_smmu.is_txr_rn_db_pcie_addr =
+				in->u_tx.tx_smmu.is_txr_rn_db_pcie_addr;
+			in_tx.u.dl_smmu.is_evt_rn_db_pcie_addr =
+				in->u_tx.tx_smmu.is_evt_rn_db_pcie_addr;
 			if (ipa_connect_wdi_pipe(&in_tx, &out_tx)) {
 				IPA_WDI_ERR("fail to setup tx pipe\n");
 				ret = -EFAULT;

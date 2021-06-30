@@ -1563,6 +1563,13 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			IPA_DPS_HPS_REP_SEQ_TYPE_2PKT_PROC_PASS_NO_DEC_UCP_DMAP,
 			QMB_MASTER_SELECT_DDR,
 			{ 6, 2, 8, 16, IPA_EE_UC, GSI_USE_PREFETCH_BUFS } },
+	/*Using WLAN4 PROD for WDI2 over gsi*/
+	[IPA_4_0_AUTO][IPA_CLIENT_WLAN4_PROD]          = {
+			true, IPA_v4_0_GROUP_UL_DL,
+			true,
+			IPA_DPS_HPS_REP_SEQ_TYPE_2PKT_PROC_PASS_NO_DEC_UCP_DMAP,
+			QMB_MASTER_SELECT_DDR,
+			{ 6, 5, 8, 16, IPA_EE_UC, GSI_USE_PREFETCH_BUFS } },
 	[IPA_4_0_AUTO][IPA_CLIENT_USB_PROD]            = {
 			true, IPA_v4_0_GROUP_UL_DL,
 			true,
@@ -1656,6 +1663,12 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
 			{ 18, 3, 6, 9, IPA_EE_UC, GSI_USE_PREFETCH_BUFS } },
+	/*Using WLAN4 PROD for WDI2 over gsi*/
+	[IPA_4_0_AUTO][IPA_CLIENT_WLAN4_CONS]          = {
+			true, IPA_v4_0_GROUP_UL_DL, false,
+			IPA_DPS_HPS_SEQ_TYPE_INVALID,
+			QMB_MASTER_SELECT_DDR,
+			{ 18, 14, 6, 9, IPA_EE_AP, GSI_USE_PREFETCH_BUFS } },
 	[IPA_4_0_AUTO][IPA_CLIENT_WLAN2_CONS]          = {
 			true, IPA_v4_0_GROUP_UL_DL,
 			false,
@@ -3902,7 +3915,8 @@ int ipa3_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
 	    param_in->client == IPA_CLIENT_ODU_PROD ||
 	    param_in->client == IPA_CLIENT_ETHERNET_PROD) {
 		result = ipa3_cfg_ep_metadata(ipa_ep_idx, &meta);
-	} else if (param_in->client == IPA_CLIENT_WLAN1_PROD) {
+	} else if (param_in->client == IPA_CLIENT_WLAN1_PROD ||
+			param_in->client == IPA_CLIENT_WLAN4_PROD) {
 		ipa3_ctx->ep[ipa_ep_idx].cfg.meta = meta;
 		result = ipa3_write_qmapid_wdi_pipe(ipa_ep_idx, meta.qmap_id);
 		if (result)
