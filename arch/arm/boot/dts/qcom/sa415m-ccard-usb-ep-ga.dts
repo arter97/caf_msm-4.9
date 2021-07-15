@@ -38,6 +38,7 @@
 
 &ipa_hw {
 	qcom,ipa-config-is-auto;
+	qcom,ipa-wdi2_over_gsi;
 };
 
 &usb {
