@@ -23,6 +23,7 @@
 #include <linux/usb/video.h>
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
+#include <linux/delay.h>
 
 #include <media/v4l2-dev.h>
 #include <media/v4l2-event.h>
@@ -405,9 +406,18 @@ uvc_function_disconnect(struct uvc_device *uvc)
 {
 	struct usb_composite_dev *cdev = uvc->func.config->cdev;
 	int ret;
+	int timeout = 20;
 
-	if ((ret = usb_function_deactivate(&uvc->func)) < 0)
+retry:
+	ret = usb_function_deactivate(&uvc->func);
+	if (ret < 0) {
 		INFO(cdev, "UVC disconnect failed with %d\n", ret);
+		if (--timeout && ret == -ETIMEDOUT) {
+			if (timeout < 10)
+				msleep(50);
+			goto retry;
+		}
+	}
 }
 
 /* --------------------------------------------------------------------------
