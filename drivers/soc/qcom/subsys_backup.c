@@ -1356,7 +1356,7 @@ static void subsys_backup_client_notify(struct qmi_handle *handle,
 		queue_work(system_wq, &backup_dev->qmi.rcv_msg_work);
 }
 
-static void subsys_backup_new_server(struct work_struct *work)
+static void subsys_backup_server_update(struct work_struct *work)
 {
 	int ret;
 	struct qmi_info *qmi;
@@ -1364,6 +1364,18 @@ static void subsys_backup_new_server(struct work_struct *work)
 
 	qmi = container_of(work, struct qmi_info, qmi_client_work);
 	backup_dev = container_of(qmi, struct subsys_backup, qmi);
+
+	if (!backup_dev->qmi.connected) {
+		subsys_backup_set_idle_state(backup_dev);
+		hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
+		free_buffers(backup_dev);
+		if (backup_dev->qmi.qmi_svc_handle &&
+			qmi_handle_destroy(backup_dev->qmi.qmi_svc_handle))
+			dev_err(backup_dev->dev,
+				"Failed to destroy QMI handle\n");
+		return;
+	}
+
 	backup_dev->last_notif_sent = -1;
 	backup_dev->backup_type = -1;
 
@@ -1394,7 +1406,6 @@ static void subsys_backup_new_server(struct work_struct *work)
 		return;
 	}
 
-	backup_dev->qmi.connected = true;
 	ret = register_for_backup_restore_notif(backup_dev);
 	if (ret < 0) {
 		dev_err(backup_dev->dev, "%s: Failed to register: %d\n",
@@ -1418,8 +1429,9 @@ static int subsys_backup_service_event_notify(struct notifier_block *nb,
 	switch (code) {
 
 	case QMI_SERVER_ARRIVE:
+		backup_dev->qmi.connected = true;
 		INIT_WORK(&backup_dev->qmi.qmi_client_work,
-					subsys_backup_new_server);
+					subsys_backup_server_update);
 		INIT_WORK(&backup_dev->qmi.rcv_msg_work,
 					subsys_backup_recv_msg);
 		queue_work(system_wq, &backup_dev->qmi.qmi_client_work);
@@ -1427,13 +1439,9 @@ static int subsys_backup_service_event_notify(struct notifier_block *nb,
 
 	case QMI_SERVER_EXIT:
 		backup_dev->qmi.connected = false;
-		subsys_backup_set_idle_state(backup_dev);
-		hyp_assign_buffers(backup_dev, VMID_HLOS, VMID_MSS_MSA);
-		free_buffers(backup_dev);
-		if (backup_dev->qmi.qmi_svc_handle &&
-			qmi_handle_destroy(backup_dev->qmi.qmi_svc_handle))
-			dev_err(backup_dev->dev,
-				"Failed to destroy QMI handle\n");
+		INIT_WORK(&backup_dev->qmi.qmi_client_work,
+					subsys_backup_server_update);
+		queue_work(system_wq, &backup_dev->qmi.qmi_client_work);
 		break;
 
 	default:
