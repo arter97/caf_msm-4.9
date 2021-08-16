@@ -424,10 +424,21 @@ retry:
  * USB probe and disconnect
  */
 
+static ssize_t function_name_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct uvc_device *uvc = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%s\n", uvc->func.fi->group.cg_item.ci_name);
+}
+
+static DEVICE_ATTR_RO(function_name);
+
 static int
 uvc_register_video(struct uvc_device *uvc)
 {
 	struct usb_composite_dev *cdev = uvc->func.config->cdev;
+	int ret;
 
 	/* TODO reference counting. */
 	uvc->vdev.v4l2_dev = &uvc->v4l2_dev;
@@ -440,7 +451,17 @@ uvc_register_video(struct uvc_device *uvc)
 
 	video_set_drvdata(&uvc->vdev, uvc);
 
-	return video_register_device(&uvc->vdev, VFL_TYPE_GRABBER, -1);
+	ret = video_register_device(&uvc->vdev, VFL_TYPE_GRABBER, -1);
+	if (ret < 0)
+		return ret;
+
+	ret = device_create_file(&uvc->vdev.dev, &dev_attr_function_name);
+	if (ret < 0) {
+		video_unregister_device(&uvc->vdev);
+		return ret;
+	}
+
+	return 0;
 }
 
 #define UVC_COPY_DESCRIPTOR(mem, dst, desc) \
@@ -689,12 +710,14 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 	uvc_iad.bFirstInterface = ret;
 	uvc_control_intf.bInterfaceNumber = ret;
 	uvc->control_intf = ret;
+	opts->control_interface = ret;
 
 	if ((ret = usb_interface_id(c, f)) < 0)
 		goto error;
 	uvc_streaming_intf_alt0.bInterfaceNumber = ret;
 	uvc_streaming_intf_alt1.bInterfaceNumber = ret;
 	uvc->streaming_intf = ret;
+	opts->streaming_interface = ret;
 
 	/* Copy descriptors */
 	f->fs_descriptors = uvc_copy_descriptors(uvc, USB_SPEED_FULL);
@@ -782,6 +805,7 @@ static struct usb_function_instance *uvc_alloc_inst(void)
 	struct uvc_output_terminal_descriptor *od;
 	struct uvc_color_matching_descriptor *md;
 	struct uvc_descriptor_header **ctl_cls;
+	int ret;
 
 	opts = kzalloc(sizeof(*opts), GFP_KERNEL);
 	if (!opts)
@@ -858,7 +882,12 @@ static struct usb_function_instance *uvc_alloc_inst(void)
 	opts->streaming_interval = 1;
 	opts->streaming_maxpacket = 1024;
 
-	uvcg_attach_configfs(opts);
+	ret = uvcg_attach_configfs(opts);
+	if (ret < 0) {
+		kfree(opts);
+		return ERR_PTR(ret);
+	}
+
 	return &opts->func_inst;
 }
 
@@ -878,6 +907,7 @@ static void uvc_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	INFO(cdev, "%s\n", __func__);
 
+	device_remove_file(&uvc->vdev.dev, &dev_attr_function_name);
 	video_unregister_device(&uvc->vdev);
 	v4l2_device_unregister(&uvc->v4l2_dev);
 
