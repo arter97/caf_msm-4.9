@@ -62,6 +62,8 @@
 #define IPA_UC_FINISH_MAX 6
 #define IPA_UC_WAIT_MIN_SLEEP 1000
 #define IPA_UC_WAII_MAX_SLEEP 1200
+#define IPA_HOLB_TMR_VAL 65535
+
 /*
  * The transport descriptor size was changed to GSI_CHAN_RE_SIZE_16B, but
  * IPA users still use sps_iovec size as FIFO element size.
@@ -780,6 +782,7 @@ struct ipa3_ep_context {
 	struct ipa3_wlan_stats wstats;
 	u32 uc_offload_state;
 	atomic_t disconnect_in_progress;
+	u32 gsi_offload_state;
 	u32 qmi_request_sent;
 	bool napi_enabled;
 	u32 eot_in_poll_err;
@@ -1269,6 +1272,19 @@ struct ipa3_uc_wdi_ctx {
 };
 
 /**
+ * struct ipa3_wdi2_ctx - IPA wdi2 context
+ */
+struct ipa3_wdi2_ctx {
+	phys_addr_t rdy_ring_base_pa;
+	phys_addr_t rdy_ring_rp_pa;
+	u32 rdy_ring_size;
+	phys_addr_t rdy_comp_ring_base_pa;
+	phys_addr_t rdy_comp_ring_wp_pa;
+	u32 rdy_comp_ring_size;
+	u32 *rdy_ring_rp_va;
+	u32 *rdy_comp_ring_wp_va;
+};
+/**
  * struct ipa3_transport_pm - transport power management related members
  * @transport_pm_mutex: Mutex to protect the transport_pm functionality.
  */
@@ -1566,6 +1582,7 @@ struct ipa3_context {
 	bool ipa_wdi2;
 	bool ipa_config_is_auto;
 	bool use_xbl_boot;
+	bool ipa_wdi2_over_gsi;
 	bool use_64_bit_dma_mask;
 	/* featurize if memory footprint becomes a concern */
 	struct ipa3_stats stats;
@@ -1632,6 +1649,7 @@ struct ipa3_context {
 	u32 wan_aggr_time_limit;
 	u32 lan_aggr_time_limit;
 	u32 rndis_aggr_time_limit;
+	struct ipa3_wdi2_ctx wdi2_ctx;
 };
 
 struct ipa3_plat_drv_res {
@@ -1654,6 +1672,7 @@ struct ipa3_plat_drv_res {
 	bool ipa_wdi2;
 	bool ipa_config_is_auto;
 	bool use_xbl_boot;
+	bool ipa_wdi2_over_gsi;
 	bool use_64_bit_dma_mask;
 	bool use_bw_vote;
 	u32 wan_rx_ring_size;
@@ -2171,10 +2190,17 @@ int ipa3_sys_update_gsi_hdls(u32 clnt_hdl, unsigned long gsi_ch_hdl,
 
 int ipa3_connect_wdi_pipe(struct ipa_wdi_in_params *in,
 		struct ipa_wdi_out_params *out);
+int ipa3_connect_gsi_wdi_pipe(struct ipa_wdi_in_params *in,
+		struct ipa_wdi_out_params *out);
+
 int ipa3_disconnect_wdi_pipe(u32 clnt_hdl);
 int ipa3_enable_wdi_pipe(u32 clnt_hdl);
+int ipa3_enable_gsi_wdi_pipe(u32 clnt_hdl);
 int ipa3_disable_wdi_pipe(u32 clnt_hdl);
+int ipa3_disable_gsi_wdi_pipe(u32 clnt_hdl);
+int ipa3_disconnect_gsi_wdi_pipe(u32 clnt_hdl);
 int ipa3_resume_wdi_pipe(u32 clnt_hdl);
+int ipa3_resume_gsi_wdi_pipe(u32 clnt_hdl);
 int ipa3_suspend_wdi_pipe(u32 clnt_hdl);
 int ipa3_get_wdi_stats(struct IpaHwStatsWDIInfoData_t *stats);
 u16 ipa3_get_smem_restr_bytes(void);
@@ -2431,6 +2457,7 @@ void ipa3_delete_dflt_flt_rules(u32 ipa_ep_idx);
 
 int ipa3_enable_data_path(u32 clnt_hdl);
 int ipa3_disable_data_path(u32 clnt_hdl);
+int ipa3_disable_gsi_data_path(u32 clnt_hdl);
 int ipa3_alloc_rule_id(struct idr *rule_ids);
 int ipa3_id_alloc(void *ptr);
 void *ipa3_id_find(u32 id);
@@ -2453,6 +2480,7 @@ int ipa3_tag_aggr_force_close(int pipe_num);
 
 void ipa3_active_clients_unlock(void);
 int ipa3_wdi_init(void);
+int ipa3_write_qmapid_gsi_wdi_pipe(u32 clnt_hdl, u8 qmap_id);
 int ipa3_write_qmapid_wdi_pipe(u32 clnt_hdl, u8 qmap_id);
 int ipa3_tag_process(struct ipa3_desc *desc, int num_descs,
 		    unsigned long timeout);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2018, 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, 2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1170,12 +1170,27 @@ static void gsi_prime_evt_ring(struct gsi_evt_ctx *ctx)
 	spin_unlock_irqrestore(&ctx->ring.slock, flags);
 }
 
+static void gsi_prime_evt_ring_wdi(struct gsi_evt_ctx *ctx)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&ctx->ring.slock, flags);
+	if (ctx->ring.base_va)
+		memset((void *)ctx->ring.base_va, 0, ctx->ring.len);
+	ctx->ring.wp_local = ctx->ring.base +
+		((ctx->ring.max_num_elem + 2) * ctx->ring.elem_sz);
+	gsi_ring_evt_doorbell(ctx);
+	spin_unlock_irqrestore(&ctx->ring.slock, flags);
+}
+
 static int gsi_validate_evt_ring_props(struct gsi_evt_ring_props *props)
 {
 	uint64_t ra;
 
 	if ((props->re_size == GSI_EVT_RING_RE_SIZE_4B &&
 				props->ring_len % 4) ||
+			(props->re_size == GSI_EVT_RING_RE_SIZE_8B &&
+				 props->ring_len % 8) ||
 			(props->re_size == GSI_EVT_RING_RE_SIZE_16B &&
 				 props->ring_len % 16)) {
 		GSIERR("bad params ring_len %u not a multiple of RE size %u\n",
@@ -1309,6 +1324,8 @@ int gsi_alloc_evt_ring(struct gsi_evt_ring_props *props, unsigned long dev_hdl,
 	atomic_inc(&gsi_ctx->num_evt_ring);
 	if (props->intf == GSI_EVT_CHTYPE_GPI_EV)
 		gsi_prime_evt_ring(ctx);
+	else if (props->intf == GSI_EVT_CHTYPE_WDI_EV)
+		gsi_prime_evt_ring_wdi(ctx);
 	mutex_unlock(&gsi_ctx->mlock);
 
 	spin_lock_irqsave(&gsi_ctx->slock, flags);
@@ -1382,7 +1399,8 @@ int gsi_dealloc_evt_ring(unsigned long evt_ring_hdl)
 		return -GSI_STATUS_NODEV;
 	}
 
-	if (evt_ring_hdl >= gsi_ctx->max_ev) {
+	if (evt_ring_hdl >= gsi_ctx->max_ev ||
+			evt_ring_hdl >= GSI_EVT_RING_MAX) {
 		GSIERR("bad params evt_ring_hdl=%lu\n", evt_ring_hdl);
 		return -GSI_STATUS_INVALID_PARAMS;
 	}
@@ -1554,6 +1572,8 @@ int gsi_reset_evt_ring(unsigned long evt_ring_hdl)
 
 	if (ctx->props.intf == GSI_EVT_CHTYPE_GPI_EV)
 		gsi_prime_evt_ring(ctx);
+	if (ctx->props.intf == GSI_EVT_CHTYPE_WDI_EV)
+		gsi_prime_evt_ring_wdi(ctx);
 	mutex_unlock(&gsi_ctx->mlock);
 
 	return GSI_STATUS_SUCCESS;
@@ -1714,6 +1734,8 @@ static int gsi_validate_channel_props(struct gsi_chan_props *props)
 
 	if ((props->re_size == GSI_CHAN_RE_SIZE_4B &&
 				props->ring_len % 4) ||
+			(props->re_size == GSI_CHAN_RE_SIZE_8B &&
+				 props->ring_len % 8) ||
 			(props->re_size == GSI_CHAN_RE_SIZE_16B &&
 				 props->ring_len % 16) ||
 			(props->re_size == GSI_CHAN_RE_SIZE_32B &&
@@ -1925,15 +1947,7 @@ static void __gsi_write_channel_scratch(unsigned long chan_hdl,
 	gsi_writel(val.data.word3, gsi_ctx->base +
 		GSI_EE_n_GSI_CH_k_SCRATCH_2_OFFS(chan_hdl,
 			gsi_ctx->per.ee));
-	/* below sequence is not atomic. assumption is sequencer specific fields
-	 * will remain unchanged across this sequence
-	 */
-	reg = gsi_readl(gsi_ctx->base +
-		GSI_EE_n_GSI_CH_k_SCRATCH_3_OFFS(chan_hdl,
-			gsi_ctx->per.ee));
-	reg &= 0xFFFF;
-	reg |= (val.data.word4 & 0xFFFF0000);
-	gsi_writel(reg, gsi_ctx->base +
+	gsi_writel(val.data.word4, gsi_ctx->base +
 		GSI_EE_n_GSI_CH_k_SCRATCH_3_OFFS(chan_hdl,
 			gsi_ctx->per.ee));
 }
@@ -1970,6 +1984,35 @@ int gsi_write_channel_scratch(unsigned long chan_hdl,
 	return GSI_STATUS_SUCCESS;
 }
 EXPORT_SYMBOL(gsi_write_channel_scratch);
+
+int gsi_write_channel_scratch3_reg(unsigned long chan_hdl,
+		union __packed gsi_wdi2_channel_scratch3_reg val)
+{
+	struct gsi_chan_ctx *ctx;
+
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return -GSI_STATUS_NODEV;
+	}
+
+	if (chan_hdl >= gsi_ctx->max_ch) {
+		GSIERR("bad params chan_hdl=%lu\n", chan_hdl);
+		return -GSI_STATUS_INVALID_PARAMS;
+	}
+
+	ctx = &gsi_ctx->chan[chan_hdl];
+
+	mutex_lock(&ctx->mlock);
+
+	ctx->scratch.wdi.endp_metadatareg_offset =
+				val.wdi.endp_metadatareg_offset;
+	ctx->scratch.wdi.qmap_id = val.wdi.qmap_id;
+	gsi_writel(val.data.word1, gsi_ctx->base +
+		GSI_EE_n_GSI_CH_k_SCRATCH_3_OFFS(chan_hdl,
+			gsi_ctx->per.ee));
+	mutex_unlock(&ctx->mlock);
+	return GSI_STATUS_SUCCESS;
+}
 
 int gsi_read_channel_scratch(unsigned long chan_hdl,
 	union __packed gsi_channel_scratch * ch_scratch)
@@ -3167,6 +3210,22 @@ free_lock:
 	return res;
 }
 EXPORT_SYMBOL(gsi_halt_channel_ee);
+
+void gsi_wdi3_write_evt_ring_db(unsigned long evt_ring_hdl,
+		uint32_t db_addr_low, uint32_t db_addr_high)
+{
+	if (!gsi_ctx) {
+		pr_err("%s:%d gsi context not allocated\n", __func__, __LINE__);
+		return;
+	}
+
+	gsi_writel(db_addr_low, gsi_ctx->base +
+		GSI_EE_n_EV_CH_k_CNTXT_12_OFFS(evt_ring_hdl, gsi_ctx->per.ee));
+
+	gsi_writel(db_addr_high, gsi_ctx->base +
+		GSI_EE_n_EV_CH_k_CNTXT_13_OFFS(evt_ring_hdl, gsi_ctx->per.ee));
+}
+EXPORT_SYMBOL(gsi_wdi3_write_evt_ring_db);
 
 static int msm_gsi_probe(struct platform_device *pdev)
 {
