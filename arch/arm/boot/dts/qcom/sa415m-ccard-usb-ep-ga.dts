@@ -54,3 +54,7 @@
 	qcom,default-policy-nop;
 	status = "okay";
 };
+
+&pcie0 {
+	qcom,pcie-slv-msb-bit;
+};

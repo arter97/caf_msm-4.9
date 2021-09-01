@@ -88,6 +88,7 @@
 #define PCIE20_PARF_SID_OFFSET		0x234
 #define PCIE20_PARF_BDF_TRANSLATE_CFG	0x24C
 #define PCIE20_PARF_BDF_TRANSLATE_N	0x250
+#define PCIE20_PARF_SLV_ADDR_MSB_CTRL	0x2C0
 #define PCIE20_PARF_DEVICE_TYPE		0x1000
 
 #define PCIE20_ELBI_VERSION		0x00
@@ -575,6 +576,7 @@ struct msm_pcie_dev_t {
 	bool				l1_supported;
 	bool				 l1ss_supported;
 	bool				common_clk_en;
+	bool				pcie_slv_msb_bit;
 	bool				clk_power_manage_en;
 	bool				 aux_clk_sync;
 	bool				aer_enable;
@@ -3845,6 +3847,10 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 	writel_relaxed(dev->slv_addr_space_size, dev->parf +
 		PCIE20_PARF_SLV_ADDR_SPACE_SIZE);
 
+	/* Enable Slave address input MSB bit to Constant 0 */
+	if (dev->pcie_slv_msb_bit)
+		msm_pcie_write_reg(dev->parf, PCIE20_PARF_SLV_ADDR_MSB_CTRL, 0x2);
+
 	if (dev->use_msi) {
 		PCIE_DBG(dev, "RC%d: enable WR halt.\n", dev->rc_idx);
 		val = dev->wr_halt_size ? dev->wr_halt_size :
@@ -5796,6 +5802,13 @@ static int msm_pcie_probe(struct platform_device *pdev)
 	PCIE_DBG(&msm_pcie_dev[rc_idx],
 		"AUX clock frequency is %s 19.2MHz.\n",
 		msm_pcie_dev[rc_idx].use_19p2mhz_aux_clk ? "" : "not");
+
+	msm_pcie_dev[rc_idx].pcie_slv_msb_bit =
+		of_property_read_bool((&pdev->dev)->of_node,
+				"qcom,pcie-slv-msb-bit");
+	PCIE_DBG(&msm_pcie_dev[rc_idx],
+		"PCIe Slave address MSB control bit is %s set\n",
+		msm_pcie_dev[rc_idx].pcie_slv_msb_bit ? "" : "not");
 
 	msm_pcie_dev[rc_idx].smmu_exist =
 		of_property_read_bool((&pdev->dev)->of_node,
