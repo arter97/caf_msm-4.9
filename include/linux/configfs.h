@@ -61,7 +61,7 @@ struct config_item {
 	struct list_head	ci_entry;
 	struct config_item	*ci_parent;
 	struct config_group	*ci_group;
-	struct config_item_type	*ci_type;
+	const struct config_item_type	*ci_type;
 	struct dentry		*ci_dentry;
 };
 
@@ -75,7 +75,7 @@ static inline char *config_item_name(struct config_item * item)
 
 extern void config_item_init_type_name(struct config_item *item,
 				       const char *name,
-				       struct config_item_type *type);
+				       const struct config_item_type *type);
 
 extern struct config_item * config_item_get(struct config_item *);
 extern void config_item_put(struct config_item *);
@@ -103,7 +103,7 @@ struct config_group {
 extern void config_group_init(struct config_group *group);
 extern void config_group_init_type_name(struct config_group *group,
 					const char *name,
-					struct config_item_type *type);
+					const struct config_item_type *type);
 
 static inline struct config_group *to_config_group(struct config_item *item)
 {
@@ -228,7 +228,7 @@ static struct configfs_bin_attribute _pfx##attr_##_name = {	\
 struct configfs_item_operations {
 	void (*release)(struct config_item *);
 	int (*allow_link)(struct config_item *src, struct config_item *target);
-	int (*drop_link)(struct config_item *src, struct config_item *target);
+	void (*drop_link)(struct config_item *src, struct config_item *target);
 };
 
 struct configfs_group_operations {
@@ -263,7 +263,7 @@ void configfs_remove_default_groups(struct config_group *group);
 struct config_group *
 configfs_register_default_group(struct config_group *parent_group,
 				const char *name,
-				struct config_item_type *item_type);
+				const struct config_item_type *item_type);
 void configfs_unregister_default_group(struct config_group *group);
 
 /* These functions can sleep and can alloc with GFP_KERNEL */
