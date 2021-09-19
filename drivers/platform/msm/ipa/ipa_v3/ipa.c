@@ -2042,6 +2042,11 @@ static long ipa3_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		retval = ipa3_resend_wlan_msg();
 		break;
 
+	case IPA_IOC_QUERY_CACHED_DRIVER_MSG:
+		IPADBG("Got IPA_IOC_QUERY_CACHED_DRIVER_MSG\n");
+		retval = ipa3_resend_driver_msg();
+		break;
+
 	case IPA_IOC_GSB_CONNECT:
 		IPADBG("Got IPA_IOC_GSB_CONNECT\n");
 		if (ipa3_send_gsb_msg(arg, IPA_GSB_CONNECT)) {
@@ -5678,6 +5683,10 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	/* store wlan client-connect-msg-list */
 	INIT_LIST_HEAD(&ipa3_ctx->msg_wlan_client_list);
 	mutex_init(&ipa3_ctx->msg_wlan_client_lock);
+
+	/* store  ecm-connect-msg-list */
+	INIT_LIST_HEAD(&ipa3_ctx->msg_lan_list);
+	mutex_init(&ipa3_ctx->msg_lan_lock);
 
 	mutex_init(&ipa3_ctx->lock);
 	mutex_init(&ipa3_ctx->q6_proxy_clk_vote_mutex);

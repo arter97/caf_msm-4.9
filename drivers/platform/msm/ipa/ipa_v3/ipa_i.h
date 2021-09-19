@@ -1573,6 +1573,8 @@ struct ipa3_context {
 	struct mutex msg_lock;
 	struct list_head msg_wlan_client_list;
 	struct mutex msg_wlan_client_lock;
+	struct list_head msg_lan_list;
+	struct mutex msg_lan_lock;
 	wait_queue_head_t msg_waitq;
 	enum ipa_hw_type ipa_hw_type;
 	enum ipa3_hw_mode ipa3_hw_mode;
@@ -2123,6 +2125,7 @@ int ipa3_table_dma_cmd(struct ipa_ioc_nat_dma_cmd *dma);
 int ipa3_nat_dma_cmd(struct ipa_ioc_nat_dma_cmd *dma);
 
 int ipa3_nat_del_cmd(struct ipa_ioc_v4_nat_del *del);
+int ipa3_nat_cleanup_cmd(void);
 int ipa3_del_nat_table(struct ipa_ioc_nat_ipv6ct_table_del *del);
 int ipa3_del_ipv6ct_table(struct ipa_ioc_nat_ipv6ct_table_del *del);
 
@@ -2134,6 +2137,8 @@ int ipa3_nat_mdfy_pdn(struct ipa_ioc_nat_pdn_entry *mdfy_pdn);
 int ipa3_send_msg(struct ipa_msg_meta *meta, void *buff,
 		  ipa_msg_free_fn callback);
 int ipa3_resend_wlan_msg(void);
+int ipa3_resend_lan_msg(void);
+int ipa3_resend_driver_msg(void);
 int ipa3_register_pull_msg(struct ipa_msg_meta *meta, ipa_msg_pull_fn callback);
 int ipa3_deregister_pull_msg(struct ipa_msg_meta *meta);
 

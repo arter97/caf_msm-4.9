@@ -111,6 +111,7 @@
 #define IPA_IOCTL_GET_PHERIPHERAL_EP_INFO       63
 #define IPA_IOCTL_GET_NAT_IN_SRAM_INFO          64
 #define IPA_IOCTL_APP_CLOCK_VOTE                65
+#define IPA_IOCTL_QUERY_CACHED_DRIVER_MSG       66
 
 /**
  * max size of the header to be inserted
@@ -620,7 +621,13 @@ enum ipa_peripheral_event {
 #define WIGIG_FST_SWITCH (WIGIG_CLIENT_CONNECT + 1)
 #define WIGIG_EVENT_MAX (WIGIG_FST_SWITCH + 1)
 
-#define IPA_EVENT_MAX_NUM (WIGIG_EVENT_MAX)
+enum ipa_done_restore_event {
+	IPA_DONE_RESTORE_EVENT = WIGIG_EVENT_MAX,
+	IPA_DONE_RESTORE_EVENT_MAX,
+	#define IPA_DONE_RESTORE_EVENT_MAX IPA_DONE_RESTORE_EVENT_MAX
+};
+
+#define IPA_EVENT_MAX_NUM (IPA_DONE_RESTORE_EVENT_MAX)
 #define IPA_EVENT_MAX ((int)IPA_EVENT_MAX_NUM)
 
 /**
@@ -2325,6 +2332,9 @@ struct ipa_ioc_bridge_vlan_mapping_info {
 #define IPA_IOC_APP_CLOCK_VOTE _IOWR(IPA_IOC_MAGIC, \
 				IPA_IOCTL_APP_CLOCK_VOTE, \
 				uint32_t)
+
+#define IPA_IOC_QUERY_CACHED_DRIVER_MSG _IO(IPA_IOC_MAGIC,\
+				IPA_IOCTL_QUERY_CACHED_DRIVER_MSG)
 
 /*
  * unique magic number of the Tethering bridge ioctls
