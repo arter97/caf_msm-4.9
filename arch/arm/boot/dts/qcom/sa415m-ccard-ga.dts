@@ -35,3 +35,11 @@
 		};
 	};
 };
+
+&ipa_hw {
+	qcom,ipa-wdi2_over_gsi;
+};
+
+&pcie0 {
+	qcom,pcie-slv-msb-bit;
+};
