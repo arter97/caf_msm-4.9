@@ -1218,6 +1218,8 @@ static int dwc3_probe(struct platform_device *pdev)
 	else
 		dwc->sysdev = dwc->dev;
 
+	device_property_read_u32(dev, "num-gsi-eps", &dwc->num_gsi_eps);
+
 	dwc->has_lpm_erratum = device_property_read_bool(dev,
 				"snps,has-lpm-erratum");
 	device_property_read_u8(dev, "snps,lpm-nyet-threshold",
