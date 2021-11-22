@@ -166,6 +166,9 @@
 /**\name    Accel general purpose register 4*/
 #define SMI230_ACCEL_GP_4_REG               UINT8_C(0x27)
 
+/**\name    Orientation result register*/
+#define SMI230_REG_ORIENT_HIGHG_OUT        UINT8_C(0x29)
+
 /**\name    Accel Internal status register */
 #define SMI230_ACCEL_INTERNAL_STAT_REG      UINT8_C(0x2A)
 
@@ -262,6 +265,21 @@
 #define SMI230_ACCEL_INTA_ENABLE            UINT8_C(0x01)
 #define SMI230_ACCEL_INTB_DISABLE           UINT8_C(0x00)
 #define SMI230_ACCEL_INTB_ENABLE            UINT8_C(0x02)
+
+#define SMI230_ACCEL_DATA_SYNC_INT_DISABLE          UINT8_C(0x00)
+#define SMI230_ACCEL_DATA_SYNC_INT_ENABLE           UINT8_C(0x01)
+#define SMI230_ACCEL_ANY_MOT_INT_DISABLE            UINT8_C(0x00)
+#define SMI230_ACCEL_ANY_MOT_INT_ENABLE             UINT8_C(0x02)
+#define SMI230_ACCEL_HIGH_G_INT_DISABLE             UINT8_C(0x00)
+#define SMI230_ACCEL_HIGH_G_INT_ENABLE              UINT8_C(0x04)
+#define SMI230_ACCEL_LOW_G_INT_DISABLE              UINT8_C(0x00)
+#define SMI230_ACCEL_LOW_G_INT_ENABLE               UINT8_C(0x08)
+#define SMI230_ACCEL_ORIENT_INT_DISABLE             UINT8_C(0x00)
+#define SMI230_ACCEL_ORIENT_INT_ENABLE              UINT8_C(0x10)
+#define SMI230_ACCEL_NO_MOT_INT_DISABLE             UINT8_C(0x00)
+#define SMI230_ACCEL_NO_MOT_INT_ENABLE              UINT8_C(0x20)
+#define SMI230_ACCEL_ERR_INT_DISABLE                UINT8_C(0x00)
+#define SMI230_ACCEL_ERR_INT_ENABLE                 UINT8_C(0x80)
 
 /**\name    Accel Soft reset delay */
 #define SMI230_ACCEL_SOFTRESET_DELAY_MS     UINT8_C(1)
@@ -644,6 +662,114 @@
 #define SMI230_SET_HIGH_BYTE  UINT16_C(0xFF00)
 #define SMI230_SET_LOW_NIBBLE UINT8_C(0x0F)
 
+/**\name     Feature start Addresses  */
+#define SMI230_ACCEL_ANYMOTION_ADR                  UINT8_C(0x00)
+#define SMI230_ACCEL_DATA_SYNC_ADR                  UINT8_C(0x02)
+#define SMI230_HIGH_G_START_ADR                     UINT8_C(0x03)
+#define SMI230_LOW_G_START_ADR                      UINT8_C(0x06)
+#define SMI230_ORIENT_START_ADR                     UINT8_C(0x09)
+#define SMI230_NO_MOTION_START_ADR                  UINT8_C(0x0B)
+
+/**\name    Accel Any-motion Macros  */
+#define SMI230_ACCEL_ANYMOTION_LEN                  UINT8_C(0x02)
+#define SMI230_ACCEL_ANYMOTION_THRESHOLD_MASK       UINT16_C(0x07FF)
+#define SMI230_ACCEL_ANYMOTION_THRESHOLD_SHIFT      UINT8_C(0x00)
+#define SMI230_ACCEL_ANYMOTION_NOMOTION_SEL_MASK    UINT16_C(0x0800)
+#define SMI230_ACCEL_ANYMOTION_NOMOTION_SEL_SHIFT   UINT8_C(0x0B)
+#define SMI230_ACCEL_ANYMOTION_DURATION_MASK        UINT16_C(0x1FFF)
+#define SMI230_ACCEL_ANYMOTION_DURATION_SHIFT       UINT8_C(0x00)
+#define SMI230_ACCEL_ANYMOTION_X_EN_MASK            UINT16_C(0x2000)
+#define SMI230_ACCEL_ANYMOTION_X_EN_SHIFT           UINT8_C(0x0D)
+#define SMI230_ACCEL_ANYMOTION_Y_EN_MASK            UINT16_C(0x4000)
+#define SMI230_ACCEL_ANYMOTION_Y_EN_SHIFT           UINT8_C(0x0E)
+#define SMI230_ACCEL_ANYMOTION_Z_EN_MASK            UINT16_C(0x8000)
+#define SMI230_ACCEL_ANYMOTION_Z_EN_SHIFT           UINT8_C(0x0F)
+
+/**\name     Mask definitions for high-g feature configuration */
+#define SMI230_HIGH_G_THRES_MASK                    UINT16_C(0x7FFF)
+#define SMI230_HIGH_G_HYST_MASK                     UINT16_C(0x0FFF)
+#define SMI230_HIGH_G_X_SEL_MASK                    UINT16_C(0x1000)
+#define SMI230_HIGH_G_Y_SEL_MASK                    UINT16_C(0x2000)
+#define SMI230_HIGH_G_Z_SEL_MASK                    UINT16_C(0x4000)
+#define SMI230_HIGH_G_ENABLE_MASK                   UINT16_C(0x8000)
+#define SMI230_HIGH_G_DUR_MASK                      UINT16_C(0x0FFF)
+#define SMI230_HIGH_G_OUT_CONF_MASK                 UINT16_C(0xF000)
+
+/**\name    Bit position definitions for high-g feature configuration */
+#define SMI230_HIGH_G_THRES_POS                     UINT8_C(0x00)
+#define SMI230_HIGH_G_HYST_POS                      UINT8_C(0x00)
+#define SMI230_HIGH_G_OUT_CONF_POS                  UINT8_C(0x0C)
+#define SMI230_HIGH_G_X_SEL_POS                     UINT8_C(0x0C)
+#define SMI230_HIGH_G_Y_SEL_POS                     UINT8_C(0x0D)
+#define SMI230_HIGH_G_Z_SEL_POS                     UINT8_C(0x0E)
+#define SMI230_HIGH_G_ENABLE_POS                    UINT8_C(0x0F)
+#define SMI230_HIGH_G_DUR_POS                       UINT8_C(0x00)
+#define SMI230_HIGH_G_AXIS_X_POS                    UINT8_C(0x03)
+#define SMI230_HIGH_G_AXIS_Y_POS                    UINT8_C(0x04)
+#define SMI230_HIGH_G_AXIS_Z_POS                    UINT8_C(0x05)
+#define SMI230_HIGH_G_AXIS_DIRECTION_POS            UINT8_C(0x06)
+
+#define SMI230_HIGH_G_AXIS_X_MASK                   UINT8_C(0x08)
+#define SMI230_HIGH_G_AXIS_Y_MASK                   UINT8_C(0x10)
+#define SMI230_HIGH_G_AXIS_Z_MASK                   UINT8_C(0x20)
+#define SMI230_HIGH_G_AXIS_DIRECTION_MASK           UINT8_C(0x80)
+
+/**\name     Mask definitions for low-g feature configuration */
+#define SMI230_LOW_G_THRES_MASK                     UINT16_C(0x7FFF)
+#define SMI230_LOW_G_HYST_MASK                      UINT16_C(0x0FFF)
+#define SMI230_LOW_G_DUR_MASK                       UINT16_C(0x0FFF)
+#define SMI230_LOW_G_ENABLE_MASK                    UINT16_C(0x1000)
+
+/**\name    Bit position definitions for low-g feature configuration */
+#define SMI230_LOW_G_THRES_POS                      UINT16_C(0x00)
+#define SMI230_LOW_G_HYST_POS                       UINT16_C(0x00)
+#define SMI230_LOW_G_DUR_POS                        UINT16_C(0x00)
+#define SMI230_LOW_G_ENABLE_POS                     UINT16_C(0x0C)
+
+/**\name    Mask definitions for orientation feature configuration */
+#define SMI230_ORIENT_ENABLE_MASK                   UINT16_C(0x0001)
+#define SMI230_ORIENT_UP_DOWN_MASK                  UINT16_C(0x0002)
+#define SMI230_ORIENT_SYMM_MODE_MASK                UINT16_C(0x000C)
+#define SMI230_ORIENT_BLOCK_MODE_MASK               UINT16_C(0x0030)
+#define SMI230_ORIENT_THETA_MASK                    UINT16_C(0x0FC0)
+#define SMI230_ORIENT_HYST_MASK                     UINT16_C(0x07FF)
+#define SMI230_ORIENT_PORTRAIT_LANDSCAPE_MASK       UINT8_C(0x03)
+#define SMI230_ORIENT_FACEUP_DOWN_MASK              UINT8_C(0x04)
+
+/**\name    Bit position definitions for orientation feature configuration */
+#define SMI230_ORIENT_ENABLE_POS                    UINT8_C(0x00)
+#define SMI230_ORIENT_UP_DOWN_POS                   UINT8_C(0x01)
+#define SMI230_ORIENT_SYMM_MODE_POS                 UINT8_C(0x02)
+#define SMI230_ORIENT_BLOCK_MODE_POS                UINT8_C(0x04)
+#define SMI230_ORIENT_THETA_POS                     UINT8_C(0x06)
+#define SMI230_ORIENT_HYST_POS                      UINT8_C(0x00)
+#define SMI230_ORIENT_PORTRAIT_LANDSCAPE_POS        UINT8_C(0x00)
+#define SMI230_ORIENT_FACEUP_DOWN_POS               UINT8_C(0x02)
+
+/**\name    Macros for orientation feature output */
+#define SMI230_ORIENT_PORTRAIT_UPRIGHT              UINT8_C(0x00)
+#define SMI230_ORIENT_LANDSCAPE_LEFT                UINT8_C(0x01)
+#define SMI230_ORIENT_PORTRAIT_UPSIDE_DOWN          UINT8_C(0x02)
+#define SMI230_ORIENT_LANDSCAPE_RIGHT               UINT8_C(0x03)
+#define SMI230_ORIENT_FACE_UP                       UINT8_C(0x00)
+#define SMI230_ORIENT_FACE_DOWN                     UINT8_C(0x01)
+
+/**\name    Mask definitions for no-motion feature configuration */
+#define SMI230_NO_MOTION_THRESHOLD_MASK             UINT16_C(0x07FF)
+#define SMI230_NO_MOTION_SEL_MASK                   UINT16_C(0x0800)
+#define SMI230_NO_MOTION_DURATION_MASK              UINT16_C(0x1FFF)
+#define SMI230_NO_MOTION_X_EN_MASK                  UINT16_C(0x2000)
+#define SMI230_NO_MOTION_Y_EN_MASK                  UINT16_C(0x4000)
+#define SMI230_NO_MOTION_Z_EN_MASK                  UINT16_C(0x8000)
+
+/**\name    Bit position definitions for no-motion feature configuration */
+#define SMI230_NO_MOTION_THRESHOLD_POS              UINT8_C(0)
+#define SMI230_NO_MOTION_SEL_POS                    UINT8_C(11)
+#define SMI230_NO_MOTION_DURATION_POS               UINT8_C(0)
+#define SMI230_NO_MOTION_X_EN_POS                   UINT8_C(13)
+#define SMI230_NO_MOTION_Y_EN_POS                   UINT8_C(14)
+#define SMI230_NO_MOTION_Z_EN_POS                   UINT8_C(15)
+
 /**\name Macro to SET and GET BITS of a register */
 #define SMI230_SET_BITS(reg_var, bitname, val) \
     ((reg_var & ~(bitname##_MASK)) | \
@@ -760,21 +886,6 @@ struct smi230_err_reg
     uint8_t err_code;
 };
 
-#define SMI230_ACCEL_ANYMOTION_ADR                0x00
-#define SMI230_ACCEL_ANYMOTION_LEN                2
-#define SMI230_ACCEL_ANYMOTION_THRESHOLD_MASK     0x07FF
-#define SMI230_ACCEL_ANYMOTION_THRESHOLD_SHIFT    0
-#define SMI230_ACCEL_ANYMOTION_NOMOTION_SEL_MASK  0x0800
-#define SMI230_ACCEL_ANYMOTION_NOMOTION_SEL_SHIFT 11
-#define SMI230_ACCEL_ANYMOTION_DURATION_MASK      0x1FFF
-#define SMI230_ACCEL_ANYMOTION_DURATION_SHIFT     0
-#define SMI230_ACCEL_ANYMOTION_X_EN_MASK          0x2000
-#define SMI230_ACCEL_ANYMOTION_X_EN_SHIFT         13
-#define SMI230_ACCEL_ANYMOTION_Y_EN_MASK          0x4000
-#define SMI230_ACCEL_ANYMOTION_Y_EN_SHIFT         14
-#define SMI230_ACCEL_ANYMOTION_Z_EN_MASK          0x8000
-#define SMI230_ACCEL_ANYMOTION_Z_EN_SHIFT         15
-
 /*!
  *  @brief Anymotion config structure
  */
@@ -783,8 +894,8 @@ struct smi230_anymotion_cfg
     /* 11 bit threshold of anymotion detection (threshold = X mg * 2,048 (5.11 format)) */
     uint16_t threshold;
 
-    /* 1 bit select between any- and nomotion behavior */
-    uint16_t nomotion_sel;
+    /* 1 bit enable anymotion */
+    uint16_t enable;
 
     /* 13 bit set the duration for any- and nomotion (time = duration * 20ms (@50Hz)) */
     uint16_t duration;
@@ -799,7 +910,6 @@ struct smi230_anymotion_cfg
     uint16_t z_en;
 };
 
-#define SMI230_ACCEL_DATA_SYNC_ADR         0x02
 #define SMI230_ACCEL_DATA_SYNC_LEN         1
 #define SMI230_ACCEL_DATA_SYNC_MODE_MASK   0x0003
 #define SMI230_ACCEL_DATA_SYNC_MODE_SHIFT  0
@@ -816,6 +926,114 @@ struct smi230_data_sync_cfg
 {
     /*! Mode (0 = off, 1 = 400Hz, 2 = 1kHz, 3 = 2kHz) */
     uint8_t mode;
+};
+
+struct smi230_high_g_cfg
+{
+    /*!  Acceleration threshold */
+    uint16_t threshold;
+
+    /*!  Hysteresis */
+    uint16_t hysteresis;
+
+    /*! To select per x-axis */
+    uint16_t select_x;
+
+    /*! To select per y-axis */
+    uint16_t select_y;
+
+    /*! To select per z-axis */
+    uint16_t select_z;
+
+    /*! high-g enable */
+    uint16_t enable;
+
+    /*!  Duration interval */
+    uint16_t duration;
+};
+
+/*! @name Structure to define low-g configuration */
+struct smi230_low_g_cfg
+{
+    /*! Acceleration threshold */
+    uint16_t threshold;
+
+    /*! Hysteresis */
+    uint16_t hysteresis;
+
+    /*! Duration interval */
+    uint16_t duration;
+
+    /*! low-g enable */
+    uint16_t enable;
+
+};
+
+struct smi230_high_g_out
+{
+    /*! High G detected on x-axis */
+    uint8_t x;
+
+    /*! High G detected on y-axis */
+    uint8_t y;
+
+    /*! High G detected on z-axis */
+    uint8_t z;
+
+    /*! Axis direction on which High G detected */
+    uint8_t direction;
+};
+
+struct smi230_orient_cfg
+{
+    /*!  Upside/down detection */
+    uint16_t ud_en;
+
+    /*!  Symmetrical, high or low Symmetrical */
+    uint16_t mode;
+
+    /*!  Blocking mode */
+    uint16_t blocking;
+
+    /*!  Threshold angle */
+    uint16_t theta;
+
+    /*!  Acceleration hysteresis for orientation detection */
+    uint16_t hysteresis;
+
+    /*! Orientation feature enable */
+    uint16_t enable;
+};
+
+struct smi230_orient_out
+{
+    /*! Orientation portrait landscape */
+    uint8_t portrait_landscape;
+
+    /*! Orientation face-up down  */
+    uint8_t faceup_down;
+};
+
+struct smi230_no_motion_cfg
+{
+    /*! Duration in 50Hz samples(20msec) */
+    uint16_t duration;
+
+    /*! Acceleration slope threshold */
+    uint16_t threshold;
+
+    /*! To select per x-axis */
+    uint16_t select_x;
+
+    /*! To select per y-axis */
+    uint16_t select_y;
+
+    /*! To select per z-axis */
+    uint16_t select_z;
+
+    /*! Enable no-motion feature */
+    uint16_t enable;
+
 };
 
 /*!
@@ -845,21 +1063,27 @@ enum smi230_gyro_int_channel {
  */
 enum smi230_accel_int_types {
     SMI230_ACCEL_DATA_RDY_INT,
-
     /* Accel data ready interrupt */
     SMI230_ACCEL_SYNC_DATA_RDY_INT,
-
     /* Accel synchronized data ready interrupt */
     SMI230_ACCEL_SYNC_INPUT,
-
-    /* Accel anymotion interrupt for SMI230*/
-    SMI230_ACCEL_ANYMOTION_INT,
-
     /* Accel FIFO watermark interrupt */
-    SMI230_FIFO_WM_INT,
-
+    SMI230_ACCEL_FIFO_WM_INT,
     /* Accel FIFO full interrupt */
-    SMI230_FIFO_FULL_INT
+    SMI230_ACCEL_FIFO_FULL_INT,
+    //SMI230_ACCEL_INT_FIFO_FULL,
+    /* Accel anymotion interrupt*/
+    SMI230_ACCEL_ANYMOTION_INT,
+    /* Accel high-g interrupt */
+    SMI230_ACCEL_HIGH_G_INT,
+    /* Accel low-g interrupt */
+    SMI230_ACCEL_LOW_G_INT,
+    /* Accel orient interrupt */
+    SMI230_ACCEL_ORIENT_INT,
+    /* Accel no-motion interrupt */
+    SMI230_ACCEL_NO_MOTION_INT,
+    /* Accel Error interrupt */
+    SMI230_ACCEL_ERROR_INT
 };
 
 /*!

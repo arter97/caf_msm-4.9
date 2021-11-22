@@ -87,6 +87,36 @@ choice
 	depends on SMI230_ACC_FIFO
 endchoice
 
+config SMI230_ACC_ANYMOTION
+	bool "SMI230 ACC anymotion"
+	depends on SMI230_ACC_DRIVER
+	help
+	 enable ACC ANYMOTION feature.
+
+config SMI230_ACC_HIGH_G
+	bool "SMI230 ACC high-g feature"
+	depends on SMI230_ACC_DRIVER
+	help
+	 enable ACC high-g feature.
+
+config SMI230_ACC_LOW_G
+	bool "SMI230 ACC low-g feature"
+	depends on SMI230_ACC_DRIVER
+	help
+	 enable ACC low-g feature.
+
+config SMI230_ACC_ORIENTATION
+	bool "SMI230 ACC orientation"
+	depends on SMI230_ACC_DRIVER
+	help
+	 enable ACC orientation feature.
+
+config SMI230_ACC_NO_MOTION
+	bool "SMI230 ACC no motion"
+	depends on SMI230_ACC_DRIVER
+	help
+	 enable ACC no-motion feature.
+
 config SMI230_GYRO_FIFO
 	bool "SMI230 gyroscope FIFO enable"
 	depends on !SMI230_DATA_SYNC && SMI230_GYRO_DRIVER

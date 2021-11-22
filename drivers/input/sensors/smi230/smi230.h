@@ -78,6 +78,16 @@ extern "C" {
 int8_t smi230_acc_init(struct smi230_dev *dev);
 
 /*!
+ *  @brief This API uploads the smi230 config file onto the device.
+ *
+ *  @param[in,out] dev  : Structure instance of smi230_dev.
+ *
+ *  @return Result of API execution status
+ *  @retval zero -> Success / -ve value -> Error
+ */
+int8_t smi230_apply_config_file(struct smi230_dev *dev);
+
+/*!
  *  @brief This API is used to write the binary configuration in the sensor
  *
  *  @param[in] dev : Structure instance of smi230_dev.
@@ -694,6 +704,47 @@ int8_t smi230_gyro_set_fifo_wm(uint8_t wm, const struct smi230_dev *dev);
  */
 int8_t smi230_gyro_set_fifo_config(struct gyro_fifo_config *config, const struct smi230_dev *dev);
 
+/*!
+ * @brief This API gets the output values of high_g: Axis and Direction
+ */
+int8_t smi230_get_high_g_output(struct smi230_high_g_out *high_g_out, struct smi230_dev *dev);
+
+/*!
+ * @brief This API sets high-g configurations like threshold,
+ * hysteresis, duration, and output configuration.
+ */
+int8_t smi230_set_high_g_config(const struct smi230_high_g_cfg *config, struct smi230_dev *dev);
+
+/*!
+ * @brief This API sets low-g configurations like threshold,
+ * hysteresis, duration, and output configuration.
+ */
+int8_t smi230_set_low_g_config(const struct smi230_low_g_cfg *config, struct smi230_dev *dev);
+
+/*!
+ * @brief This API gets the output values of orientation: portrait-
+ * landscape and face up-down.
+ */
+int8_t smi230_get_orient_output(struct smi230_orient_out *orient_out, struct smi230_dev *dev);
+
+/*!
+ * @brief This internal API sets no-motion configurations like axes select,
+ * duration, threshold and output-configuration.
+ */
+int8_t smi230_set_no_motion_config(const struct smi230_no_motion_cfg *config, struct smi230_dev *dev);
+
+/*!
+ * @brief This API sets orientation configurations like upside/down
+ * detection, symmetrical modes, blocking mode, theta and hysteresis
+ *
+ */
+int8_t smi230_set_orient_config(const struct smi230_orient_cfg *config, struct smi230_dev *dev);
+
+/*!
+ *  @brief This API is used to enable/disable and configure the anymotion
+ *  feature.
+ */
+int8_t smi230_configure_anymotion(struct smi230_anymotion_cfg *anymotion_cfg, struct smi230_dev *dev);
 #ifdef __cplusplus
 }
 #endif

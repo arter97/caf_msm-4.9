@@ -82,16 +82,6 @@ extern "C" {
 int8_t smi230_init(struct smi230_dev *dev);
 
 /*!
- *  @brief This API uploads the smi230 config file onto the device.
- *
- *  @param[in,out] dev  : Structure instance of smi230_dev.
- *
- *  @return Result of API execution status
- *  @retval zero -> Success / -ve value -> Error
- */
-int8_t smi230_apply_config_file(struct smi230_dev *dev);
-
-/*!
  *  @brief This API is used to enable/disable the data synchronization
  *  feature.
  *
@@ -102,18 +92,6 @@ int8_t smi230_apply_config_file(struct smi230_dev *dev);
  *  @retval zero -> Success / -ve value -> Error
  */
 int8_t smi230_configure_data_synchronization(struct smi230_data_sync_cfg sync_cfg, struct smi230_dev *dev);
-
-/*!
- *  @brief This API is used to enable/disable and configure the anymotion
- *  feature.
- *
- *  @param[in] anymotion_cfg : configure anymotion feature
- *  @param[in] dev : Structure instance of smi230_dev.
- *
- *  @return Result of API execution status
- *  @retval zero -> Success / -ve value -> Error
- */
-int8_t smi230_configure_anymotion(struct smi230_anymotion_cfg anymotion_cfg, const struct smi230_dev *dev);
 
 /*!
  *  @brief This API reads the synchronized accel & gyro data from the sensor,

@@ -52,6 +52,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/timekeeping.h>
 
 #include "smi230_driver.h"
 #include "smi230_data_sync.h"
@@ -79,6 +80,7 @@ struct smi230_client_data {
 	int IRQ;
 	uint8_t gpio_pin;
 	struct work_struct irq_work;
+	uint64_t timestamp;
 };
 
 static struct smi230_dev *p_smi230_dev;
@@ -594,6 +596,7 @@ static int smi230_input_init(struct smi230_client_data *client_data)
 
 	input_set_capability(dev, EV_MSC, MSC_RAW);
 	input_set_capability(dev, EV_MSC, MSC_GESTURE);
+	input_set_capability(dev, EV_MSC, MSC_TIMESTAMP);
 	input_set_abs_params(dev, ABS_X, SMI230_MIN_VALUE, SMI230_MAX_VALUE, 0, 0);
 	input_set_abs_params(dev, ABS_Y, SMI230_MIN_VALUE, SMI230_MAX_VALUE, 0, 0);
 	input_set_abs_params(dev, ABS_Z, SMI230_MIN_VALUE, SMI230_MAX_VALUE, 0, 0);
@@ -634,6 +637,67 @@ static void smi230_data_sync_ready_handle(
 }
 #endif
 
+#ifdef CONFIG_SMI230_ACC_ORIENTATION
+static void smi230_orientation_handle(
+	struct smi230_client_data *client_data)
+{
+	struct smi230_orient_out orient_out;
+	int err = 0;
+
+	err = smi230_get_orient_output(&orient_out, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("get orient output error!");
+		return;
+	}
+	PINFO("orientation detected portrait %u, faceup %u.",
+		orient_out.portrait_landscape,
+		orient_out.faceup_down);
+}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_NO_MOTION
+static void smi230_no_motion_handle(
+	struct smi230_client_data *client_data)
+{
+	PINFO("no motion detected");
+}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_ANYMOTION
+static void smi230_anymotion_handle(
+	struct smi230_client_data *client_data)
+{
+	PINFO("anymotion int detected");
+}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_HIGH_G
+static void smi230_high_g_handle(
+	struct smi230_client_data *client_data)
+{
+	struct smi230_high_g_out high_g_out;
+	int err = 0;
+
+	err = smi230_get_high_g_output(&high_g_out, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("get high-g output error!");
+		return;
+	}
+	PINFO("high-g detected x %u, y %u, z %u.",
+		high_g_out.x,
+		high_g_out.y,
+		high_g_out.z);
+}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_LOW_G
+static void smi230_low_g_handle(
+	struct smi230_client_data *client_data)
+{
+	PINFO("low-g detected.");
+}
+#endif
+
 #ifdef CONFIG_SMI230_ACC_FIFO
 static struct smi230_sensor_data fifo_accel_data[SMI230_MAX_ACC_FIFO_FRAME];
 
@@ -650,10 +714,6 @@ static void smi230_acc_fifo_handle(
 		return;
 	}
 
-#ifdef CONFIG_SMI230_DEBUG
-	PINFO("ACC FIFO length %d", fifo.length);
-#endif
-
 	fifo.data = fifo_buf;
 	err = smi230_acc_read_fifo_data(&fifo, p_smi230_dev);
 	if (err != SMI230_OK) {
@@ -661,7 +721,8 @@ static void smi230_acc_fifo_handle(
 		return;
 	}
 
-#ifdef CONFIG_SMI230_DEBUG
+#if 0
+	PINFO("ACC FIFO length %d", fifo.length);
 	PINFO("====================");
 	PINFO("ACC FIFO data %d", fifo.data[0]);
 	PINFO("ACC FIFO data %d", fifo.data[1]);
@@ -704,11 +765,14 @@ static void smi230_new_data_ready_handle(
 {
 	struct smi230_sensor_data accel_data;
 	int err = 0;
+	struct timespec ts;
+	ts = ns_to_timespec(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
 		return;
-
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
 	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.x);
 	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.y);
 	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.z);
@@ -721,6 +785,14 @@ static void smi230_irq_work_func(struct work_struct *work)
 {
 	struct smi230_client_data *client_data =
 		container_of(work, struct smi230_client_data, irq_work);
+	int err = 0;
+	uint8_t int_stat;
+
+	err = smi230_acc_get_regs(SMI230_ACCEL_INT_STAT_0_REG, &int_stat, 1, p_smi230_dev);
+	if (err) {
+		PERR("read int status error");
+		return;
+	}
 
 #ifdef CONFIG_SMI230_ACC_FIFO
 	smi230_acc_fifo_handle(client_data);
@@ -731,12 +803,39 @@ static void smi230_irq_work_func(struct work_struct *work)
 #ifdef CONFIG_SMI230_DATA_SYNC
 	smi230_data_sync_ready_handle(client_data);
 #endif
+
+#ifdef CONFIG_SMI230_ACC_ANYMOTION
+	if ((int_stat & SMI230_ACCEL_ANY_MOT_INT_ENABLE) != 0)
+		smi230_anymotion_handle(client_data);
+#endif
+
+#ifdef CONFIG_SMI230_ACC_ORIENTATION
+	if ((int_stat & SMI230_ACCEL_ORIENT_INT_ENABLE) != 0)
+		smi230_orientation_handle(client_data);
+#endif
+
+#ifdef CONFIG_SMI230_ACC_NO_MOTION
+	if ((int_stat & SMI230_ACCEL_NO_MOT_INT_ENABLE) != 0)
+		smi230_no_motion_handle(client_data);
+#endif
+
+#ifdef CONFIG_SMI230_ACC_HIGH_G
+	if ((int_stat & SMI230_ACCEL_HIGH_G_INT_ENABLE) != 0)
+		smi230_high_g_handle(client_data);
+#endif
+
+#ifdef CONFIG_SMI230_ACC_LOW_G
+	if ((int_stat & SMI230_ACCEL_LOW_G_INT_ENABLE) != 0)
+		smi230_low_g_handle(client_data);
+#endif
 }
 
 static irqreturn_t smi230_irq_handle(int irq, void *handle)
 {
 	struct smi230_client_data *client_data = handle;
 	int err = 0;
+
+	client_data->timestamp= ktime_get_ns();
 
 	err = schedule_work(&client_data->irq_work);
 	if (err < 0)
@@ -818,6 +917,21 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 #ifdef CONFIG_SMI230_ACC_FIFO
 	struct accel_fifo_config fifo_config;
 #endif
+#ifdef CONFIG_SMI230_ACC_ANYMOTION
+	struct smi230_anymotion_cfg anymotion_cfg;
+#endif
+#ifdef CONFIG_SMI230_ACC_ORIENTATION
+	struct smi230_orient_cfg orientation_cfg;
+#endif
+#ifdef CONFIG_SMI230_ACC_NO_MOTION
+	struct smi230_no_motion_cfg no_motion_cfg;
+#endif
+#ifdef CONFIG_SMI230_ACC_HIGH_G
+	struct smi230_high_g_cfg high_g_cfg;
+#endif
+#ifdef CONFIG_SMI230_ACC_LOW_G
+	struct smi230_low_g_cfg low_g_cfg;
+#endif
 	struct smi230_int_cfg int_config;
 
 	if (dev == NULL || smi230_dev == NULL)
@@ -879,14 +993,14 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
 #ifdef CONFIG_SMI230_ACC_FIFO_WM
 	PINFO("ACC FIFO watermark is enabled");
-	int_config.accel_int_config_1.int_type = SMI230_FIFO_WM_INT;
-	int_config.accel_int_config_2.int_type = SMI230_FIFO_WM_INT;
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_FIFO_WM_INT;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_FIFO_WM_INT;
 
-	err |= smi230_acc_set_fifo_wm(91, p_smi230_dev);
+	err |= smi230_acc_set_fifo_wm(100, p_smi230_dev);
 #endif
 #ifdef CONFIG_SMI230_ACC_FIFO_FULL
 	PINFO("ACC FIFO full is enabled");
-	int_config.accel_int_config_2.int_type = SMI230_FIFO_FULL_INT;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_FIFO_FULL_INT;
 #endif
 
 	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
@@ -934,8 +1048,10 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 
 #endif
 
-#ifdef CONFIG_SMI230_DATA_SYNC
-	PINFO("DATA sync is enabled");
+#if defined(CONFIG_SMI230_DATA_SYNC) || defined(CONFIG_SMI230_ACC_HIGH_G) ||\
+	defined(CONFIG_SMI230_ACC_ANYMOTION) || defined(CONFIG_SMI230_ACC_LOW_G) ||\
+	defined(CONFIG_SMI230_ACC_NO_MOTION) || defined(CONFIG_SMI230_ACC_ORIENTATION)
+	PINFO("sensor features enabled");
 	/* API uploads the smi230 config file onto the device and wait for 150ms 
 	   to enable the data synchronization - delay taken care inside the function */
 	err |= smi230_apply_config_file(p_smi230_dev);
@@ -946,7 +1062,9 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 		PERR("Configuration file transfer error!");
 		goto exit_free_client_data;
 	}
+#endif
 
+#ifdef CONFIG_SMI230_DATA_SYNC
 	/*! Mode (0 = off, 1 = 400Hz, 2 = 1kHz, 3 = 2kHz) */
 	sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_2000HZ;
 	err |= smi230_configure_data_synchronization(sync_cfg, p_smi230_dev);
@@ -997,6 +1115,115 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 		goto exit_free_client_data;
 	}
 #endif
+#endif
+
+#ifdef CONFIG_SMI230_ACC_ORIENTATION
+	orientation_cfg.ud_en = 1;
+	orientation_cfg.mode = 0;
+	orientation_cfg.blocking = 0x3;
+	orientation_cfg.theta = 0x28;
+	orientation_cfg.hysteresis = 0x80;
+	orientation_cfg.enable = 1;
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
+	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
+	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_ORIENT_INT;
+
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("set orientation interrupt failed");
+		goto exit_free_client_data;
+	}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_NO_MOTION
+	no_motion_cfg.threshold = 0xAA;
+	no_motion_cfg.enable = 0x1;
+	no_motion_cfg.duration = 0x5;
+	no_motion_cfg.select_x = 0x1;
+	no_motion_cfg.select_y = 0x1;
+	no_motion_cfg.select_z = 0x1;
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
+	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
+	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_NO_MOTION_INT;
+
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("set orientation interrupt failed");
+		goto exit_free_client_data;
+	}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_ANYMOTION
+	anymotion_cfg.threshold = 0xAA;
+	anymotion_cfg.enable = 0x1;
+	anymotion_cfg.duration = 0x5;
+	anymotion_cfg.x_en = 0x1;
+	anymotion_cfg.y_en = 0x1;
+	anymotion_cfg.z_en = 0x1;
+
+	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+
+	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
+	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
+	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_ANYMOTION_INT;
+
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("set anymotion interrupt failed");
+		goto exit_free_client_data;
+	}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_HIGH_G
+	high_g_cfg.threshold = 0xC00;
+	high_g_cfg.hysteresis = 0x3E8;
+	high_g_cfg.select_x = 0x1;
+	high_g_cfg.select_y = 0x1;
+	high_g_cfg.select_z = 0x1;
+	high_g_cfg.enable = 0x1;
+	high_g_cfg.duration = 0x4;
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
+	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
+	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_HIGH_G_INT;
+
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("set high-g interrupt failed");
+		goto exit_free_client_data;
+	}
+#endif
+
+#ifdef CONFIG_SMI230_ACC_LOW_G
+	low_g_cfg.threshold = 0x200;
+	low_g_cfg.hysteresis = 0x100;
+	low_g_cfg.enable = 0x1;
+	low_g_cfg.duration = 0x0;
+
+	smi230_set_low_g_config(&low_g_cfg, p_smi230_dev);
+
+	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
+	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
+	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_LOW_G_INT;
+
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("set high-g interrupt failed");
+		goto exit_free_client_data;
+	}
 #endif
 
 	/*acc input device init */

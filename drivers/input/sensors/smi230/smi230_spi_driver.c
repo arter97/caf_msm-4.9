@@ -55,6 +55,7 @@
 
 #define SMI230_SPI_MAX_BUFFER_SIZE      32
 
+static uint8_t *read_buf = NULL;
 static struct spi_device *smi230_acc_device;
 static struct spi_device *smi230_gyro_device;
 
@@ -93,6 +94,7 @@ static int8_t smi230_spi_read(uint8_t dev_addr,
 #ifdef CONFIG_SMI230_DEBUG
 	int ret;
 #endif
+	uint16_t index;
 	struct spi_message msg;
 	struct spi_transfer xfer[2] = {
 		[0] = {
@@ -100,7 +102,7 @@ static int8_t smi230_spi_read(uint8_t dev_addr,
 			.len = 1,
 		},
 		[1] = {
-			.rx_buf = data,
+			.rx_buf = read_buf,
 			.len = len,
 		}
 	};
@@ -110,6 +112,7 @@ static int8_t smi230_spi_read(uint8_t dev_addr,
 	spi_message_add_tail(&xfer[1], &msg);
 #ifdef CONFIG_SMI230_DEBUG
 	/* PINFO("read xfer reg %x len %d\t", reg_addr - 0x80, len); */
+#endif
 
 	if (dev_addr == SMI230_ACCEL_CHIP_ID) {
 		ret = spi_sync(smi230_acc_device, &msg);
@@ -117,13 +120,13 @@ static int8_t smi230_spi_read(uint8_t dev_addr,
 	else {
 		ret = spi_sync(smi230_gyro_device, &msg);
 	}
+
+	for (index = 0; index < len; index++)
+	{
+		data[index] = read_buf[index];
+	}
+
 	return ret;
-#else
-	if (dev_addr == SMI230_ACCEL_CHIP_ID)
-		return spi_sync(smi230_acc_device, &msg);
-	else
-		return spi_sync(smi230_gyro_device, &msg);
-#endif
 }
 
 /* ACC driver */
@@ -139,6 +142,11 @@ static int smi230_acc_spi_probe(struct spi_device *device)
 		return err;
 	}
 
+	if (read_buf == NULL)
+		read_buf = kmalloc(CONFIG_SMI230_MAX_BUFFER_LEN + 1, GFP_KERNEL);
+        if (!read_buf) {
+            return SMI230_E_NULL_PTR;
+        }
 
 	/* chip_id is used to differentiate acc/gyro on spi read/write */
 	smi230_spi_dev.accel_id = SMI230_ACCEL_CHIP_ID;
@@ -149,6 +157,8 @@ static int smi230_acc_spi_probe(struct spi_device *device)
         if (err == SMI230_OK)
 		PINFO("Bosch Sensor Device %s initialized", SENSOR_ACC_NAME);
 	else {
+		kfree(read_buf);
+		read_buf = NULL;
 		smi230_acc_device = NULL;
 		PERR("Bosch Sensor Device %s initialization failed, error %d",
 				SENSOR_ACC_NAME, err);
@@ -165,6 +175,10 @@ static int smi230_acc_spi_probe(struct spi_device *device)
 
 static int smi230_acc_spi_remove(struct spi_device *device)
 {
+	if (read_buf != NULL) {
+		kfree(read_buf);
+		read_buf = NULL;
+	}
 	return smi230_acc_remove(&device->dev);
 }
 
@@ -205,6 +219,12 @@ static int smi230_gyro_spi_probe(struct spi_device *device)
 		return err;
 	}
 
+	if (read_buf == NULL)
+		read_buf = kmalloc(CONFIG_SMI230_MAX_BUFFER_LEN + 1, GFP_KERNEL);
+        if (!read_buf) {
+            return SMI230_E_NULL_PTR;
+        }
+
 	/* chip_id is used to differentiate acc/gyro on spi read/write */
 	smi230_spi_dev.gyro_id = SMI230_GYRO_CHIP_ID;
 
@@ -214,6 +234,8 @@ static int smi230_gyro_spi_probe(struct spi_device *device)
         if (err == SMI230_OK)
 		PINFO("Bosch Sensor Device %s initialized", SENSOR_GYRO_NAME);
 	else {
+		kfree(read_buf);
+		read_buf = NULL;
 		smi230_gyro_device = NULL;
 		PERR("Bosch Sensor Device %s initialization failed, error %d",
 			       SENSOR_GYRO_NAME, err);
@@ -226,6 +248,10 @@ static int smi230_gyro_spi_probe(struct spi_device *device)
 
 static int smi230_gyro_spi_remove(struct spi_device *device)
 {
+	if (read_buf != NULL) {
+		kfree(read_buf);
+		read_buf = NULL;
+	}
 	return smi230_gyro_remove(&device->dev);
 }
 
