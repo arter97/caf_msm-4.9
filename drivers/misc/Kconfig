@@ -843,6 +843,14 @@ config QPNP_MISC
 	  and the driver provides an API to check if this interrupt
 	  is available on the current PMIC chip.
 
+config TZ_NAND_PROBE
+	tristate "Probe TZ NAND driver"
+	default n
+	help
+	  Provides a communication interface using Secure Channel
+	  Manager (SCM) interface to reinitialize Qualcomm Technologies, Inc.
+	  NAND controller in TZ
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

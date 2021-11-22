@@ -347,6 +347,7 @@ struct qseecom_continue_blocked_request_ireq {
 #define TZ_SVC_EXTERNAL                  3     /* External image loading */
 #define TZ_SVC_RPMB                      4     /* RPMB */
 #define TZ_SVC_KEYSTORE                  5     /* Keystore management */
+#define TZ_SVC_NAND                      7     /* NAND */
 #define TZ_SVC_ES                        16    /* Enterprise Security */
 #define TZ_SVC_MDTP                      18    /* Mobile Device Theft */
 
@@ -587,6 +588,13 @@ struct qseecom_continue_blocked_request_ireq {
 
 #define TZ_OS_RPMB_CHECK_PROV_STATUS_ID_PARAM_ID \
 	TZ_SYSCALL_CREATE_PARAM_ID_0
+
+#define TZ_OS_NAND_PROBE_STATUS_ID \
+	TZ_SYSCALL_CREATE_SMC_ID(TZ_OWNER_QSEE_OS, TZ_SVC_NAND, 0x01)
+
+#define TZ_OS_NAND_PROBE_STATUS_ID_PARAM_ID \
+	TZ_SYSCALL_CREATE_PARAM_ID_2( \
+	TZ_SYSCALL_PARAM_TYPE_BUF_RW, TZ_SYSCALL_PARAM_TYPE_VAL )
 
 #define TZ_OS_KS_GEN_KEY_ID \
 	TZ_SYSCALL_CREATE_SMC_ID(TZ_OWNER_QSEE_OS, TZ_SVC_KEYSTORE, 0x01)
