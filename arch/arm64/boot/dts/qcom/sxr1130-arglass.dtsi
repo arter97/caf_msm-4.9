@@ -549,3 +549,6 @@
 	};
 };
 
+&usb0 {
+	qcom,num-gsi-evt-buffs = <0x0>;
+};

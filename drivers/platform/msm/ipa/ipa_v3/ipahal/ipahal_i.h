@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -655,7 +655,7 @@ struct ipa_hw_hdr_proc_ctx_tlv {
  */
 struct ipa_hw_hdr_proc_ctx_hdr_add {
 	struct ipa_hw_hdr_proc_ctx_tlv tlv;
-	u32 hdr_addr;
+	u64 hdr_addr;
 };
 
 /**

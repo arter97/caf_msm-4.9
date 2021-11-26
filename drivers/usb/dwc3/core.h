@@ -973,6 +973,7 @@ struct dwc3_scratchpad_array {
  * @create_reg_debugfs: create debugfs entry to allow dwc3 register dump
  * @xhci_imod_value: imod value to use with xhci
  * @core_id: usb core id to differentiate different controller
+ * @num_gsi_eps: number of GSI based hardware accelerated endpoints
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -1175,6 +1176,7 @@ struct dwc3 {
 	u32			xhci_imod_value;
 	int			core_id;
 	int			retries_on_error;
+	u32			num_gsi_eps;
 };
 
 /* -------------------------------------------------------------------------- */
