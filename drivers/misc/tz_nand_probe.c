@@ -24,9 +24,6 @@
 #define QSEECOM_SCM_EBUSY_WAIT_MS 30
 #define QSEECOM_SCM_EBUSY_MAX_RETRY 67
 
-static dma_addr_t dma_pa;
-static void *dma_va;
-
 static void call_tz_nand_probe(uint32_t smc_id, struct scm_desc *desc)
 {
     int ret = 0;
@@ -47,27 +44,23 @@ static void call_tz_nand_probe(uint32_t smc_id, struct scm_desc *desc)
 
 int _tz_nand_probe(void)
 {
+    int ret = 0;
     struct scm_desc desc = {0};
-    uint32_t dma_pool_size=0x2000, i=0; // FLASH driver needs ~5K+ memory
 
-    dma_va = dma_alloc_coherent(NULL, dma_pool_size, &dma_pa, GFP_KERNEL);
-    desc.arginfo = TZ_OS_NAND_PROBE_STATUS_ID_PARAM_ID;
-    desc.args[0] = (uint32_t)dma_pa;
-    desc.args[1] = (uint32_t)dma_pool_size;
+    desc.arginfo = TZ_NAND_PROBE_STATUS_ID_PARAM_ID;
+    call_tz_nand_probe(TZ_NAND_PROBE_STATUS_ID, &desc);
+    if(desc.ret[0] != 0)
+    {
+        ret = -EIO;
+    }
+    pr_info("return %x\n", (uint32_t)desc.ret[0]);
 
-    pr_info("Inside the init function %x %x \n", (uint32_t)dma_pa, (uint32_t)dma_va, dma_pool_size);
-    memset((void*)dma_va, 0x0, dma_pool_size);
-    call_tz_nand_probe(TZ_OS_NAND_PROBE_STATUS_ID, &desc);
-    pr_info("return %x %x\n", (uint32_t)desc.ret[0], (uint32_t)desc.ret[1]);
-    dma_free_coherent(NULL, dma_pool_size, dma_va, dma_pa);
-
-    pr_info("scm_call_done \n");
-    return 0;
+    return ret;
 }
 
 void _tz_nand_probe_exit(void)
 {
-    printk(KERN_ALERT "Exit kernel device ");
+    printk(KERN_ALERT "Exit NAND PROBE\n");
 }
 module_init(_tz_nand_probe);
 module_exit(_tz_nand_probe_exit);
