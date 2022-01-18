@@ -418,7 +418,7 @@
 				config {
 					pins = "gpio53";
 					drive-strength = <2>;
-					bias-disable;
+					bias-pull-up;
 				};
 			};
 		};
