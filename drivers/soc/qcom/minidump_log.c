@@ -45,9 +45,11 @@ static void __init register_kernel_sections(void)
 {
 	struct md_region ksec_entry;
 	char *data_name = "KDATABSS";
+#ifdef CONFIG_SMP
 	const size_t static_size = __per_cpu_end - __per_cpu_start;
 	void __percpu *base = (void __percpu *)__per_cpu_start;
 	unsigned int cpu;
+#endif
 
 	strlcpy(ksec_entry.name, data_name, sizeof(ksec_entry.name));
 	ksec_entry.virt_addr = (uintptr_t)_sdata;
@@ -55,7 +57,7 @@ static void __init register_kernel_sections(void)
 	ksec_entry.size = roundup((__bss_stop - _sdata), 4);
 	if (msm_minidump_add_region(&ksec_entry) < 0)
 		pr_err("Failed to add data section in Minidump\n");
-
+#ifdef CONFIG_SMP
 	/* Add percpu static sections */
 	for_each_possible_cpu(cpu) {
 		void *start = per_cpu_ptr(base, cpu);
@@ -69,6 +71,7 @@ static void __init register_kernel_sections(void)
 		if (msm_minidump_add_region(&ksec_entry) < 0)
 			pr_err("Failed to add percpu sections in Minidump\n");
 	}
+#endif
 }
 
 void dump_stack_minidump(u64 sp)
