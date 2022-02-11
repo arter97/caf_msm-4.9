@@ -59,6 +59,8 @@ Optional properties:
  - snps,xhci-imod-value: Interrupt moderation interval for host mode
 	(in increments of 250nsec).
  - usb-core-id: Differentiates between different controllers present on a device.
+ - qcom,use-rt-thread: When set, use RT thread instead of bottom half work queue to
+			process dwc3 interrupts
  - snps,bus-suspend-enable: If present then controller supports low power mode
 	during bus suspend.
  - snps,usb3-u1u2-disable: If present, disable U1U2 low power modes in Superspeed mode

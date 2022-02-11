@@ -2425,9 +2425,11 @@ static int dwc3_gadget_stop(struct usb_gadget *g)
 	dwc->gadget_driver = NULL;
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
-	dbg_event(0xFF, "fwq_started", 0);
-	flush_workqueue(dwc->dwc_wq);
-	dbg_event(0xFF, "fwq_completed", 0);
+	if (!dwc->use_rt_thread) {
+		dbg_event(0xFF, "fwq_started", 0);
+		flush_workqueue(dwc->dwc_wq);
+		dbg_event(0xFF, "fwq_completed", 0);
+	}
 
 	return 0;
 }
@@ -3818,8 +3820,12 @@ irqreturn_t dwc3_interrupt(int irq, void *_dwc)
 	dwc->irq_event_count[dwc->irq_dbg_index] = temp_cnt / 4;
 	dwc->irq_dbg_index = (dwc->irq_dbg_index + 1) % MAX_INTR_STATS;
 
-	if (ret == IRQ_WAKE_THREAD)
-		queue_work(dwc->dwc_wq, &dwc->bh_work);
+	if (ret == IRQ_WAKE_THREAD) {
+		if (dwc->use_rt_thread)
+			dwc3_thread_interrupt(dwc->irq, dwc);
+		else
+			queue_work(dwc->dwc_wq, &dwc->bh_work);
+	}
 
 	return IRQ_HANDLED;
 }
