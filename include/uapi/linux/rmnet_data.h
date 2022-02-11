@@ -1,5 +1,7 @@
 /* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
  *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -216,7 +218,13 @@ enum rmnet_netlink_message_types_e {
 	 *       char[] vnd_name - Use as name
 	 * Returns: status code
 	 */
-	RMNET_NETLINK_NEW_VND_WITH_NAME
+	RMNET_NETLINK_NEW_VND_WITH_NAME,
+
+	/* RMNET_NETLINK_GET_ID_FROM_VND - Gets ID from a VND
+	 * Args: char[] dev_name: Null terminated ASCII string, max length: 15
+	 * Returns: uint32_t id
+	 */
+	RMNET_NETLINK_GET_ID_FROM_VND
 };
 #define RMNET_NETLINK_NEW_VND_WITH_NAME RMNET_NETLINK_NEW_VND_WITH_NAME
 

@@ -1,5 +1,7 @@
 /* Copyright (c) 2013-2017, 2019 The Linux Foundation. All rights reserved.
  *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -541,6 +543,38 @@ static void _rmnet_netlink_add_del_vnd_tc_flow
 	}
 }
 
+static void _rmnet_netlink_get_id_from_vnd(struct rmnet_nl_msg_s *rmnet_header,
+					    struct rmnet_nl_msg_s *resp_rmnet)
+{
+	struct net_device *dev;
+	struct rmnet_logical_ep_conf_s *epconfig_l;
+
+	if (!rmnet_header || !resp_rmnet)
+		return;
+
+	resp_rmnet->crd = RMNET_NETLINK_MSG_RETURNCODE;
+
+	dev = dev_get_by_name(&init_net, rmnet_header->vnd.vnd_name);
+	if(!dev) {
+		resp_rmnet->return_code = RMNET_CONFIG_NO_SUCH_DEVICE;
+		return;
+	}
+
+	epconfig_l = rmnet_vnd_get_le_config(dev);
+
+	if(epconfig_l) {
+		/* Begin Data */
+		resp_rmnet->crd = RMNET_NETLINK_MSG_RETURNDATA;
+		resp_rmnet->arg_length = sizeof(((struct rmnet_nl_msg_s *)0)->vnd);
+		resp_rmnet->vnd.id = epconfig_l->mux_id;
+		resp_rmnet->return_code = RMNET_CONFIG_OK;
+	} else {
+		resp_rmnet->return_code = RMNET_CONFIG_NO_SUCH_DEVICE;
+	}
+
+	dev_put(dev);
+}
+
 /* rmnet_config_netlink_msg_handler() - Netlink message handler callback
  * @skb:      Packet containing netlink messages
  *
@@ -682,6 +716,10 @@ void rmnet_config_netlink_msg_handler(struct sk_buff *skb)
 		_rmnet_netlink_add_del_vnd_tc_flow(rmnet_header->message_type,
 						   rmnet_header,
 						   resp_rmnet);
+		break;
+
+	case RMNET_NETLINK_GET_ID_FROM_VND:
+		_rmnet_netlink_get_id_from_vnd(rmnet_header, resp_rmnet);
 		break;
 
 	default:
