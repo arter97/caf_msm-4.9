@@ -845,6 +845,7 @@
 		qcom,ssctl-instance-id = <0x22>;
 		qcom,firmware-name = "modem";
 		memory-region = <&mss_mem>;
+		qcom,minidump-id = <3>;
 		status = "ok";
 
 		/* GPIO inputs from mss */

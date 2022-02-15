@@ -331,6 +331,14 @@
 			};
 		};
 	};
+
+	qcom,msm-imem@1468B000 {
+		dload_type@1c {
+			compatible = "qcom,msm-imem-dload-type";
+			reg = <0x1c 4>;
+		};
+	};
+
 };
 
 &ipa_hw {
