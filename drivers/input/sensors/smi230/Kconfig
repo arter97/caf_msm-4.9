@@ -88,34 +88,34 @@ choice
 endchoice
 
 config SMI230_ACC_ANYMOTION
-	bool "SMI230 ACC anymotion"
+	bool "enable SMI230 ACC anymotion at startup"
 	depends on SMI230_ACC_DRIVER
 	help
-	 enable ACC ANYMOTION feature.
+	 enable ACC ANYMOTION feature by default at startup.
 
 config SMI230_ACC_HIGH_G
-	bool "SMI230 ACC high-g feature"
+	bool "enable SMI230 ACC high-g feature by default at startup"
 	depends on SMI230_ACC_DRIVER
 	help
-	 enable ACC high-g feature.
+	 enable ACC high-g feature at startup.
 
 config SMI230_ACC_LOW_G
-	bool "SMI230 ACC low-g feature"
+	bool "enable SMI230 ACC low-g feature at startup"
 	depends on SMI230_ACC_DRIVER
 	help
-	 enable ACC low-g feature.
+	 enable ACC low-g feature by default at startup.
 
 config SMI230_ACC_ORIENTATION
-	bool "SMI230 ACC orientation"
+	bool "enable SMI230 ACC orientation at startup"
 	depends on SMI230_ACC_DRIVER
 	help
-	 enable ACC orientation feature.
+	 enable ACC orientation feature by default at startup.
 
 config SMI230_ACC_NO_MOTION
-	bool "SMI230 ACC no motion"
+	bool "enable SMI230 ACC no motion at startup"
 	depends on SMI230_ACC_DRIVER
 	help
-	 enable ACC no-motion feature.
+	 enable ACC no-motion feature by default at startup.
 
 config SMI230_GYRO_FIFO
 	bool "SMI230 gyroscope FIFO enable"

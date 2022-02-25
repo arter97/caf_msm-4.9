@@ -84,6 +84,12 @@ struct smi230_client_data {
 };
 
 static struct smi230_dev *p_smi230_dev;
+static struct smi230_anymotion_cfg anymotion_cfg;
+static struct smi230_orient_cfg orientation_cfg;
+static struct smi230_no_motion_cfg no_motion_cfg;
+static struct smi230_high_g_cfg high_g_cfg;
+static struct smi230_low_g_cfg low_g_cfg;
+static struct smi230_int_cfg int_config;
 
 static ssize_t smi230_acc_reg_dump(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -255,6 +261,9 @@ static ssize_t smi230_acc_store_datasync_odr(struct device *dev,
 		break;
 	case 400:
 		sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_400HZ;
+		break;
+	case 0:
+		sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_OFF;
 		break;
 	default:
 		PERR("ODR not supported");
@@ -526,6 +535,791 @@ static ssize_t smi230_acc_store_fifo_reset(struct device *dev,
 	return count;
 }
 
+static ssize_t smi230_acc_anymotion_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		anymotion_cfg.enable = 0x0;
+		PINFO("disable anymotion int");
+		break;
+	case 1:
+		anymotion_cfg.enable = 0x1;
+		PINFO("enable anymotion int");
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	err = smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+	if (err != SMI230_OK) {
+		PERR("set anymotion config failed");
+	}
+
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_ANYMOTION_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_ANYMOTION_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
+	if (err != SMI230_OK) {
+		PERR("set anymotion interrupt failed");
+	}
+
+	return count;
+}
+
+static ssize_t smi230_acc_anymotion_threshold_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, thr;
+
+	err = kstrtoint(buf, 10, &thr);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	anymotion_cfg.threshold = thr;
+
+	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_anymotion_duration_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, duration;
+
+	err = kstrtoint(buf, 10, &duration);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	anymotion_cfg.duration = duration;
+
+	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_anymotion_x_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, x_enable;
+
+	err = kstrtoint(buf, 10, &x_enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(x_enable) {
+	case 0:
+		anymotion_cfg.x_en = 0x0;
+		break;
+	case 1:
+		anymotion_cfg.x_en = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+
+	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_anymotion_y_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, y_enable;
+
+	err = kstrtoint(buf, 10, &y_enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(y_enable) {
+	case 0:
+		anymotion_cfg.y_en = 0x0;
+		break;
+	case 1:
+		anymotion_cfg.y_en = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+
+	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_anymotion_z_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, z_enable;
+
+	err = kstrtoint(buf, 10, &z_enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(z_enable) {
+	case 0:
+		anymotion_cfg.z_en = 0x0;
+		break;
+	case 1:
+		anymotion_cfg.z_en = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+
+	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		high_g_cfg.enable = 0x0;
+		PINFO("disabled high_g int");
+		break;
+	case 1:
+		high_g_cfg.enable = 0x1;
+		PINFO("enabled high_g int");
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_HIGH_G_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_HIGH_G_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
+	if (err != SMI230_OK) {
+		PERR("setting high_g interrupt failed");
+	}
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_threshold_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, thr;
+
+	err = kstrtoint(buf, 10, &thr);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	high_g_cfg.threshold = thr;
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_hysteresis_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, hyst;
+
+	err = kstrtoint(buf, 10, &hyst);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	high_g_cfg.hysteresis = hyst;
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_select_x_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		high_g_cfg.select_x = 0x0;
+		break;
+	case 1:
+		high_g_cfg.select_x = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_select_y_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		high_g_cfg.select_y = 0x0;
+		break;
+	case 1:
+		high_g_cfg.select_y = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_select_z_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		high_g_cfg.select_z = 0x0;
+		break;
+	case 1:
+		high_g_cfg.select_z = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_high_g_duration_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, dur;
+
+	err = kstrtoint(buf, 10, &dur);
+	if (err) {
+		PERR("invalid params");
+		return err;
+	}
+
+	high_g_cfg.duration = dur;
+
+	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_low_g_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		low_g_cfg.enable = 0x0;
+		PINFO("disabled low_g int");
+		break;
+	case 1:
+		low_g_cfg.enable = 0x1;
+		PINFO("enabled low_g int");
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_low_g_config(&low_g_cfg, p_smi230_dev);
+
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_LOW_G_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_LOW_G_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
+	if (err != SMI230_OK) {
+		PERR("set low-g interrupt failed");
+	}
+
+	return count;
+}
+
+static ssize_t smi230_acc_low_g_threshold_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, thr;
+
+	err = kstrtoint(buf, 10, &thr);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	low_g_cfg.threshold = thr;
+
+	smi230_set_low_g_config(&low_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_low_g_hysteresis_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, hyst;
+
+	err = kstrtoint(buf, 10, &hyst);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	low_g_cfg.hysteresis = hyst;
+
+	smi230_set_low_g_config(&low_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_low_g_duration_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, dur;
+
+	err = kstrtoint(buf, 10, &dur);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	low_g_cfg.duration = dur;
+
+	smi230_set_low_g_config(&low_g_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_orientation_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		orientation_cfg.enable = 0x0;
+		PINFO("disabled orientation int");
+		break;
+	case 1:
+		orientation_cfg.enable = 0x1;
+		PINFO("enabled orientation int");
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_ORIENT_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_ORIENT_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
+	if (err != SMI230_OK) {
+		PERR("set orientation interrupt failed");
+	}
+
+	return count;
+}
+
+static ssize_t smi230_acc_orientation_ud_en_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		orientation_cfg.ud_en = 0x0;
+		break;
+	case 1:
+		orientation_cfg.ud_en = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_orientation_mode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, mode;
+
+	err = kstrtoint(buf, 10, &mode);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(mode) {
+	case 0:
+		orientation_cfg.mode = 0x0;
+		break;
+	case 1:
+		orientation_cfg.mode = 0x1;
+		break;
+	case 2:
+		orientation_cfg.mode = 0x2;
+		break;
+	case 3:
+		orientation_cfg.mode = 0x3;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_orientation_blocking_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, mode;
+
+	err = kstrtoint(buf, 10, &mode);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(mode) {
+	case 0:
+		orientation_cfg.blocking = 0x0;
+		break;
+	case 1:
+		orientation_cfg.blocking = 0x1;
+		break;
+	case 2:
+		orientation_cfg.blocking = 0x2;
+		break;
+	case 3:
+		orientation_cfg.blocking = 0x3;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_orientation_theta_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, theta;
+
+	err = kstrtoint(buf, 10, &theta);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	orientation_cfg.theta = theta;
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_orientation_hysteresis_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, hyst;
+
+	err = kstrtoint(buf, 10, &hyst);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	orientation_cfg.hysteresis = hyst;
+
+	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_no_motion_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		no_motion_cfg.enable = 0x0;
+		PINFO("disabled no motion int");
+		break;
+	case 1:
+		no_motion_cfg.enable = 0x1;
+		PINFO("enabled no motion int");
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_NO_MOTION_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
+	int_config.accel_int_config_2.int_type = SMI230_ACCEL_NO_MOTION_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
+	if (err != SMI230_OK) {
+		PERR("set no_motion interrupt failed");
+	}
+
+	return count;
+}
+
+static ssize_t smi230_acc_no_motion_select_x_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		no_motion_cfg.select_x = 0x0;
+		break;
+	case 1:
+		no_motion_cfg.select_x = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_no_motion_select_y_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		no_motion_cfg.select_y = 0x0;
+		break;
+	case 1:
+		no_motion_cfg.select_y = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_no_motion_select_z_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, enable;
+
+	err = kstrtoint(buf, 10, &enable);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	switch(enable) {
+	case 0:
+		no_motion_cfg.select_z = 0x0;
+		break;
+	case 1:
+		no_motion_cfg.select_z = 0x1;
+		break;
+	default:
+		PERR("params not supported");
+		return count;
+	}
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_no_motion_threshold_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, thr;
+
+	err = kstrtoint(buf, 10, &thr);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	no_motion_cfg.threshold = thr;
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+	return count;
+}
+
+static ssize_t smi230_acc_no_motion_duration_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0, dur;
+
+	err = kstrtoint(buf, 10, &dur);
+	if (err) {
+		PERR("ivalid params");
+		return err;
+	}
+
+	no_motion_cfg.duration = dur;
+
+	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
+
+	return count;
+}
+
 static DEVICE_ATTR(regs_dump, S_IRUGO,
 	smi230_acc_reg_dump, NULL);
 static DEVICE_ATTR(chip_id, S_IRUGO,
@@ -556,6 +1350,69 @@ static DEVICE_ATTR(temp, S_IRUGO,
 static DEVICE_ATTR(driver_version, S_IRUGO,
 	smi230_acc_show_driver_version, NULL);
 
+static DEVICE_ATTR(anymotion_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_anymotion_enable_store);
+static DEVICE_ATTR(anymotion_threshold, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_anymotion_threshold_store);
+static DEVICE_ATTR(anymotion_duration, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_anymotion_duration_store);
+static DEVICE_ATTR(anymotion_x_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_anymotion_x_enable_store);
+static DEVICE_ATTR(anymotion_y_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_anymotion_y_enable_store);
+static DEVICE_ATTR(anymotion_z_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_anymotion_z_enable_store);
+
+static DEVICE_ATTR(high_g_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_enable_store);
+static DEVICE_ATTR(high_g_threshold, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_threshold_store);
+static DEVICE_ATTR(high_g_hysteresis, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_hysteresis_store);
+static DEVICE_ATTR(high_g_select_x, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_select_x_store);
+static DEVICE_ATTR(high_g_select_y, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_select_y_store);
+static DEVICE_ATTR(high_g_select_z, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_select_z_store);
+static DEVICE_ATTR(high_g_duration, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_high_g_duration_store);
+
+static DEVICE_ATTR(low_g_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_low_g_enable_store);
+static DEVICE_ATTR(low_g_threshold, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_low_g_threshold_store);
+static DEVICE_ATTR(low_g_hysteresis, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_low_g_hysteresis_store);
+static DEVICE_ATTR(low_g_duration, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_low_g_duration_store);
+
+static DEVICE_ATTR(orientation_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_orientation_enable_store);
+static DEVICE_ATTR(orientation_ud_en, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_orientation_ud_en_store);
+static DEVICE_ATTR(orientation_mode, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_orientation_mode_store);
+static DEVICE_ATTR(orientation_blocking, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_orientation_blocking_store);
+static DEVICE_ATTR(orientation_theta, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_orientation_theta_store);
+static DEVICE_ATTR(orientation_hysteresis, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_orientation_hysteresis_store);
+
+static DEVICE_ATTR(no_motion_enable, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_no_motion_enable_store);
+static DEVICE_ATTR(no_motion_select_x, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_no_motion_select_x_store);
+static DEVICE_ATTR(no_motion_select_y, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_no_motion_select_y_store);
+static DEVICE_ATTR(no_motion_select_z, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_no_motion_select_z_store);
+static DEVICE_ATTR(no_motion_threshold, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_no_motion_threshold_store);
+static DEVICE_ATTR(no_motion_duration, S_IRUGO|S_IWUSR|S_IWGRP,
+	NULL, smi230_acc_no_motion_duration_store);
+
 static struct attribute *smi230_attributes[] = {
 	&dev_attr_regs_dump.attr,
 	&dev_attr_chip_id.attr,
@@ -572,6 +1429,35 @@ static struct attribute *smi230_attributes[] = {
 	&dev_attr_acc_value.attr,
 	&dev_attr_fifo_reset.attr,
 	&dev_attr_temp.attr,
+	&dev_attr_anymotion_enable.attr,
+	&dev_attr_anymotion_threshold.attr,
+	&dev_attr_anymotion_duration.attr,
+	&dev_attr_anymotion_x_enable.attr,
+	&dev_attr_anymotion_y_enable.attr,
+	&dev_attr_anymotion_z_enable.attr,
+	&dev_attr_high_g_enable.attr,
+	&dev_attr_high_g_threshold.attr,
+	&dev_attr_high_g_hysteresis.attr,
+	&dev_attr_high_g_select_x.attr,
+	&dev_attr_high_g_select_y.attr,
+	&dev_attr_high_g_select_z.attr,
+	&dev_attr_high_g_duration.attr,
+	&dev_attr_low_g_enable.attr,
+	&dev_attr_low_g_threshold.attr,
+	&dev_attr_low_g_hysteresis.attr,
+	&dev_attr_low_g_duration.attr,
+	&dev_attr_orientation_enable.attr,
+	&dev_attr_orientation_ud_en.attr,
+	&dev_attr_orientation_mode.attr,
+	&dev_attr_orientation_blocking.attr,
+	&dev_attr_orientation_theta.attr,
+	&dev_attr_orientation_hysteresis.attr,
+	&dev_attr_no_motion_enable.attr,
+	&dev_attr_no_motion_select_x.attr,
+	&dev_attr_no_motion_select_y.attr,
+	&dev_attr_no_motion_select_z.attr,
+	&dev_attr_no_motion_threshold.attr,
+	&dev_attr_no_motion_duration.attr,
 	&dev_attr_driver_version.attr,
 	NULL
 };
@@ -637,66 +1523,146 @@ static void smi230_data_sync_ready_handle(
 }
 #endif
 
-#ifdef CONFIG_SMI230_ACC_ORIENTATION
 static void smi230_orientation_handle(
 	struct smi230_client_data *client_data)
 {
 	struct smi230_orient_out orient_out;
+	struct smi230_sensor_data accel_data;
 	int err = 0;
+	struct timespec ts;
+	ts = ns_to_timespec(client_data->timestamp);
+
+	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
+	if (err != SMI230_OK)
+		return;
 
 	err = smi230_get_orient_output(&orient_out, p_smi230_dev);
 	if (err != SMI230_OK) {
 		PERR("get orient output error!");
 		return;
 	}
+
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, orient_out.portrait_landscape + 1);
+
+	input_sync(client_data->input);
+
+
 	PINFO("orientation detected portrait %u, faceup %u.",
 		orient_out.portrait_landscape,
 		orient_out.faceup_down);
 }
-#endif
 
-#ifdef CONFIG_SMI230_ACC_NO_MOTION
 static void smi230_no_motion_handle(
 	struct smi230_client_data *client_data)
 {
+	struct smi230_sensor_data accel_data;
+	int err = 0;
+	struct timespec ts;
+	ts = ns_to_timespec(client_data->timestamp);
+
+	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
+	if (err != SMI230_OK)
+		return;
+
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)no_motion_cfg.threshold);
+
+	input_sync(client_data->input);
+
 	PINFO("no motion detected");
 }
-#endif
 
-#ifdef CONFIG_SMI230_ACC_ANYMOTION
 static void smi230_anymotion_handle(
 	struct smi230_client_data *client_data)
 {
+	struct smi230_sensor_data accel_data;
+	int err = 0;
+	struct timespec ts;
+	ts = ns_to_timespec(client_data->timestamp);
+
+	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
+	if (err != SMI230_OK)
+		return;
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)anymotion_cfg.threshold);
+
+	input_sync(client_data->input);
+
+
+
 	PINFO("anymotion int detected");
 }
-#endif
 
-#ifdef CONFIG_SMI230_ACC_HIGH_G
 static void smi230_high_g_handle(
 	struct smi230_client_data *client_data)
 {
 	struct smi230_high_g_out high_g_out;
+	struct smi230_sensor_data accel_data;
 	int err = 0;
+	struct timespec ts;
+	ts = ns_to_timespec(client_data->timestamp);
+
+	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
+	if (err != SMI230_OK)
+		return;
 
 	err = smi230_get_high_g_output(&high_g_out, p_smi230_dev);
 	if (err != SMI230_OK) {
 		PERR("get high-g output error!");
 		return;
 	}
+
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)(high_g_out.x | high_g_out.y | high_g_out.z));
+
+	input_sync(client_data->input);
+
 	PINFO("high-g detected x %u, y %u, z %u.",
 		high_g_out.x,
 		high_g_out.y,
 		high_g_out.z);
 }
-#endif
 
-#ifdef CONFIG_SMI230_ACC_LOW_G
 static void smi230_low_g_handle(
 	struct smi230_client_data *client_data)
 {
+	struct smi230_sensor_data accel_data;
+	int err = 0;
+	struct timespec ts;
+	ts = ns_to_timespec(client_data->timestamp);
+
+	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
+	if (err != SMI230_OK)
+		return;
+
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)low_g_cfg.threshold);
+
+	input_sync(client_data->input);
+
 	PINFO("low-g detected.");
 }
-#endif
 
 #ifdef CONFIG_SMI230_ACC_FIFO
 static struct smi230_sensor_data fifo_accel_data[SMI230_MAX_ACC_FIFO_FRAME];
@@ -804,30 +1770,20 @@ static void smi230_irq_work_func(struct work_struct *work)
 	smi230_data_sync_ready_handle(client_data);
 #endif
 
-#ifdef CONFIG_SMI230_ACC_ANYMOTION
 	if ((int_stat & SMI230_ACCEL_ANY_MOT_INT_ENABLE) != 0)
 		smi230_anymotion_handle(client_data);
-#endif
 
-#ifdef CONFIG_SMI230_ACC_ORIENTATION
 	if ((int_stat & SMI230_ACCEL_ORIENT_INT_ENABLE) != 0)
 		smi230_orientation_handle(client_data);
-#endif
 
-#ifdef CONFIG_SMI230_ACC_NO_MOTION
 	if ((int_stat & SMI230_ACCEL_NO_MOT_INT_ENABLE) != 0)
 		smi230_no_motion_handle(client_data);
-#endif
 
-#ifdef CONFIG_SMI230_ACC_HIGH_G
 	if ((int_stat & SMI230_ACCEL_HIGH_G_INT_ENABLE) != 0)
 		smi230_high_g_handle(client_data);
-#endif
 
-#ifdef CONFIG_SMI230_ACC_LOW_G
 	if ((int_stat & SMI230_ACCEL_LOW_G_INT_ENABLE) != 0)
 		smi230_low_g_handle(client_data);
-#endif
 }
 
 static irqreturn_t smi230_irq_handle(int irq, void *handle)
@@ -917,22 +1873,6 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 #ifdef CONFIG_SMI230_ACC_FIFO
 	struct accel_fifo_config fifo_config;
 #endif
-#ifdef CONFIG_SMI230_ACC_ANYMOTION
-	struct smi230_anymotion_cfg anymotion_cfg;
-#endif
-#ifdef CONFIG_SMI230_ACC_ORIENTATION
-	struct smi230_orient_cfg orientation_cfg;
-#endif
-#ifdef CONFIG_SMI230_ACC_NO_MOTION
-	struct smi230_no_motion_cfg no_motion_cfg;
-#endif
-#ifdef CONFIG_SMI230_ACC_HIGH_G
-	struct smi230_high_g_cfg high_g_cfg;
-#endif
-#ifdef CONFIG_SMI230_ACC_LOW_G
-	struct smi230_low_g_cfg low_g_cfg;
-#endif
-	struct smi230_int_cfg int_config;
 
 	if (dev == NULL || smi230_dev == NULL)
 		return -EINVAL;
@@ -1048,9 +1988,6 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 
 #endif
 
-#if defined(CONFIG_SMI230_DATA_SYNC) || defined(CONFIG_SMI230_ACC_HIGH_G) ||\
-	defined(CONFIG_SMI230_ACC_ANYMOTION) || defined(CONFIG_SMI230_ACC_LOW_G) ||\
-	defined(CONFIG_SMI230_ACC_NO_MOTION) || defined(CONFIG_SMI230_ACC_ORIENTATION)
 	PINFO("sensor features enabled");
 	/* API uploads the smi230 config file onto the device and wait for 150ms 
 	   to enable the data synchronization - delay taken care inside the function */
@@ -1062,7 +1999,6 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 		PERR("Configuration file transfer error!");
 		goto exit_free_client_data;
 	}
-#endif
 
 #ifdef CONFIG_SMI230_DATA_SYNC
 	/*! Mode (0 = off, 1 = 400Hz, 2 = 1kHz, 3 = 2kHz) */
@@ -1117,109 +2053,129 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 #endif
 #endif
 
-#ifdef CONFIG_SMI230_ACC_ORIENTATION
 	orientation_cfg.ud_en = 1;
 	orientation_cfg.mode = 0;
 	orientation_cfg.blocking = 0x3;
 	orientation_cfg.theta = 0x28;
 	orientation_cfg.hysteresis = 0x80;
-	orientation_cfg.enable = 1;
+	orientation_cfg.enable = 0;
 
+#ifdef CONFIG_SMI230_ACC_ORIENTATION
+	orientation_cfg.enable = 1;
 	smi230_set_orient_config(&orientation_cfg, p_smi230_dev);
 
-	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
-	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
-	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_ORIENT_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
 	int_config.accel_int_config_2.int_type = SMI230_ACCEL_ORIENT_INT;
-
 	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
 	if (err != SMI230_OK) {
 		PERR("set orientation interrupt failed");
 		goto exit_free_client_data;
 	}
 #endif
 
-#ifdef CONFIG_SMI230_ACC_NO_MOTION
 	no_motion_cfg.threshold = 0xAA;
-	no_motion_cfg.enable = 0x1;
+	no_motion_cfg.enable = 0x0;
 	no_motion_cfg.duration = 0x5;
 	no_motion_cfg.select_x = 0x1;
 	no_motion_cfg.select_y = 0x1;
 	no_motion_cfg.select_z = 0x1;
 
+#ifdef CONFIG_SMI230_ACC_NO_MOTION
+	no_motion_cfg.enable = 0x1;
 	smi230_set_no_motion_config(&no_motion_cfg, p_smi230_dev);
 
-	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
-	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
-	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_NO_MOTION_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
 	int_config.accel_int_config_2.int_type = SMI230_ACCEL_NO_MOTION_INT;
-
 	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
 	if (err != SMI230_OK) {
 		PERR("set orientation interrupt failed");
 		goto exit_free_client_data;
 	}
 #endif
 
-#ifdef CONFIG_SMI230_ACC_ANYMOTION
 	anymotion_cfg.threshold = 0xAA;
-	anymotion_cfg.enable = 0x1;
+	anymotion_cfg.enable = 0x0;
 	anymotion_cfg.duration = 0x5;
 	anymotion_cfg.x_en = 0x1;
-	anymotion_cfg.y_en = 0x1;
-	anymotion_cfg.z_en = 0x1;
+	anymotion_cfg.y_en = 0x0;
+	anymotion_cfg.z_en = 0x0;
 
+#ifdef CONFIG_SMI230_ACC_ANYMOTION
+	anymotion_cfg.enable = 0x1;
 	smi230_configure_anymotion(&anymotion_cfg, p_smi230_dev);
 
-	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
-	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
-	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_ANYMOTION_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
 	int_config.accel_int_config_2.int_type = SMI230_ACCEL_ANYMOTION_INT;
-
 	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
 	if (err != SMI230_OK) {
 		PERR("set anymotion interrupt failed");
 		goto exit_free_client_data;
 	}
 #endif
 
-#ifdef CONFIG_SMI230_ACC_HIGH_G
 	high_g_cfg.threshold = 0xC00;
 	high_g_cfg.hysteresis = 0x3E8;
 	high_g_cfg.select_x = 0x1;
 	high_g_cfg.select_y = 0x1;
 	high_g_cfg.select_z = 0x1;
-	high_g_cfg.enable = 0x1;
+	high_g_cfg.enable = 0x0;
 	high_g_cfg.duration = 0x4;
 
+#ifdef CONFIG_SMI230_ACC_HIGH_G
+	high_g_cfg.enable = 0x1;
 	smi230_set_high_g_config(&high_g_cfg, p_smi230_dev);
 
-	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
-	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
-	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_HIGH_G_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
 	int_config.accel_int_config_2.int_type = SMI230_ACCEL_HIGH_G_INT;
-
 	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
 	if (err != SMI230_OK) {
 		PERR("set high-g interrupt failed");
 		goto exit_free_client_data;
 	}
 #endif
 
-#ifdef CONFIG_SMI230_ACC_LOW_G
 	low_g_cfg.threshold = 0x200;
 	low_g_cfg.hysteresis = 0x100;
-	low_g_cfg.enable = 0x1;
+	low_g_cfg.enable = 0x0;
 	low_g_cfg.duration = 0x0;
 
+#ifdef CONFIG_SMI230_ACC_LOW_G
+	low_g_cfg.enable = 0x1;
 	smi230_set_low_g_config(&low_g_cfg, p_smi230_dev);
 
-	int_config.accel_int_config_2.int_channel = SMI230_INT_CHANNEL_2;
-	int_config.accel_int_config_2.int_pin_cfg.output_mode = SMI230_INT_MODE_PUSH_PULL;
-	int_config.accel_int_config_2.int_pin_cfg.lvl = SMI230_INT_ACTIVE_HIGH;
+#ifdef CONFIG_SMI230_ACC_INT1
+	int_config.accel_int_config_1.int_type = SMI230_ACCEL_LOW_G_INT;
+	err |= smi230_acc_set_int_config(&int_config.accel_int_config_1, p_smi230_dev);
+#endif
+#ifdef CONFIG_SMI230_ACC_INT2
 	int_config.accel_int_config_2.int_type = SMI230_ACCEL_LOW_G_INT;
-
 	err |= smi230_acc_set_int_config(&int_config.accel_int_config_2, p_smi230_dev);
+#endif
+
 	if (err != SMI230_OK) {
 		PERR("set high-g interrupt failed");
 		goto exit_free_client_data;
