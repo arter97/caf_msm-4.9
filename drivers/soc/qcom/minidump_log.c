@@ -19,6 +19,7 @@
 #include <linux/thread_info.h>
 #include <soc/qcom/minidump.h>
 #include <asm/sections.h>
+#include <linux/mm.h>
 
 static void __init register_log_buf(void)
 {
