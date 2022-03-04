@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -141,7 +142,7 @@ struct msm_ipc_router_xprt_info {
 	u32 hello_sent;
 	struct list_head pkt_list;
 	struct wakeup_source ws;
-	struct mutex rx_lock_lhb2; /* lock for xprt rx operations */
+	spinlock_t rx_lock_lhb2; /* lock for xprt rx operations */
 	struct mutex tx_lock_lhb2; /* lock for xprt tx operations */
 	u32 need_len;
 	u32 abort_data_read;
@@ -555,20 +556,21 @@ void ipc_router_release_rtentry(struct kref *ref)
 struct rr_packet *rr_read(struct msm_ipc_router_xprt_info *xprt_info)
 {
 	struct rr_packet *temp_pkt;
+	unsigned long flags;
 
 	if (!xprt_info)
 		return NULL;
 
-	mutex_lock(&xprt_info->rx_lock_lhb2);
+	spin_lock_irqsave(&xprt_info->rx_lock_lhb2, flags);
 	if (xprt_info->abort_data_read) {
-		mutex_unlock(&xprt_info->rx_lock_lhb2);
+		spin_unlock_irqrestore(&xprt_info->rx_lock_lhb2, flags);
 		IPC_RTR_ERR("%s detected SSR & exiting now\n",
 			    xprt_info->xprt->name);
 		return NULL;
 	}
 
 	if (list_empty(&xprt_info->pkt_list)) {
-		mutex_unlock(&xprt_info->rx_lock_lhb2);
+		spin_unlock_irqrestore(&xprt_info->rx_lock_lhb2, flags);
 		return NULL;
 	}
 
@@ -577,7 +579,7 @@ struct rr_packet *rr_read(struct msm_ipc_router_xprt_info *xprt_info)
 	list_del(&temp_pkt->list);
 	if (list_empty(&xprt_info->pkt_list))
 		__pm_relax(&xprt_info->ws);
-	mutex_unlock(&xprt_info->rx_lock_lhb2);
+	spin_unlock_irqrestore(&xprt_info->rx_lock_lhb2, flags);
 	return temp_pkt;
 }
 
@@ -4146,7 +4148,7 @@ static int msm_ipc_router_add_xprt(struct msm_ipc_router_xprt *xprt)
 	xprt_info->hello_sent = 0;
 	xprt_info->remote_node_id = -1;
 	INIT_LIST_HEAD(&xprt_info->pkt_list);
-	mutex_init(&xprt_info->rx_lock_lhb2);
+	spin_lock_init(&xprt_info->rx_lock_lhb2);
 	mutex_init(&xprt_info->tx_lock_lhb2);
 	wakeup_source_init(&xprt_info->ws, xprt->name);
 	xprt_info->need_len = 0;
@@ -4200,25 +4202,26 @@ static void msm_ipc_router_remove_xprt(struct msm_ipc_router_xprt *xprt)
 {
 	struct msm_ipc_router_xprt_info *xprt_info;
 	struct rr_packet *temp_pkt, *pkt;
+	unsigned long flags;
 
 	if (xprt && xprt->priv) {
 		xprt_info = xprt->priv;
 
 		IPC_RTR_INFO(xprt_info->log_ctx, "Removing xprt: [%s]\n",
 			     xprt->name);
-		mutex_lock(&xprt_info->rx_lock_lhb2);
+		spin_lock_irqsave(&xprt_info->rx_lock_lhb2, flags);
 		xprt_info->abort_data_read = 1;
-		mutex_unlock(&xprt_info->rx_lock_lhb2);
+		spin_unlock_irqrestore(&xprt_info->rx_lock_lhb2, flags);
 		kthread_flush_worker(&xprt_info->kworker);
 		kthread_stop(xprt_info->task);
 		xprt_info->task = NULL;
-		mutex_lock(&xprt_info->rx_lock_lhb2);
+		spin_lock_irqsave(&xprt_info->rx_lock_lhb2, flags);
 		list_for_each_entry_safe(pkt, temp_pkt,
 					 &xprt_info->pkt_list, list) {
 			list_del(&pkt->list);
 			release_pkt(pkt);
 		}
-		mutex_unlock(&xprt_info->rx_lock_lhb2);
+		spin_unlock_irqrestore(&xprt_info->rx_lock_lhb2, flags);
 
 		down_write(&xprt_info_list_lock_lha5);
 		list_del(&xprt_info->list);
@@ -4268,6 +4271,7 @@ void msm_ipc_router_xprt_notify(struct msm_ipc_router_xprt *xprt,
 	struct msm_ipc_router_xprt_work *xprt_work;
 	struct msm_ipc_router_remote_port *rport_ptr = NULL;
 	struct rr_packet *pkt;
+	unsigned long flags;
 	int ret;
 
 	ret = ipc_router_core_init();
@@ -4339,7 +4343,7 @@ void msm_ipc_router_xprt_notify(struct msm_ipc_router_xprt *xprt,
 		rport_ptr = ipc_router_get_rport_ref(pkt->hdr.src_node_id,
 						     pkt->hdr.src_port_id);
 
-	mutex_lock(&xprt_info->rx_lock_lhb2);
+	spin_lock_irqsave(&xprt_info->rx_lock_lhb2, flags);
 	list_add_tail(&pkt->list, &xprt_info->pkt_list);
 	/* check every pkt is from SENSOR services or not and
 	 * avoid holding both edge and port specific wake-up sources
@@ -4355,7 +4359,7 @@ void msm_ipc_router_xprt_notify(struct msm_ipc_router_xprt *xprt,
 			}
 		}
 	}
-	mutex_unlock(&xprt_info->rx_lock_lhb2);
+	spin_unlock_irqrestore(&xprt_info->rx_lock_lhb2, flags);
 	if (rport_ptr)
 		kref_put(&rport_ptr->ref, ipc_router_release_rport);
 	kthread_queue_work(&xprt_info->kworker, &xprt_info->read_data);
