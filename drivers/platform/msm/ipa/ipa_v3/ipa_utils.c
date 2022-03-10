@@ -1955,7 +1955,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			QMB_MASTER_SELECT_DDR,
 			{ 16, 5, 9, 9, IPA_EE_Q6, GSI_USE_PREFETCH_BUFS } },
 	[IPA_4_0_AUTO_MHI][IPA_CLIENT_USB_DPL_CONS]        = {
-			false, IPA_v4_0_MHI_GROUP_DDR,
+			true, IPA_v4_0_MHI_GROUP_DDR,
 			false,
 			IPA_DPS_HPS_SEQ_TYPE_INVALID,
 			QMB_MASTER_SELECT_DDR,
