@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, 2022 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -278,12 +278,17 @@ int cam_mem_mgr_cache_ops(struct cam_mem_cache_ops_cmd *cmd)
 	if (idx >= CAM_MEM_BUFQ_MAX || idx <= 0)
 		return -EINVAL;
 
-	mutex_lock(&tbl.bufq[idx].q_lock);
+	mutex_lock(&tbl.m_lock);
 
-	if (!tbl.bufq[idx].active) {
-		rc = -EINVAL;
-		goto fail;
+	if (!test_bit(idx, tbl.bitmap)) {
+		CAM_ERR(CAM_MEM, "Buffer at idx=%d is already unmapped,",
+			idx);
+		mutex_unlock(&tbl.m_lock);
+		return -EINVAL;
 	}
+
+	mutex_lock(&tbl.bufq[idx].q_lock);
+	mutex_unlock(&tbl.m_lock);
 
 	if (cmd->buf_handle != tbl.bufq[idx].buf_handle) {
 		rc = -EINVAL;
@@ -618,7 +623,7 @@ int cam_mem_mgr_alloc_and_map(struct cam_mem_mgr_alloc_cmd *cmd)
 		tbl.bufq[idx].vaddr = 0;
 
 	tbl.bufq[idx].i_hdl = ion_hdl;
-	tbl.bufq[idx].len = cmd->len;
+	tbl.bufq[idx].len = len;
 	tbl.bufq[idx].num_hdl = cmd->num_hdl;
 	memcpy(tbl.bufq[idx].hdls, cmd->mmu_hdls,
 		sizeof(int32_t) * cmd->num_hdl);

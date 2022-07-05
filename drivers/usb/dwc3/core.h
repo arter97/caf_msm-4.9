@@ -958,6 +958,7 @@ struct dwc3_scratchpad_array {
  * @in_lpm: indicates if controller is in low power mode (no clocks)
  * @tx_fifo_size: Available RAM size for TX fifo allocation
  * @irq: irq number
+ * @use_rt_thread: if true, use RT thread to process irqs instead of work queue
  * @bh: tasklet which handles the interrupt
  * @irq_cnt: total irq count
  * @bh_completion_time: time taken for taklet completion
@@ -1154,6 +1155,7 @@ struct dwc3 {
 
 	/* IRQ timing statistics */
 	int			irq;
+	bool			use_rt_thread;
 	unsigned long		ep_cmd_timeout_cnt;
 	unsigned long		irq_cnt;
 	unsigned int		bh_completion_time[MAX_INTR_STATS];

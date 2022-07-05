@@ -48,6 +48,9 @@
 /* Max CSI Rx irq error count threshold value */
 #define CAM_IFE_CSID_MAX_IRQ_ERROR_COUNT               100
 
+/* factor to conver qtime to boottime */
+static int64_t qtime_to_boottime;
+
 static int cam_ife_csid_is_ipp_format_supported(
 	uint32_t in_format)
 {
@@ -2087,9 +2090,20 @@ static int cam_ife_csid_get_time_stamp(
 		CAM_IFE_CSID_QTIMER_MUL_FACTOR,
 		CAM_IFE_CSID_QTIMER_DIV_FACTOR);
 
+	/* use a universal qtime-2-boottime offset for all cameras
+	 * this enables uniform timestamp comparision between cameras
+	 */
+	if (qtime_to_boottime == 0) {
+		get_monotonic_boottime64(&ts);
+		qtime_to_boottime =
+			(int64_t)((ts.tv_sec * 1000000000) + ts.tv_nsec) -
+			(int64_t)time_stamp->time_stamp_val;
+		CAM_DBG(CAM_ISP, "qtime_to_boottime:%lld", qtime_to_boottime);
+	}
+
 	get_monotonic_boottime64(&ts);
-	time_stamp->boot_timestamp = (uint64_t)((ts.tv_sec * 1000000000) +
-		ts.tv_nsec);
+	time_stamp->boot_timestamp = time_stamp->time_stamp_val +
+		qtime_to_boottime;
 
 	return 0;
 }
