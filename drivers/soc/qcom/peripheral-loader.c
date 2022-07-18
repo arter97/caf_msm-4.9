@@ -291,11 +291,13 @@ int pil_do_ramdump(struct pil_desc *desc,
 
 		if ((desc->minidump_ss->md_ss_smem_regions_baseptr != 0) &&
 			(desc->minidump_ss->md_ss_toc_init == true) &&
-			(desc->minidump_ss->md_ss_enable_status ==
-				MD_SS_ENABLED)) {
-			if (encryption_status == MD_SS_ENCR_DONE ||
-				encryption_status == MD_SS_ENCR_NOTREQ) {
-				pr_info("Minidump : Dumping for %s\n",
+		    ((desc->minidump_ss->md_ss_enable_status ==
+		      MD_SS_ENABLED) ||
+		     (desc->minidump_ss->md_ss_enable_status ==
+				       MD_SS_NON_SECURE_DUMP_ENBL))) {
+			if (desc->minidump_ss->encryption_status ==
+			    MD_SS_ENCR_DONE) {
+				pr_debug("Dumping Minidump for %s\n",
 					desc->name);
 				return pil_do_minidump(desc, minidump_dev);
 			}

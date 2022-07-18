@@ -33,6 +33,7 @@
 #define MD_SS_ENCR_START	('S' << 24 | 'T' << 16 | 'R' << 8 | 'T' << 0)
 #define MD_SS_ENABLED		('E' << 24 | 'N' << 16 | 'B' << 8 | 'L' << 0)
 #define MD_SS_DISABLED		('D' << 24 | 'S' << 16 | 'B' << 8 | 'L' << 0)
+#define MD_SS_NON_SECURE_DUMP_ENBL ('N' << 24 | 'S' << 16 | 'E' << 8 | 'N' << 0)
 
 /**
  * md_ss_region - Minidump region
