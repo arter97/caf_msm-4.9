@@ -1,4 +1,5 @@
 /* Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -28,4 +29,17 @@
 	compatible = "qcom,sdm845-mtp", "qcom,sdm845", "qcom,mtp";
 	qcom,msm-id = <321 0x20000>;
 	qcom,board-id = <8 0>;
+};
+
+&dsi_nt35597_truly_dsc_cmd_display {
+	/delete-property/ qcom,dsi-display-active;
+};
+
+&sde_dp {
+	qcom,display-type = "primary";
+};
+
+&mdss_mdp {
+	qcom,sde-mixer-display-pref = "none", "none", "none",
+			"none", "none", "none";
 };
