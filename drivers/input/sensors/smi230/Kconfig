@@ -31,6 +31,7 @@ config SMI230_ACC_DRIVER
 choice
 	prompt "Select ACC interrupt source"
 	depends on (!SMI230_DATA_SYNC) && SMI230_ACC_DRIVER
+	default SMI230_ACC_INT2
 
     config SMI230_ACC_INT1
 	bool "use int1 as source"
@@ -54,6 +55,7 @@ config SMI230_GYRO_DRIVER
 choice
 	prompt "Select GYRO interrupt source"
 	depends on (!SMI230_DATA_SYNC) && SMI230_GYRO_DRIVER
+	default SMI230_GYRO_INT4
 
     config SMI230_GYRO_INT3
 	bool "use int3 as source"

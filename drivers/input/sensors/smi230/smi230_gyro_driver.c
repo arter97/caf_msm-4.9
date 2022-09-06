@@ -6,8 +6,8 @@
  * GPL LICENSE
  * Copyright (c) 2020-2021 Robert Bosch GmbH. All rights reserved.
  *
- * This file is free software licensed under the terms of version 2 
- * of the GNU General Public License, available from the file LICENSE-GPL 
+ * This file is free software licensed under the terms of version 2
+ * of the GNU General Public License, available from the file LICENSE-GPL
  * in the main directory of this source tree.
  *
  * BSD LICENSE
@@ -52,6 +52,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/time64.h>
 
 #include "smi230_driver.h"
 #include "smi230_data_sync.h"
@@ -74,7 +75,7 @@ struct smi230_client_data {
 	struct device *dev;
 	struct input_dev *input;
 	int IRQ;
-	uint8_t gpio_pin;
+	int gpio_pin;
 	struct work_struct irq_work;
 	uint64_t timestamp;
 };
@@ -459,6 +460,9 @@ static void smi230_gyro_fifo_handle(
 	struct smi230_fifo_frame fifo;
 	int err = 0, i;
 	uint8_t fifo_length, extract_length;
+	uint32_t tsamp;
+	uint64_t timestamp_ns;
+	struct timespec64 ts;
 
 	err = smi230_gyro_get_fifo_length(&fifo_length, p_smi230_dev);
 	if (err != SMI230_OK) {
@@ -484,30 +488,63 @@ static void smi230_gyro_fifo_handle(
 	input_sync(client_data->input);
 #endif
 
+	switch (p_smi230_dev->gyro_cfg.odr) {
+	case SMI230_GYRO_BW_523_ODR_2000_HZ:
+		tsamp = 500000;
+		break;
+	case SMI230_GYRO_BW_230_ODR_2000_HZ:
+		tsamp = 500000;
+		break;
+	case SMI230_GYRO_BW_116_ODR_1000_HZ:
+		tsamp = 1000000;
+		break;
+	case SMI230_GYRO_BW_47_ODR_400_HZ:
+		tsamp = 2500000;
+		break;
+	case SMI230_GYRO_BW_23_ODR_200_HZ:
+		tsamp = 5000000;
+		break;
+	case SMI230_GYRO_BW_12_ODR_100_HZ:
+		tsamp = 10000000;
+		break;
+	case SMI230_GYRO_BW_64_ODR_200_HZ:
+		tsamp = 5000000;
+		break;
+	case SMI230_GYRO_BW_32_ODR_100_HZ:
+		tsamp = 10000000;
+		break;
+	}
+
 	extract_length = SMI230_MAX_GYRO_FIFO_FRAME;
 	err = smi230_gyro_extract_fifo(fifo_gyro_data,
                             &extract_length,
                             &fifo,
                             p_smi230_dev);
 
+	timestamp_ns = client_data->timestamp - tsamp * extract_length;
 
 	for (i = 0; i < extract_length; i++) {
-		input_event(client_data->input, EV_ABS, ABS_X, (int)fifo_gyro_data[i].x);
-		input_event(client_data->input, EV_ABS, ABS_Y, (int)fifo_gyro_data[i].y);
-		input_event(client_data->input, EV_ABS, ABS_Z, (int)fifo_gyro_data[i].z);
+		timestamp_ns += tsamp;
+		ts = ns_to_timespec64(timestamp_ns);
+
+		input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+		input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+		input_event(client_data->input, EV_MSC, MSC_RAW, (int)fifo_gyro_data[i].x);
+		input_event(client_data->input, EV_MSC, MSC_RAW, (int)fifo_gyro_data[i].y);
+		input_event(client_data->input, EV_MSC, MSC_RAW, (int)fifo_gyro_data[i].z);
 		input_sync(client_data->input);
 	}
 }
 
 #else /* new data */
 
-static void smi230_new_data_ready_handle(
+__maybe_unused static void smi230_new_data_ready_handle(
 	struct smi230_client_data *client_data)
 {
 	struct smi230_sensor_data gyro_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_gyro_get_data(&gyro_data, p_smi230_dev);
 	if (err != SMI230_OK)
@@ -515,16 +552,16 @@ static void smi230_new_data_ready_handle(
 
 	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
 	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)gyro_data.x);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)gyro_data.y);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)gyro_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)gyro_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)gyro_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)gyro_data.z);
 
 	input_sync(client_data->input);
 }
 #endif
 #endif
 
-static void smi230_irq_work_func(struct work_struct *work)
+__maybe_unused static void smi230_irq_work_func(struct work_struct *work)
 {
 #ifndef CONFIG_SMI230_DATA_SYNC
 	struct smi230_client_data *client_data =
@@ -552,14 +589,14 @@ static irqreturn_t smi230_irq_handle(int irq, void *handle)
 	return IRQ_HANDLED;
 }
 
-static void smi230_free_irq(struct smi230_client_data *client_data)
+__maybe_unused static void smi230_free_irq(struct smi230_client_data *client_data)
 {
 	cancel_work_sync(&client_data->irq_work);
 	free_irq(client_data->IRQ, client_data);
 	gpio_free(client_data->gpio_pin);
 }
 
-static int smi230_request_irq(struct smi230_client_data *client_data)
+__maybe_unused static int smi230_request_irq(struct smi230_client_data *client_data)
 {
 	int err = 0;
 
@@ -606,7 +643,9 @@ int smi230_gyro_remove(struct device *dev)
 	struct smi230_client_data *client_data = dev_get_drvdata(dev);
 
 	if (NULL != client_data) {
+#ifndef CONFIG_SMI230_DATA_SYNC
 		smi230_free_irq(client_data);
+#endif
 		sysfs_remove_group(&client_data->input->dev.kobj,
 				&smi230_attribute_group);
 		smi230_input_destroy(client_data);
@@ -688,11 +727,6 @@ int smi230_gyro_probe(struct device *dev, struct smi230_dev *smi230_dev)
 	err |= smi230_gyro_set_int_config(&int_config.gyro_int_config_2, p_smi230_dev);
 #endif
 
-	p_smi230_dev->gyro_cfg.odr = SMI230_GYRO_BW_523_ODR_2000_HZ;
-	p_smi230_dev->gyro_cfg.range = SMI230_GYRO_RANGE_2000_DPS;
-        err |= smi230_gyro_set_meas_conf(p_smi230_dev);
-	smi230_delay(100);
-
 	fifo_config.mode = SMI230_GYRO_FIFO_MODE;
 #ifdef CONFIG_SMI230_GYRO_FIFO_WM
 	/* 0x88 to enable wm int, 0x80 to disable */
@@ -703,7 +737,7 @@ int smi230_gyro_probe(struct device *dev, struct smi230_dev *smi230_dev)
 #endif
 #ifdef CONFIG_SMI230_GYRO_FIFO_FULL
 	PINFO("GYRO FIFO full enabled");
-	fifo_config.wm_en = 0x80;
+	fifo_config.wm_en = 0x08;
 #endif
 
 	/* disable external event sync on both int3 and int 4 */
@@ -718,8 +752,6 @@ int smi230_gyro_probe(struct device *dev, struct smi230_dev *smi230_dev)
 		PERR("FIFO HW init failed");
 		goto exit_free_client_data;
 	}
-
-	smi230_delay(100);
 
 #else /* new data */
 
@@ -779,18 +811,21 @@ int smi230_gyro_probe(struct device *dev, struct smi230_dev *smi230_dev)
 	}
 
 	/*request irq and config*/
+#ifndef CONFIG_SMI230_DATA_SYNC
 	err = smi230_request_irq(client_data);
 	if (err < 0) {
 		PERR("Request irq failed");
 		goto exit_cleanup_sysfs;
 	}
-
+#endif
 	PINFO("Sensor %s was probed successfully", SENSOR_GYRO_NAME);
 
 	return 0;
+#ifndef CONFIG_SMI230_DATA_SYNC
 exit_cleanup_sysfs:
 	sysfs_remove_group(&client_data->input->dev.kobj,
 		&smi230_attribute_group);
+#endif
 exit_cleanup_input:
 	smi230_input_destroy(client_data);
 exit_free_client_data:

@@ -6,8 +6,8 @@
  * GPL LICENSE
  * Copyright (c) 2020-2021 Robert Bosch GmbH. All rights reserved.
  *
- * This file is free software licensed under the terms of version 2 
- * of the GNU General Public License, available from the file LICENSE-GPL 
+ * This file is free software licensed under the terms of version 2
+ * of the GNU General Public License, available from the file LICENSE-GPL
  * in the main directory of this source tree.
  *
  * BSD LICENSE
@@ -52,6 +52,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/time64.h>
 #include <linux/timekeeping.h>
 
 #include "smi230_driver.h"
@@ -78,12 +79,13 @@ struct smi230_client_data {
 	struct device *dev;
 	struct input_dev *input;
 	int IRQ;
-	uint8_t gpio_pin;
+	int gpio_pin;
 	struct work_struct irq_work;
 	uint64_t timestamp;
 };
 
 static struct smi230_dev *p_smi230_dev;
+static struct workqueue_struct* p_workqueue;
 static struct smi230_anymotion_cfg anymotion_cfg;
 static struct smi230_orient_cfg orientation_cfg;
 static struct smi230_no_motion_cfg no_motion_cfg;
@@ -261,6 +263,12 @@ static ssize_t smi230_acc_store_datasync_odr(struct device *dev,
 		break;
 	case 400:
 		sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_400HZ;
+		break;
+	case 200:
+		sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_200HZ;
+		break;
+	case 100:
+		sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_100HZ;
 		break;
 	case 0:
 		sync_cfg.mode = SMI230_ACCEL_DATA_SYNC_MODE_OFF;
@@ -1500,6 +1508,7 @@ static void smi230_data_sync_ready_handle(
 	struct smi230_sensor_data accel_data;
 	struct smi230_sensor_data gyro_data;
 	struct smi230_sensor_data accel_sync;
+	struct timespec64 ts;
 	int err = 0;
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
@@ -1509,15 +1518,19 @@ static void smi230_data_sync_ready_handle(
 	if (err != SMI230_OK)
 		return;
 
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_sync.x);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_sync.y);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_sync.z);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)gyro_data.x);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)gyro_data.y);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)gyro_data.z);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.x);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.y);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.z);
+	ts = ns_to_timespec64(client_data->timestamp);
+
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_sync.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_sync.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_sync.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)gyro_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)gyro_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)gyro_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
 
 	input_sync(client_data->input);
 }
@@ -1529,8 +1542,8 @@ static void smi230_orientation_handle(
 	struct smi230_orient_out orient_out;
 	struct smi230_sensor_data accel_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
@@ -1562,8 +1575,8 @@ static void smi230_no_motion_handle(
 {
 	struct smi230_sensor_data accel_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
@@ -1586,8 +1599,8 @@ static void smi230_anymotion_handle(
 {
 	struct smi230_sensor_data accel_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
@@ -1612,8 +1625,8 @@ static void smi230_high_g_handle(
 	struct smi230_high_g_out high_g_out;
 	struct smi230_sensor_data accel_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
@@ -1645,8 +1658,8 @@ static void smi230_low_g_handle(
 {
 	struct smi230_sensor_data accel_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
@@ -1673,6 +1686,9 @@ static void smi230_acc_fifo_handle(
 	struct smi230_fifo_frame fifo;
 	int err = 0, i;
 	uint16_t fifo_length;
+	uint32_t tsamp;
+	uint64_t timestamp_ns;
+	struct timespec64 ts;
 
 	err = smi230_acc_get_fifo_length(&fifo.length, p_smi230_dev);
 	if (err != SMI230_OK) {
@@ -1707,6 +1723,33 @@ static void smi230_acc_fifo_handle(
 	input_sync(client_data->input);
 #endif
 
+	switch (p_smi230_dev->accel_cfg.odr) {
+	case SMI230_ACCEL_ODR_12_5_HZ:
+		tsamp = 80000000;
+		break;
+	case SMI230_ACCEL_ODR_25_HZ:
+		tsamp = 40000000;
+		break;
+	case SMI230_ACCEL_ODR_50_HZ:
+		tsamp = 20000000;
+		break;
+	case SMI230_ACCEL_ODR_100_HZ:
+		tsamp = 10000000;
+		break;
+	case SMI230_ACCEL_ODR_200_HZ:
+		tsamp = 5000000;
+		break;
+	case SMI230_ACCEL_ODR_400_HZ:
+		tsamp = 2500000;
+		break;
+	case SMI230_ACCEL_ODR_800_HZ:
+		tsamp = 1250000;
+		break;
+	case SMI230_ACCEL_ODR_1600_HZ:
+		tsamp = 625000;
+		break;
+	}
+
 	/* make sure all frames are read out,
 	 * the actual frame numbers will be returned
 	 * through fifo_length itself*/
@@ -1716,32 +1759,40 @@ static void smi230_acc_fifo_handle(
                             &fifo,
                             p_smi230_dev);
 
+	timestamp_ns = client_data->timestamp - tsamp * fifo_length;
+
 	for (i = 0; i < fifo_length; i++) {
-		input_event(client_data->input, EV_ABS, ABS_X, (int)fifo_accel_data[i].x);
-		input_event(client_data->input, EV_ABS, ABS_Y, (int)fifo_accel_data[i].y);
-		input_event(client_data->input, EV_ABS, ABS_Z, (int)fifo_accel_data[i].z);
+		timestamp_ns += tsamp;
+		ts = ns_to_timespec64(timestamp_ns);
+
+		input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
+		input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
+		input_event(client_data->input, EV_MSC, MSC_RAW, (int)fifo_accel_data[i].x);
+		input_event(client_data->input, EV_MSC, MSC_RAW, (int)fifo_accel_data[i].y);
+		input_event(client_data->input, EV_MSC, MSC_RAW, (int)fifo_accel_data[i].z);
 		input_sync(client_data->input);
 	}
 }
 
 #else /* new data */
 
-static void smi230_new_data_ready_handle(
+__maybe_unused static void smi230_new_data_ready_handle(
 	struct smi230_client_data *client_data)
 {
 	struct smi230_sensor_data accel_data;
 	int err = 0;
-	struct timespec ts;
-	ts = ns_to_timespec(client_data->timestamp);
+	struct timespec64 ts;
+	ts = ns_to_timespec64(client_data->timestamp);
 
 	err = smi230_acc_get_data(&accel_data, p_smi230_dev);
 	if (err != SMI230_OK)
 		return;
+
 	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_sec);
 	input_event(client_data->input, EV_MSC, MSC_TIMESTAMP, ts.tv_nsec);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.x);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.y);
-	input_event(client_data->input, EV_MSC, MSC_GESTURE, (int)accel_data.z);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.x);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.y);
+	input_event(client_data->input, EV_MSC, MSC_RAW, (int)accel_data.z);
 
 	input_sync(client_data->input);
 }
@@ -1760,14 +1811,12 @@ static void smi230_irq_work_func(struct work_struct *work)
 		return;
 	}
 
-#ifdef CONFIG_SMI230_ACC_FIFO
+#if defined(CONFIG_SMI230_ACC_FIFO)
 	smi230_acc_fifo_handle(client_data);
+#elif defined(CONFIG_SMI230_DATA_SYNC)
+	smi230_data_sync_ready_handle(client_data);
 #else
 	smi230_new_data_ready_handle(client_data);
-#endif
-
-#ifdef CONFIG_SMI230_DATA_SYNC
-	smi230_data_sync_ready_handle(client_data);
 #endif
 
 	if ((int_stat & SMI230_ACCEL_ANY_MOT_INT_ENABLE) != 0)
@@ -1791,9 +1840,9 @@ static irqreturn_t smi230_irq_handle(int irq, void *handle)
 	struct smi230_client_data *client_data = handle;
 	int err = 0;
 
-	client_data->timestamp= ktime_get_ns();
+	client_data->timestamp= ktime_get_boottime_ns();
 
-	err = schedule_work(&client_data->irq_work);
+	err = queue_work(p_workqueue, &client_data->irq_work);
 	if (err < 0)
 		PERR("schedule_work failed\n");
 
@@ -1805,12 +1854,14 @@ static void smi230_free_irq(struct smi230_client_data *client_data)
 	cancel_work_sync(&client_data->irq_work);
 	free_irq(client_data->IRQ, client_data);
 	gpio_free(client_data->gpio_pin);
+	destroy_workqueue(p_workqueue);
 }
 
 static int smi230_request_irq(struct smi230_client_data *client_data)
 {
 	int err = 0;
 
+	p_workqueue = create_singlethread_workqueue("smi230");
 	INIT_WORK(&client_data->irq_work, smi230_irq_work_func);
 
 	client_data->gpio_pin = of_get_named_gpio_flags(
@@ -1989,7 +2040,7 @@ int smi230_acc_probe(struct device *dev, struct smi230_dev *smi230_dev)
 #endif
 
 	PINFO("sensor features enabled");
-	/* API uploads the smi230 config file onto the device and wait for 150ms 
+	/* API uploads the smi230 config file onto the device and wait for 150ms
 	   to enable the data synchronization - delay taken care inside the function */
 	err |= smi230_apply_config_file(p_smi230_dev);
         if (err == SMI230_OK)

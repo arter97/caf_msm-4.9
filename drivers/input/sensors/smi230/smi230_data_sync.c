@@ -155,6 +155,18 @@ int8_t smi230_configure_data_synchronization(struct smi230_data_sync_cfg sync_cf
                 dev->gyro_cfg.odr = SMI230_GYRO_BW_47_ODR_400_HZ;
                 dev->gyro_cfg.bw = SMI230_GYRO_BW_47_ODR_400_HZ;
                 break;
+            case SMI230_ACCEL_DATA_SYNC_MODE_100HZ:
+                dev->accel_cfg.odr = SMI230_ACCEL_ODR_400_HZ;
+                dev->accel_cfg.bw = SMI230_ACCEL_BW_OSR4;
+                dev->gyro_cfg.odr = SMI230_GYRO_BW_32_ODR_100_HZ;
+                dev->gyro_cfg.bw = SMI230_GYRO_BW_32_ODR_100_HZ;
+                break;
+            case SMI230_ACCEL_DATA_SYNC_MODE_200HZ:
+                dev->accel_cfg.odr = SMI230_ACCEL_ODR_800_HZ;
+                dev->accel_cfg.bw = SMI230_ACCEL_BW_OSR4;
+                dev->gyro_cfg.odr = SMI230_GYRO_BW_64_ODR_200_HZ;
+                dev->gyro_cfg.bw = SMI230_GYRO_BW_64_ODR_200_HZ;
+                break;
             default:
                 break;
         }
