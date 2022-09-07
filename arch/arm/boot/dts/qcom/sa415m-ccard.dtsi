@@ -487,3 +487,8 @@
 	regulator-min-microvolt = <1800000>;
 	regulator-max-microvolt = <1800000>;
 };
+
+&pcie0 {
+	/delete-property/ qcom,l1-supported;
+	/delete-property/ qcom,l1ss-supported;
+};
