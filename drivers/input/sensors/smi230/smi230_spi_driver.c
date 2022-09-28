@@ -91,7 +91,9 @@ static int8_t smi230_spi_write(uint8_t dev_addr,
 static int8_t smi230_spi_read(uint8_t dev_addr,
 	uint8_t reg_addr, uint8_t *data, uint16_t len)
 {
+#ifdef CONFIG_SMI230_DEBUG
 	int ret;
+#endif
 	uint16_t index;
 	struct spi_message msg;
 	struct spi_transfer xfer[2] = {
@@ -313,5 +315,3 @@ module_exit(smi230_module_exit);
 
 MODULE_DESCRIPTION("SMI230 SENSOR DRIVER");
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_VERSION(DRIVER_VERSION);
-
