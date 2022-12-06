@@ -66,6 +66,25 @@
 };
 
 &i2c_4 {
+	smi230_gyro@68 {
+		compatible = "SMI230GYRO";
+		reg = <0x68>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sensor_int1_default>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <78 IRQ_TYPE_EDGE_RISING>;
+		gpio_irq = <&tlmm 78 IRQ_TYPE_EDGE_RISING>;
+	};
+
+	smi230_acc@18 {
+		compatible = "SMI230ACC";
+		reg = <0x18>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sensor_int2_default>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <79 IRQ_TYPE_EDGE_RISING>;
+		gpio_irq = <&tlmm 79 IRQ_TYPE_EDGE_RISING>;
+	};
 	asm330@6a {
 		reg = <0x6b>;
 		asm330-enable-gpio = <&tlmm 90 0x1>;
