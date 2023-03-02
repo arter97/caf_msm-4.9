@@ -1,4 +1,5 @@
 /* Copyright (c) 2014-2016,2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +18,8 @@
 #include <linux/mhi.h>
 #include <net/sock.h>
 #include <linux/of.h>
+#include <linux/kthread.h>
+#include <linux/sched.h>
 
 static int ipc_router_mhi_xprt_debug_mask;
 module_param_named(debug_mask, ipc_router_mhi_xprt_debug_mask,
@@ -38,12 +41,17 @@ struct ipc_router_mhi_xprt {
 	char xprt_name[XPRT_NAME_LEN];
 	struct msm_ipc_router_xprt xprt;
 	spinlock_t ul_lock;		/* lock to protect ul_pkts */
+	spinlock_t dl_lock;
 	struct list_head ul_pkts;
+	struct list_head dl_pkts;
 	atomic_t in_reset;
 	struct completion sft_close_complete;
 	unsigned int xprt_version;
 	unsigned int xprt_option;
 	struct rr_packet *in_pkt;
+	struct kthread_work kwork;
+	struct kthread_worker kworker;
+	struct task_struct *task;
 };
 
 struct ipc_router_mhi_pkt {
@@ -53,6 +61,30 @@ struct ipc_router_mhi_pkt {
 	struct completion done;
 };
 
+static void mhi_xprt_dl_data(struct kthread_work *work)
+{
+	struct ipc_router_mhi_xprt *mhi_xprtp = container_of(work, struct ipc_router_mhi_xprt, kwork);
+	struct ipc_router_mhi_pkt *pkt, *tmp;
+	unsigned long flags;
+
+	spin_lock_irqsave(&mhi_xprtp->dl_lock, flags);
+
+	list_for_each_entry_safe(pkt, tmp, &mhi_xprtp->dl_pkts, node) {
+		if(!pkt->rr_pkt)
+			continue;
+
+		list_del(&pkt->node);
+
+		spin_unlock_irqrestore(&mhi_xprtp->dl_lock, flags);
+		msm_ipc_router_xprt_notify(&mhi_xprtp->xprt, IPC_ROUTER_XPRT_EVENT_DATA,
+					   (void *)pkt->rr_pkt);
+		release_pkt(pkt->rr_pkt);
+		kfree(pkt);
+		spin_lock_irqsave(&mhi_xprtp->dl_lock, flags);
+	}
+	spin_unlock_irqrestore(&mhi_xprtp->dl_lock, flags);
+
+}
 static void ipc_router_mhi_pkt_release(struct kref *ref)
 {
 	struct rr_packet *pkt = container_of(ref, struct rr_packet,
@@ -68,17 +100,28 @@ static void qcom_mhi_ipc_router_dl_callback(struct mhi_device *mhi_dev,
 	struct ipc_router_mhi_xprt *mhi_xprtp = dev_get_drvdata(&mhi_dev->dev);
 	struct sk_buff *skb;
 	void *dest_buf;
+	unsigned long flags;
+	struct ipc_router_mhi_pkt *mhi_pkt;
 
 	if (!mhi_xprtp || mhi_res->transaction_status) {
 		D("%s: Transport error transaction_status %d\n",
 		__func__, mhi_res->transaction_status);
 		return;
 	}
+
+	mhi_pkt = kzalloc(sizeof(*mhi_pkt), GFP_ATOMIC);
+
+	if(!mhi_pkt) {
+		IPC_RTR_ERR("%s: Failed to allocate memory for mhi packet\n",
+			    __func__);
+		return;
+	}
 	/* Create a new rr_packet */
-	mhi_xprtp->in_pkt = create_pkt(NULL);
-	if (!mhi_xprtp->in_pkt) {
+	mhi_pkt->rr_pkt = create_pkt(NULL);
+	if (!mhi_pkt->rr_pkt) {
 		IPC_RTR_ERR("%s: Couldn't alloc rr_packet\n",
-					__func__);
+			    __func__);
+		kfree(mhi_pkt);
 		return;
 	}
 	D("%s: Allocated rr_packet\n", __func__);
@@ -87,19 +130,21 @@ static void qcom_mhi_ipc_router_dl_callback(struct mhi_device *mhi_dev,
 	if (!skb) {
 		IPC_RTR_ERR("%s: Couldn't alloc skb\n",
 				__func__);
-		release_pkt(mhi_xprtp->in_pkt);
+		release_pkt(mhi_pkt->rr_pkt);
+		kfree(mhi_pkt);
 		return;
 	}
 	dest_buf = skb_put(skb, mhi_res->bytes_xferd);
 	memcpy(dest_buf, mhi_res->buf_addr, mhi_res->bytes_xferd);
-	mhi_xprtp->in_pkt->length = mhi_res->bytes_xferd;
-	skb_queue_tail(mhi_xprtp->in_pkt->pkt_fragment_q, skb);
+	mhi_pkt->rr_pkt->length =  mhi_res->bytes_xferd;
 
-	msm_ipc_router_xprt_notify(&mhi_xprtp->xprt,
-						IPC_ROUTER_XPRT_EVENT_DATA,
-						(void *)mhi_xprtp->in_pkt);
-	release_pkt(mhi_xprtp->in_pkt);
-	mhi_xprtp->in_pkt = NULL;
+	skb_queue_tail(mhi_pkt->rr_pkt->pkt_fragment_q, skb);
+
+	spin_lock_irqsave(&mhi_xprtp->dl_lock, flags);
+	list_add_tail(&mhi_pkt->node, &mhi_xprtp->dl_pkts);
+	spin_unlock_irqrestore(&mhi_xprtp->dl_lock, flags);
+
+	kthread_queue_work(&mhi_xprtp->kworker, &mhi_xprtp->kwork);
 }
 
 /* from mhi to qrtr */
@@ -343,7 +388,20 @@ static int qcom_mhi_ipc_router_probe(struct mhi_device *mhi_dev,
 	atomic_set(&mhi_xprtp->in_reset, 0);
 
 	INIT_LIST_HEAD(&mhi_xprtp->ul_pkts);
+	INIT_LIST_HEAD(&mhi_xprtp->dl_pkts);
 	spin_lock_init(&mhi_xprtp->ul_lock);
+	spin_lock_init(&mhi_xprtp->dl_lock);
+
+	kthread_init_work(&mhi_xprtp->kwork, mhi_xprt_dl_data);
+	kthread_init_worker(&mhi_xprtp->kworker);
+
+	mhi_xprtp->task = kthread_run(kthread_worker_fn, &mhi_xprtp->kworker,
+				      "%s", "ipcrtr_mhi");
+	if (IS_ERR(mhi_xprtp->task)) {
+		pr_err("%s: failed to spawn mhi_xprt_dl_data kthread %ld\n",
+			__func__, PTR_ERR(mhi_xprtp->task));
+		return PTR_ERR(mhi_xprtp->task);
+	}
 
 	dev_set_drvdata(&mhi_dev->dev, mhi_xprtp);
 
@@ -358,6 +416,8 @@ static int qcom_mhi_ipc_router_probe(struct mhi_device *mhi_dev,
 static void qcom_mhi_ipc_router_remove(struct mhi_device *mhi_dev)
 {
 	struct ipc_router_mhi_xprt *mhi_xprtp = dev_get_drvdata(&mhi_dev->dev);
+	struct ipc_router_mhi_pkt *dl, *tmp;
+	unsigned long flags;
 
 	init_completion(&mhi_xprtp->sft_close_complete);
 	msm_ipc_router_xprt_notify(&mhi_xprtp->xprt,
@@ -365,6 +425,17 @@ static void qcom_mhi_ipc_router_remove(struct mhi_device *mhi_dev)
 	D("%s: Notified IPC Router of %s CLOSE\n",
 		  __func__, mhi_xprtp->xprt.name);
 	wait_for_completion(&mhi_xprtp->sft_close_complete);
+
+	spin_lock_irqsave(&mhi_xprtp->dl_lock, flags);
+	list_for_each_entry_safe(dl, tmp, &mhi_xprtp->dl_pkts, node) {
+		list_del(&dl->node);
+		release_pkt(dl->rr_pkt);
+		kfree(dl);
+	}
+	spin_unlock_irqrestore(&mhi_xprtp->dl_lock, flags);
+
+	kthread_flush_worker(&mhi_xprtp->kworker);
+	kthread_stop(mhi_xprtp->task);
 	dev_set_drvdata(&mhi_dev->dev, NULL);
 }
 
