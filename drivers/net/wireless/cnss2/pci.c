@@ -3430,9 +3430,13 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 	plat_priv->bus_priv = pci_priv;
 
 	ret = of_reserved_mem_device_init(dev);
-	if (ret)
-		cnss_pr_err("Failed to init resered mem device, err = %d\n",
-			    ret);
+	if (ret) {
+		if (ret == -EINVAL)
+			cnss_pr_dbg("Ignore, no specific reserved-memory assigned\n");
+		else
+			cnss_pr_err("Failed to init reserved mem device, err = %d\n",
+				    ret);
+	}
 
 	ret = cnss_pci_get_dev_cfg_node(plat_priv);
 	if (ret) {
