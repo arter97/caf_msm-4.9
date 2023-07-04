@@ -339,6 +339,23 @@
 		};
 	};
 
+	tsens@c222000 {
+		reg = <0xc222000 0x20>,
+		      <0xc263000 0x1ff>;
+		ltvr-resume-trigger;
+		ltvr-sensor-id = <0>;
+		ltvr-trip-temp-delta = <2000>;
+		ltvr-clear-temp-delta = <1000>;
+	};
+};
+
+&thermal_zones {
+	/delete-node/ aoss-usr;
+	/delete-node/ mdm-q6-lowf;
+	/delete-node/ ddrss-lowf;
+	/delete-node/ cpu-lowf;
+	/delete-node/ mdm-core-lowf;
+	/delete-node/ mdm-vpe-lowf;
 };
 
 &ipa_hw {
