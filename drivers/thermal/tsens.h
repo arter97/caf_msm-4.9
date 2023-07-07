@@ -1,4 +1,5 @@
 /* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -107,6 +108,7 @@ struct tsens_ops {
 	int (*dbg)(struct tsens_device *, u32, u32, int *);
 	int (*sensor_en)(struct tsens_device *, u32);
 	int (*calibrate)(struct tsens_device *);
+	int (*resume)(struct tsens_device *);
 };
 
 struct tsens_irqs {
@@ -159,6 +161,11 @@ struct tsens_device {
 	spinlock_t			tsens_upp_low_lock;
 	const struct tsens_data		*ctrl_data;
 	struct tsens_mtc_sysfs  mtcsys;
+	bool			ltvr_resume_trigger;
+	int				ltvr_sensor_id;
+	bool			ltvr_status_support;
+	int				ltvr_trip_temp_delta;
+	int				ltvr_clear_temp_delta;
 	struct tsens_sensor		sensor[0];
 };
 
