@@ -148,6 +148,7 @@
 		thermal-governor = "low_limits_floor";
 		thermal-sensors = <&tsens0 0>;
 		tracks-low;
+		wake-capable-sensor;
 		trips {
 			aoss_trip: aoss-trip {
 				temperature = <5000>;
@@ -181,6 +182,7 @@
 		thermal-governor = "low_limits_floor";
 		thermal-sensors = <&tsens0 1>;
 		tracks-low;
+		wake-capable-sensor;
 		trips {
 			mdm_q6_trip: mdm-q6-trip {
 				temperature = <5000>;
@@ -214,6 +216,7 @@
 		thermal-governor = "low_limits_floor";
 		thermal-sensors = <&tsens0 2>;
 		tracks-low;
+		wake-capable-sensor;
 		trips {
 			ddrss_trip: ddrss-trip {
 				temperature = <5000>;
@@ -247,6 +250,7 @@
 		thermal-governor = "low_limits_floor";
 		thermal-sensors = <&tsens0 3>;
 		tracks-low;
+		wake-capable-sensor;
 		trips {
 			cpu_trip: cpu-trip {
 				temperature = <5000>;
@@ -280,6 +284,7 @@
 		thermal-governor = "low_limits_floor";
 		thermal-sensors = <&tsens0 4>;
 		tracks-low;
+		wake-capable-sensor;
 		trips {
 			mdm_trip: mdm-trip {
 				temperature = <5000>;
@@ -313,6 +318,7 @@
 		thermal-governor = "low_limits_floor";
 		thermal-sensors = <&tsens0 5>;
 		tracks-low;
+		wake-capable-sensor;
 		trips {
 			mdm_vpe_trip: mdm-vpe-trip {
 				temperature = <5000>;
