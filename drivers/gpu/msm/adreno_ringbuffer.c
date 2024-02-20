@@ -29,6 +29,7 @@
 #include "adreno_trace.h"
 
 #include "a3xx_reg.h"
+#include "a6xx_reg.h"
 #include "adreno_a5xx.h"
 
 #define RB_HOSTPTR(_rb, _pos) \
@@ -877,6 +878,8 @@ static inline int _get_alwayson_counter(struct adreno_device *adreno_dev,
 		ADRENO_GPUREV(adreno_dev) <= ADRENO_REV_A530)
 		*p++ = adreno_getreg(adreno_dev,
 			ADRENO_REG_RBBM_ALWAYSON_COUNTER_LO);
+	else if (adreno_is_a6xx(adreno_dev))
+		*p++ = A6XX_CP_ALWAYS_ON_COUNTER_LO | (1 << 30) | (2 << 18);
 	else
 		*p++ = adreno_getreg(adreno_dev,
 			ADRENO_REG_RBBM_ALWAYSON_COUNTER_LO) |
